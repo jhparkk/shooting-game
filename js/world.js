@@ -25,8 +25,8 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '산호 언덕',
-    fog: 0x49d8c4, density: 0.0036,
-    skyTop: 0xc4fff4, skyMid: 0x3fc0c2, skyBottom: 0x0a6b7e,
+    fog: 0x39c6bb, density: 0.0042,
+    skyTop: 0xbdf9ef, skyMid: 0x35b2b6, skyBottom: 0x0a5f74,
     hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 0.95,
     ambient: 0x9ff0e8, ambientI: 0.5,
     sun: 0xfffbee, sunI: 1.5,
@@ -344,7 +344,7 @@ export class World {
           const k = clamp01((n + 1.15) / 2.3);
           // 깊을수록 모래빛에서 차가운 푸른 빛으로, 어둡게
           const dk = clamp01((SURFACE_Y - y) / 90);
-          fc.setHSL(0.40 + dk * 0.2 - k * 0.03, 0.44 - dk * 0.14, 0.34 - dk * 0.19 + k * 0.05);
+          fc.setHSL(0.38 + dk * 0.22 - k * 0.04, 0.52 - dk * 0.18, 0.3 - dk * 0.17 + k * 0.05);
           fcol[i * 3] = fc.r;
           fcol[i * 3 + 1] = fc.g;
           fcol[i * 3 + 2] = fc.b;
@@ -400,7 +400,7 @@ export class World {
           if (kind < 0.45) geo = branchCoralGeometry(color, 700 + seed * 17 + i);
           else if (kind < 0.78) geo = blobCoralGeometry(color, 800 + seed * 19 + i);
           else geo = tubeCoralGeometry(color, 900 + seed * 23 + i);
-          const sc = 1.5 + rnd() * 2.6;
+          const sc = 2.0 + rnd() * 3.0;
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
