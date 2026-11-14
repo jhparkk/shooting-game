@@ -733,9 +733,22 @@ body { touch-action: none; }
   .screen-inner { gap: 8px; }
   .btn-primary { padding: 12px; }
 }
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .stat-value { font-size: 20px; }
-  .bomb-btn { width: 56px; height: 56px; }
+  .bomb-btn { width: 54px; height: 54px; border-radius: 17px; }
+  .alt-btn { width: 46px; height: 46px; border-radius: 14px; font-size: 14px; }
+  .fire-btn { width: 84px; height: 84px; font-size: 13.5px; }
+  .pad-right { gap: 8px; }
+  .joy-label { display: none; }
+}
+@media (max-height: 520px) {
+  .joy-base { width: 100px; height: 100px; }
+  .joy-label { display: none; }
+  .fire-btn { width: 76px; height: 76px; font-size: 13px; }
+  .alt-btn { width: 44px; height: 44px; }
+  .bomb-btn { width: 52px; height: 52px; }
+  .stat-value { font-size: 19px; }
+  .reticle { transform: scale(0.85); }
 }
 @media (prefers-reduced-motion: reduce) {
   .new-record, .loading .bubbles i { animation: none; }
