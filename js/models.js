@@ -162,12 +162,11 @@ export function makeSubmarine() {
 
   // 후미 추진 링
   const thr = new THREE.Mesh(
-    new THREE.TorusGeometry(0.62, 0.07, 6, 18),
-    new THREE.MeshBasicMaterial({ color: 0x7df6ff })
+    new THREE.TorusGeometry(0.58, 0.05, 6, 18),
+    new THREE.MeshBasicMaterial({ color: 0x2ec8c8 })
   );
   thr.position.set(0, 0, 1.72);
   g.add(thr);
-
   // 전조등
   const lampGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.26, 10);
   lampGeo.rotateX(Math.PI / 2);

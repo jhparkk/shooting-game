@@ -378,7 +378,7 @@ function resetGame() {
   player.obj.visible = true;
   player.obj.position.set(0, 0, 0);
   player.obj.rotation.set(0, 0, 0);
-  player.obj.scale.setScalar(0.92);
+  player.obj.scale.setScalar(0.82);
 
   world.zoneIndex = -1;
   world.setZone(0);
@@ -896,11 +896,11 @@ function updateGame(dt) {
   const shakeY = G.shake > 0 ? rand(-1, 1) * G.shake * 0.5 : 0;
   const camTarget = tmpVec.set(
     player.x * 0.62 + shakeX,
-    player.y * 0.62 + 3.0 + shakeY,
-    9.6
+    player.y * 0.6 + 4.0 + shakeY,
+    13.0
   );
   camera.position.lerp(camTarget, 1 - Math.exp(-5.5 * dt));
-  camera.lookAt(player.x * 0.92, player.y + 1.15, -26);
+  camera.lookAt(player.x * 0.92, player.y + 0.25, -26);
   camera.rotation.z += player.roll * 0.06;
   G.shake = Math.max(0, G.shake - dt * 2.2);
 
@@ -1334,8 +1334,8 @@ function boot() {
   buildHearts();
   setText(el.startBest, G.best.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
-  camera.position.set(0, 3.4, 11);
-  camera.lookAt(0, 0.5, -20);
+  camera.position.set(0, 4.2, 13);
+  camera.lookAt(0, 0.3, -24);
   world.update(0, 0, 0);
   renderer.render(scene, camera);
 
@@ -1343,6 +1343,9 @@ function boot() {
   setTimeout(() => { el.loading.style.display = 'none'; }, 800);
 
   G.pingTimer = 4;
+  if (new URLSearchParams(location.search).has('debug')) {
+    window.__abyss = { G, enemies, world, startWave, startGame, spawnBoss, damageBoss, removeBoss };
+  }
   loop();
 }
 

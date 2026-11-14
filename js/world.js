@@ -223,9 +223,9 @@ export class World {
       m.makeRotationY(rnd() * Math.PI * 2);
       const x = (rnd() - 0.5) * 44;
       const z = (rnd() - 0.5) * SEG_LEN;
-      m.setPosition(x, floorHeight(x, z) + r * 0.2, z);
+      m.setPosition(x, floorHeight(x, z) - r * 0.15, z);
       geo.applyMatrix4(m);
-      const shade = 0.16 + rnd() * 0.16;
+      const shade = 0.07 + rnd() * 0.1;
       paint(geo, new THREE.Color().setHSL(0.52, 0.16, shade).getHex());
       rockGeos.push(geo);
     }
