@@ -120,7 +120,7 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.02;
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 400);
@@ -378,7 +378,7 @@ function resetGame() {
   player.obj.visible = true;
   player.obj.position.set(0, 0, 0);
   player.obj.rotation.set(0, 0, 0);
-  player.obj.scale.setScalar(1);
+  player.obj.scale.setScalar(0.92);
 
   world.zoneIndex = -1;
   world.setZone(0);
@@ -896,11 +896,11 @@ function updateGame(dt) {
   const shakeY = G.shake > 0 ? rand(-1, 1) * G.shake * 0.5 : 0;
   const camTarget = tmpVec.set(
     player.x * 0.62 + shakeX,
-    player.y * 0.62 + 2.7 + shakeY,
+    player.y * 0.62 + 3.0 + shakeY,
     9.6
   );
   camera.position.lerp(camTarget, 1 - Math.exp(-5.5 * dt));
-  camera.lookAt(player.x * 0.9, player.y * 0.9 + 0.15, -24);
+  camera.lookAt(player.x * 0.92, player.y + 1.15, -26);
   camera.rotation.z += player.roll * 0.06;
   G.shake = Math.max(0, G.shake - dt * 2.2);
 

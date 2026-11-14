@@ -54,12 +54,12 @@ export function paint(geo, color) {
 }
 
 const MET = {
-  hull: new THREE.MeshPhongMaterial({ color: 0xf2e3c4, shininess: 70, specular: 0x557788 }),
-  hullDark: new THREE.MeshPhongMaterial({ color: 0xd9c9a8, shininess: 40, specular: 0x334455 }),
-  accent: new THREE.MeshPhongMaterial({ color: 0xff9a3c, shininess: 60, specular: 0x996633 }),
+  hull: new THREE.MeshPhongMaterial({ color: 0xffc172, shininess: 78, specular: 0x6b8fa8 }),
+  hullDark: new THREE.MeshPhongMaterial({ color: 0xe89a45, shininess: 46, specular: 0x334455 }),
+  accent: new THREE.MeshPhongMaterial({ color: 0x2b3d55, shininess: 70, specular: 0x7799bb }),
   glass: new THREE.MeshPhongMaterial({
-    color: 0x9ef6ff, emissive: 0x1d7681, emissiveIntensity: 0.9,
-    transparent: true, opacity: 0.62, shininess: 110, specular: 0xffffff,
+    color: 0x9ef6ff, emissive: 0x1f8b96, emissiveIntensity: 1.1,
+    transparent: true, opacity: 0.66, shininess: 120, specular: 0xffffff,
   }),
   metal: new THREE.MeshPhongMaterial({ color: 0x6d7d8a, shininess: 120, specular: 0xd0e6ff }),
   metalDark: new THREE.MeshPhongMaterial({ color: 0x2b3540, shininess: 90, specular: 0x88aacc }),
@@ -95,7 +95,7 @@ export function makeSubmarine() {
   const g = new THREE.Group();
 
   const body = new THREE.SphereGeometry(1, 18, 14);
-  body.scale(0.95, 0.86, 2.0);
+  body.scale(0.86, 0.78, 2.05);
   g.add(mesh(body, MET.hull));
 
   // 하부 선체
@@ -159,6 +159,14 @@ export function makeSubmarine() {
   }
   prop.rotation.x = Math.PI / 2;
   g.add(prop);
+
+  // 후미 추진 링
+  const thr = new THREE.Mesh(
+    new THREE.TorusGeometry(0.62, 0.07, 6, 18),
+    new THREE.MeshBasicMaterial({ color: 0x7df6ff })
+  );
+  thr.position.set(0, 0, 1.72);
+  g.add(thr);
 
   // 전조등
   const lampGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.26, 10);
@@ -283,8 +291,8 @@ function jellyGeometries() {
   _jellyBell = bell;
 
   const parts = [];
-  const tGeo = new THREE.CylinderGeometry(0.03, 0.012, 1.8, 4);
-  tGeo.translate(0, -0.9, 0);
+  const tGeo = new THREE.CylinderGeometry(0.03, 0.012, 2.4, 4);
+  tGeo.translate(0, -1.2, 0);
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
     parts.push(placed(tGeo, [Math.cos(a) * 0.48, -0.12, Math.sin(a) * 0.48],
@@ -302,8 +310,8 @@ export function makeJellyfish(color) {
   const bell = new THREE.Mesh(
     _jellyBell,
     new THREE.MeshPhongMaterial({
-      color: color, emissive: color, emissiveIntensity: 0.6,
-      transparent: true, opacity: 0.5, shininess: 80, side: THREE.DoubleSide,
+      color: color, emissive: color, emissiveIntensity: 1.15,
+      transparent: true, opacity: 0.34, shininess: 90, side: THREE.DoubleSide,
       depthWrite: false,
     })
   );
@@ -323,11 +331,11 @@ export function makeJellyfish(color) {
 
   const tentacles = new THREE.Mesh(
     _jellyTentGeo,
-    new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.55, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.42, depthWrite: false })
   );
   g.add(tentacles);
 
-  const glow = spriteGlow(color, 4.4, 0.5);
+  const glow = spriteGlow(color, 5.2, 0.32);
   g.add(glow);
   return { group: g, bell, tentacles, rim, glow };
 }
@@ -743,9 +751,9 @@ export function branchCoralGeometry(color, seed) {
 /** 부채형/뇌형 산호 */
 export function blobCoralGeometry(color, seed) {
   const rnd = mulberry(seed);
-  const geo = new THREE.SphereGeometry(0.35 + rnd() * 0.35, 8, 6);
-  geo.scale(1 + rnd() * 0.5, 0.55 + rnd() * 0.5, 1 + rnd() * 0.4);
-  geo.translate(0, 0.25, 0);
+  const geo = new THREE.SphereGeometry(0.28 + rnd() * 0.24, 8, 6);
+  geo.scale(1 + rnd() * 0.45, 0.5 + rnd() * 0.4, 1 + rnd() * 0.35);
+  geo.translate(0, 0.2, 0);
   return paint(geo, color);
 }
 

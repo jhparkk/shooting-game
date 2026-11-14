@@ -13,33 +13,33 @@ import {
 export const ZONES = [
   {
     name: '산호초 지대',
-    fog: 0x14707c, density: 0.016,
-    hemiSky: 0xa8f0f4, hemiGround: 0x0d4a52, hemi: 1.35,
-    dir: 1.65, dirColor: 0xdcfbff,
+    fog: 0x0a5b6d, density: 0.017,
+    hemiSky: 0x9fe8f0, hemiGround: 0x073039, hemi: 0.85,
+    dir: 1.15, dirColor: 0xd6f7ff,
     tint: 0xffffff,
-    skyTop: 0x37b8c4, skyMid: 0x0b5f74, skyBottom: 0x03202e,
+    skyTop: 0x2b9aa8, skyMid: 0x08495c, skyBottom: 0x02141f,
     coral: [0xff7f6b, 0xffb347, 0xd96bd0, 0xff9ecb, 0xf7e04f, 0x7de0d0],
     kelp: 0x2f6b34,
   },
   {
     name: '해저 협곡',
-    fog: 0x0a4a63, density: 0.019,
-    hemiSky: 0x86d8ec, hemiGround: 0x0a2d3c, hemi: 1.0,
-    dir: 1.1, dirColor: 0xc4ecff,
-    tint: 0xb9d6e6,
-    skyTop: 0x1e7f97, skyMid: 0x074056, skyBottom: 0x021523,
+    fog: 0x073e56, density: 0.020,
+    hemiSky: 0x7ccbe0, hemiGround: 0x06222e, hemi: 0.66,
+    dir: 0.95, dirColor: 0xbce8ff,
+    tint: 0xa8c6d8,
+    skyTop: 0x1a7188, skyMid: 0x063347, skyBottom: 0x020f1b,
     coral: [0xd06a8a, 0xc98f4a, 0x9b6bd0, 0x6fa8b8, 0xb86b5a],
     kelp: 0x2b5738,
   },
   {
     name: '심해 발광 지대',
-    fog: 0x05102c, density: 0.022,
-    hemiSky: 0x4d6ea8, hemiGround: 0x050c22, hemi: 0.6,
-    dir: 0.45, dirColor: 0x7fa8e0,
-    tint: 0x8f9cf0,
-    skyTop: 0x0a2246, skyMid: 0x040d25, skyBottom: 0x01040e,
+    fog: 0x040c24, density: 0.023,
+    hemiSky: 0x4d6ea8, hemiGround: 0x040a1c, hemi: 0.42,
+    dir: 0.38, dirColor: 0x7fa8e0,
+    tint: 0x7c88e0,
+    skyTop: 0x081a38, skyMid: 0x030a1e, skyBottom: 0x01030a,
     coral: [0x6ef0ff, 0xb47bff, 0xff6ec7, 0x4ae0b0, 0x9affff],
-    kelp: 0x1b4a5a,
+    kelp: 0x18404f,
   },
 ];
 
@@ -180,7 +180,7 @@ export class World {
     this.sun.position.set(-14, 40, 8);
     this.scene.add(this.sun);
 
-    this.rim = new THREE.DirectionalLight(0x66e0ff, 0.5);
+    this.rim = new THREE.DirectionalLight(0x66e0ff, 0.35);
     this.rim.position.set(12, -8, -30);
     this.scene.add(this.rim);
   }
@@ -209,7 +209,7 @@ export class World {
       fp.setY(i, floorHeight(fp.getX(i), fp.getZ(i)));
     }
     floorGeo.computeVertexNormals();
-    paint(floorGeo, 0x2b4a4a);
+    paint(floorGeo, 0x1d3a3c);
     const floorMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     group.add(floor);
@@ -242,7 +242,7 @@ export class World {
       if (kind < 0.45) geo = branchCoralGeometry(color, 700 + seed * 17 + i);
       else if (kind < 0.78) geo = blobCoralGeometry(color, 800 + seed * 19 + i);
       else geo = tubeCoralGeometry(color, 900 + seed * 23 + i);
-      const scale = 0.7 + rnd() * 1.5;
+      const scale = 0.55 + rnd() * 0.9;
       const m = new THREE.Matrix4();
       m.makeRotationY(rnd() * Math.PI * 2);
       m.scale(new THREE.Vector3(scale, scale * (0.8 + rnd() * 0.6), scale));
@@ -260,7 +260,7 @@ export class World {
     const kelpGeos = [];
     for (let i = 0; i < 22; i++) {
       const h = 3 + rnd() * 6.5;
-      const w = 0.9 + rnd() * 0.8;
+      const w = 0.45 + rnd() * 0.5;
       const geo = kelpGeometry(h, w, 300 + seed * 13 + i);
       const m = new THREE.Matrix4();
       m.makeRotationY(rnd() * Math.PI * 2);
@@ -403,15 +403,15 @@ export class World {
         base: new THREE.Vector3((rand() - 0.5) * 42, -6 + rand() * 14, -Math.random() * 130),
         speed: 1.0 + rand() * 0.5,
         phase: rand() * 6.28,
-        scale: 0.8 + rand() * 0.7,
+        scale: 0.4 + rand() * 0.32,
       };
       for (let i = 0; i < count; i++) {
         school.offsets.push({
-          x: (rand() - 0.5) * 9,
-          y: (rand() - 0.5) * 4.2,
-          z: (rand() - 0.5) * 9,
+          x: (rand() - 0.5) * 6.5,
+          y: (rand() - 0.5) * 3.0,
+          z: (rand() - 0.5) * 6.5,
           p: rand() * 6.28,
-          s: 0.65 + rand() * 0.7,
+          s: 0.7 + rand() * 0.6,
         });
       }
       this.schools.push(school);
@@ -552,7 +552,7 @@ export class World {
     for (const s of this.schools) {
       s.base.z += speed * dt * s.speed;
       s.base.x += Math.sin(this.time * 0.3 + s.phase) * speed * dt * 0.12;
-      if (s.base.z > 45) {
+      if (s.base.z > 28) {
         s.base.z -= 175;
         s.base.x = (Math.random() - 0.5) * 42;
         s.base.y = -6 + Math.random() * 14;
