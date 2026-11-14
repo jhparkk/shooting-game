@@ -480,6 +480,7 @@ function startWave(n) {
 function waveCleared() {
   const bonus = 180 + G.wave * 60;
   G.score += bonus;
+  G.waveGoal = Infinity;
   toast(`웨이브 보너스 +${bonus}`);
   if (G.boss) removeBoss();
   G.pendingWave = 2.2;
@@ -758,7 +759,7 @@ function damageBoss(dmg) {
     const pos = p.clone();
     for (let i = 0; i < 6; i++) {
       setTimeout(() => {
-        if (!G.boss && i > 0) return;
+        if (G.state !== 'playing') return;
         fx.burst(
           pos.x + rand(-3, 3), pos.y + rand(-2, 2), pos.z + rand(-3, 3), 18,
           { colors: [0xffd9a0, 0xff7b4a, 0xffffff], speed: 14, size: 2.6, life: 0.9 }
@@ -774,6 +775,7 @@ function damageBoss(dmg) {
       dropItem(pos.x + rand(-3, 3), pos.y + rand(-1, 2), pos.z + 4, ['multi', 'rapid', 'shield'][i]);
     }
     setTimeout(() => {
+      if (G.state !== 'playing') return;
       removeBoss();
       G.kills = Infinity;
       waveCleared();
@@ -1345,7 +1347,7 @@ function boot() {
 
   G.pingTimer = 4;
   if (new URLSearchParams(location.search).has('debug')) {
-    window.__abyss = { G, enemies, world, startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy };
+    window.__abyss = { G, enemies, world, renderer, startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy };
   }
   loop();
 }
