@@ -193,7 +193,7 @@ export class World {
 
   /* ---------------- 수면 ---------------- */
   _buildSurface() {
-    const geo = new THREE.PlaneGeometry(900, 900, 1, 1);
+    const geo = new THREE.PlaneGeometry(2600, 2600, 1, 1);
     geo.rotateX(-Math.PI / 2);
     this.surfaceUniforms = {
       uTime: { value: 0 },
@@ -309,7 +309,7 @@ export class World {
           paint(geo, new THREE.Color().setHSL(0.36, 0.16, g).getHex());
           rockGeos.push(geo);
         }
-        for (let i = 0; i < 26; i++) {
+        for (let i = 0; i < 38; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
@@ -318,7 +318,7 @@ export class World {
           if (kind < 0.45) geo = branchCoralGeometry(color, 700 + seed * 17 + i);
           else if (kind < 0.78) geo = blobCoralGeometry(color, 800 + seed * 19 + i);
           else geo = tubeCoralGeometry(color, 900 + seed * 23 + i);
-          const sc = 1.3 + rnd() * 2.0;
+          const sc = 1.5 + rnd() * 2.6;
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
@@ -326,7 +326,7 @@ export class World {
           geo.applyMatrix4(m);
           coralGeos.push(geo);
         }
-        for (let i = 0; i < 13; i++) {
+        for (let i = 0; i < 18; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const h = 4 + rnd() * 9;

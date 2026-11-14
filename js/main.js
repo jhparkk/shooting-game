@@ -1469,8 +1469,14 @@ function boot() {
   G.pingTimer = 4;
   if (new URLSearchParams(location.search).has('debug')) {
     window.__abyss = {
-      G, P, enemies, world, renderer, camera,
+      G, P, enemies, world, renderer, camera, torpedoes,
       startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy, useBomb,
+      setInput: (o) => {
+        if (o.fire !== undefined) btnFiring = !!o.fire;
+        if (o.lift !== undefined) joy.lift = o.lift;
+        if (o.move !== undefined) joy.move = o.move;
+        if (o.turn !== undefined) joy.turn = o.turn;
+      },
     };
   }
   loop();
