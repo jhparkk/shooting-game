@@ -410,8 +410,7 @@ export function makeBoss() {
   g.add(jaw);
 
   // 이빨
-  const toothG = new THREE.ConeGeometry(0.17, 0.75, 5);
-  for (let i = 0; i < 9; i++) {
+  const toothG = new THREE.ConeGeometry(0.17, 0.75, 5);  for (let i = 0; i < 9; i++) {
     const x = -1.85 + (i / 8) * 3.7;
     const t = new THREE.Mesh(toothG, MET.bone);
     t.position.set(x, -0.62, -3.9);
@@ -434,6 +433,23 @@ export function makeBoss() {
   const eg2 = eg.clone();
   eg2.position.x = 1.15;
   g.add(eg2);
+
+  // 몸통 생물발광 점
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x7df6ff });
+  for (let i = 0; i < 10; i++) {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 5), glowMat);
+    const side = i % 2 === 0 ? -1 : 1;
+    dot.position.set(side * (2.45 - (i % 3) * 0.15), -1.4 + (i % 5) * 0.85, -1.2 + Math.floor(i / 2) * 1.15);
+    g.add(dot);
+  }
+  // 입 안쪽 발광
+  const mouthGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff6a4a })
+  );
+  mouthGlow.scale.set(1.7, 0.42, 0.7);
+  mouthGlow.position.set(0, -0.55, -3.65);
+  g.add(mouthGlow);
 
   // 유인 돌기(루어)
   const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 3.4, 6), MET.darkFlesh);
