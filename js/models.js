@@ -683,7 +683,7 @@ function krakenLimb(segCount, len, thick, curl, color) {
   let pz = 0;
   let ang = 0;
   let r = thick;
-  const suckerG = new THREE.SphereGeometry(0.09, 5, 4);
+  const suckerG = new THREE.SphereGeometry(0.07, 5, 4);
   for (let i = 0; i < segCount; i++) {
     const L = len / segCount;
     const geo = new THREE.CylinderGeometry(r * 0.76, r, L, 9);
@@ -712,6 +712,15 @@ function krakenLimb(segCount, len, thick, curl, color) {
     ang += curl;
     r *= 0.84;
   }
+  // 끝을 뾰족하게
+  const endQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(ang - curl, 0, 0));
+  const tipGeo = new THREE.ConeGeometry(r * 1.05, r * 3.0, 7);
+  tipGeo.rotateX(-Math.PI / 2);
+  tipGeo.translate(0, 0, -r * 1.5);
+  tipGeo.applyMatrix4(new THREE.Matrix4().compose(
+    new THREE.Vector3(px, py, pz), endQ, new THREE.Vector3(1, 1, 1)
+  ));
+  parts.push(paint(tipGeo, color));
   return mergeGeometries(parts, false);
 }
 
