@@ -20,27 +20,27 @@ export const ZONES = [
     name: '산호초 지대',
     fog: 0x2fbfb2, density: 0.0048,
     skyTop: 0xb8fff4, skyMid: 0x33b3b8, skyBottom: 0x0a5f74,
-    hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 1.25,
-    ambient: 0x9ff0e8, ambientI: 0.85,
-    sun: 0xfffbee, sunI: 2.0,
+    hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 0.95,
+    ambient: 0x9ff0e8, ambientI: 0.5,
+    sun: 0xfffbee, sunI: 1.5,
     coral: [0xff8a72, 0xffbe5c, 0xef86e0, 0xffa8cf, 0xfff07a, 0x86efd8],
   },
   {
     name: '해저 협곡',
     fog: 0x2ba5c4, density: 0.0055,
     skyTop: 0xa9ecff, skyMid: 0x2596bb, skyBottom: 0x075a7c,
-    hemiSky: 0xd2f6ff, hemiGround: 0x1f7d94, hemi: 1.15,
-    ambient: 0x8fe0f5, ambientI: 0.8,
-    sun: 0xfdf8ec, sunI: 1.9,
+    hemiSky: 0xd2f6ff, hemiGround: 0x1f7d94, hemi: 0.9,
+    ambient: 0x8fe0f5, ambientI: 0.48,
+    sun: 0xfdf8ec, sunI: 1.45,
     coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
   },
   {
     name: '산호 군락',
     fog: 0x1f8fbe, density: 0.0062,
     skyTop: 0x98e4ff, skyMid: 0x1f86b4, skyBottom: 0x064c72,
-    hemiSky: 0xccf4ff, hemiGround: 0x1a708c, hemi: 1.05,
-    ambient: 0x86d8f2, ambientI: 0.75,
-    sun: 0xfdf6e6, sunI: 1.8,
+    hemiSky: 0xccf4ff, hemiGround: 0x1a708c, hemi: 0.85,
+    ambient: 0x86d8f2, ambientI: 0.45,
+    sun: 0xfdf6e6, sunI: 1.4,
     coral: [0x7ff0ff, 0xc08bff, 0xff8ad4, 0x6cf0c0, 0xa8ffff],
   },
 ];
@@ -203,7 +203,7 @@ export class World {
     const mat = new THREE.ShaderMaterial({
       uniforms: this.surfaceUniforms,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.5,
       side: THREE.DoubleSide,
       depthWrite: false,
       fog: false,
@@ -224,7 +224,7 @@ export class World {
           float w2 = sin((vUv.x + vUv.y) * 150.0 + uTime * 2.2);
           float m = clamp(w * 0.6 + w2 * 0.4, -1.0, 1.0);
           vec3 c = mix(uB, uA, m * 0.5 + 0.5);
-          gl_FragColor = vec4(c, 0.9);
+          gl_FragColor = vec4(c, 0.42);
           #include <colorspace_fragment>
         }
       `,
@@ -283,7 +283,7 @@ export class World {
             Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
             Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
           const k = clamp01((n + 1.15) / 2.3);
-          fc.setHSL(0.42 - k * 0.04, 0.34, 0.36 + k * 0.14);
+          fc.setHSL(0.40 - k * 0.05, 0.42, 0.2 + k * 0.16);
           fcol[i * 3] = fc.r;
           fcol[i * 3 + 1] = fc.g;
           fcol[i * 3 + 2] = fc.b;
@@ -305,11 +305,11 @@ export class World {
           m.makeRotationY(rnd() * Math.PI * 2);
           m.setPosition(lx, terrainHeight(ox + lx, oz + lz) + r * 0.15, lz);
           geo.applyMatrix4(m);
-          const g = 0.3 + rnd() * 0.18;
+          const g = 0.14 + rnd() * 0.12;
           paint(geo, new THREE.Color().setHSL(0.36, 0.16, g).getHex());
           rockGeos.push(geo);
         }
-        for (let i = 0; i < 22; i++) {
+        for (let i = 0; i < 26; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
@@ -318,7 +318,7 @@ export class World {
           if (kind < 0.45) geo = branchCoralGeometry(color, 700 + seed * 17 + i);
           else if (kind < 0.78) geo = blobCoralGeometry(color, 800 + seed * 19 + i);
           else geo = tubeCoralGeometry(color, 900 + seed * 23 + i);
-          const sc = 1.1 + rnd() * 1.6;
+          const sc = 1.3 + rnd() * 2.0;
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
@@ -326,7 +326,7 @@ export class World {
           geo.applyMatrix4(m);
           coralGeos.push(geo);
         }
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 13; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const h = 4 + rnd() * 9;
@@ -372,7 +372,7 @@ export class World {
         m.makeRotationY(rnd() * Math.PI * 2);
         m.setPosition(lx, ly, (rnd() - 0.5) * 3);
         geo.applyMatrix4(m);
-        paint(geo, new THREE.Color().setHSL(0.35, 0.2, 0.26 + rnd() * 0.14).getHex());
+        paint(geo, new THREE.Color().setHSL(0.33, 0.24, 0.16 + rnd() * 0.12).getHex());
         geos.push(geo);
       }
       const mat = new THREE.MeshLambertMaterial({ vertexColors: true });

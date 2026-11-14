@@ -165,7 +165,7 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.92;
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.2, 520);

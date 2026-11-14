@@ -572,7 +572,7 @@ export function makeWhale() {
 export function makeManta() {
   const g = new THREE.Group();
   const skinMat = new THREE.MeshPhongMaterial({
-    color: 0x2c4a63, shininess: 24, side: THREE.DoubleSide,
+    color: 0x54809c, shininess: 26, side: THREE.DoubleSide,
   });
   const bellyMat = new THREE.MeshPhongMaterial({
     color: 0xbfd6e0, shininess: 12, side: THREE.DoubleSide,
