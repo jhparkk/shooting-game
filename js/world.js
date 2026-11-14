@@ -385,7 +385,7 @@ export class World {
           paint(geo, new THREE.Color().setHSL(0.36, 0.16, g).getHex());
           rockGeos.push(geo);
         }
-        for (let i = 0; i < 44; i++) {
+        for (let i = 0; i < 58; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const wx = ox + lx;
@@ -408,7 +408,7 @@ export class World {
           geo.applyMatrix4(m);
           coralGeos.push(geo);
         }
-        for (let i = 0; i < 22; i++) {
+        for (let i = 0; i < 26; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const wx = ox + lx;

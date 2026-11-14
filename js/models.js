@@ -533,42 +533,42 @@ function lionGeometries() {
   const FIN = 0xe8794a;
 
   const body = new THREE.SphereGeometry(1, 16, 12);
-  body.scale(0.42, 0.6, 1.05);
+  body.scale(0.5, 0.66, 1.2);
   const head = new THREE.SphereGeometry(1, 14, 10);
-  head.scale(0.4, 0.44, 0.5);
+  head.scale(0.46, 0.5, 0.56);
   const eye = new THREE.SphereGeometry(0.1, 8, 6);
   const mouth = new THREE.BoxGeometry(0.24, 0.09, 0.16);
 
   const parts = [
     placed(body, [0, 0, 0], [0, 0, 0], [1, 1, 1], BODY),
-    placed(head, [0, 0.04, -0.9], [0, 0, 0], [1, 1, 1], BODY),
-    placed(eye, [-0.2, 0.18, -1.16], [0, 0, 0], [1, 1, 1], 0x1b1310),
-    placed(eye, [0.2, 0.18, -1.16], [0, 0, 0], [1, 1, 1], 0x1b1310),
-    placed(mouth, [0, -0.16, -1.22], [0.1, 0, 0], [1, 1, 1], 0x8a3a2a),
+    placed(head, [0, 0.04, -1.0], [0, 0, 0], [1, 1, 1], BODY),
+    placed(eye, [-0.22, 0.2, -1.28], [0, 0, 0], [1, 1, 1], 0x1b1310),
+    placed(eye, [0.22, 0.2, -1.28], [0, 0, 0], [1, 1, 1], 0x1b1310),
+    placed(mouth, [0, -0.18, -1.34], [0.1, 0, 0], [1, 1, 1], 0x8a3a2a),
   ];
   // 흰 세로 줄무늬
   for (let i = 0; i < 4; i++) {
-    parts.push(placed(new THREE.BoxGeometry(0.5, 0.86 - i * 0.08, 0.09),
-      [0, 0.02, -0.36 + i * 0.34], [0, 0, 0], [1, 1, 1], STRIPE));
+    parts.push(placed(new THREE.BoxGeometry(0.66, 0.94 - i * 0.09, 0.1),
+      [0, 0.02, -0.42 + i * 0.36], [0, 0, 0], [1, 1, 1], STRIPE));
   }
   _lionGeo = mergeGeometries(parts, false);
 
   const finParts = [];
-  const ray = new THREE.ConeGeometry(0.035, 1.35, 4);
+  const ray = new THREE.ConeGeometry(0.042, 1.7, 4);
   // 등지느러미 — 위로 부채꼴
-  for (let i = 0; i < 8; i++) {
-    const t = (i / 7 - 0.5) * 2;
+  for (let i = 0; i < 9; i++) {
+    const t = (i / 8 - 0.5) * 2;
     finParts.push(placed(ray,
-      [0, 0.45 + Math.abs(t) * 0.05, 0.55 - i * 0.22],
-      [0, 0, t * 0.85], [1, i < 4 ? 1 : 0.7, 1], FIN));
+      [0, 0.5 + Math.abs(t) * 0.05, 0.6 - i * 0.24],
+      [0, 0, t * 0.9], [1, i < 4 ? 1 : 0.72, 1], FIN));
   }
   // 큰 가슴지느러미 — 좌우 부채
   for (let s = -1; s <= 1; s += 2) {
     for (let i = 0; i < 5; i++) {
       const t = (i / 4 - 0.5) * 2;
       finParts.push(placed(ray,
-        [s * 0.32, -0.05, -0.2],
-        [t * 1.1, 0, s * (1.15 + Math.abs(t) * 0.2)], [1, 0.95, 1], FIN));
+        [s * 0.34, -0.05, -0.25],
+        [t * 1.1, t * 0.5, s * (1.2 + Math.abs(t) * 0.2)], [1, 0.9, 1], FIN));
     }
   }
   _lionFinGeo = mergeGeometries(finParts, false);
@@ -686,7 +686,7 @@ function krakenLimb(segCount, len, thick, curl, color) {
   const suckerG = new THREE.SphereGeometry(0.09, 5, 4);
   for (let i = 0; i < segCount; i++) {
     const L = len / segCount;
-    const geo = new THREE.CylinderGeometry(r * 0.76, r, L, 7);
+    const geo = new THREE.CylinderGeometry(r * 0.76, r, L, 9);
     geo.rotateX(Math.PI / 2);
     geo.translate(0, 0, -L / 2);
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(ang, 0, 0));
@@ -731,44 +731,44 @@ export function makeKraken() {
 
   // 머리 + 몸통(망토)
   const mantle = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), skin);
-  mantle.scale.set(2.4, 2.3, 3.7);
-  mantle.position.set(0, 0, 1.1);
+  mantle.scale.set(2.2, 2.1, 4.2);
+  mantle.position.set(0, 0.1, 1.4);
   g.add(mantle);
 
-  const tipG = new THREE.ConeGeometry(1.9, 3.2, 12);
+  const tipG = new THREE.ConeGeometry(1.9, 3.6, 12);
   tipG.rotateX(-Math.PI / 2);
   const tip = new THREE.Mesh(tipG, skin);
-  tip.position.set(0, 0, 5.4);
+  tip.position.set(0, 0.1, 6.0);
   g.add(tip);
 
   // 망토 끝의 지느러미
-  const finG = new THREE.ConeGeometry(1.5, 2.2, 3);
+  const finG = new THREE.ConeGeometry(1.5, 2.6, 3);
   finG.rotateX(Math.PI / 2);
-  const finL = mesh(finG, skinDark, -1.6, 0.2, 4.6);
+  const finL = mesh(finG, skinDark, -1.7, 0.3, 5.2);
   finL.rotation.z = 0.9;
   finL.scale.set(0.16, 1, 1);
-  const finR = mesh(finG, skinDark, 1.6, 0.2, 4.6);
+  const finR = mesh(finG, skinDark, 1.7, 0.3, 5.2);
   finR.rotation.z = -0.9;
   finR.scale.set(0.16, 1, 1);
   g.add(finL, finR);
 
   // 머리
   const head = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), skin);
-  head.scale.set(2.1, 1.9, 1.5);
-  head.position.set(0, -0.1, -2.0);
+  head.scale.set(1.95, 1.8, 1.5);
+  head.position.set(0, -0.1, -2.1);
   g.add(head);
 
-  // 큰 눈
+  // 큰 눈 (금빛 홍채 + 가로 동공)
   const eyeWhite = new THREE.MeshPhongMaterial({
-    color: 0xf0d9a0, shininess: 90, emissive: 0x6a4a10, emissiveIntensity: 0.7,
+    color: 0xf7e2a8, shininess: 90, emissive: 0x8a6a18, emissiveIntensity: 0.9,
   });
   const pupilMat = new THREE.MeshBasicMaterial({ color: 0x0a0408 });
-  const eyeG = new THREE.SphereGeometry(0.72, 14, 10);
-  const pupilG = new THREE.SphereGeometry(0.34, 10, 8);
-  [-1.5, 1.5].forEach((x) => {
-    g.add(mesh(eyeG, eyeWhite, x, 0.35, -2.9));
-    const p = mesh(pupilG, pupilMat, x, 0.35, -3.42);
-    p.scale.set(0.5, 1.15, 0.5);
+  const eyeG = new THREE.SphereGeometry(0.62, 14, 10);
+  const pupilG = new THREE.SphereGeometry(0.32, 10, 8);
+  [-1.32, 1.32].forEach((x) => {
+    g.add(mesh(eyeG, eyeWhite, x, 0.42, -3.0));
+    const p = mesh(pupilG, pupilMat, x, 0.42, -3.5);
+    p.scale.set(1.25, 0.45, 0.5);
     g.add(p);
   });
 
@@ -778,35 +778,40 @@ export function makeKraken() {
   beak.position.set(0, -1.05, -2.9);
   g.add(beak);
 
-  // 다리 8가닥
+  // 다리 8가닥 — 앞쪽으로 부채꼴로 뗨친다
   const arms = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const pivot = new THREE.Group();
-    pivot.position.set(Math.cos(a) * 1.15, Math.sin(a) * 1.0, -2.2);
-    const geo = krakenLimb(5, 5.0 + (i % 2) * 0.8, 0.62, 0.16, KRAKEN.arm);
-    const limb = new THREE.Mesh(geo, limbMat);
+    pivot.position.set(Math.cos(a) * 1.0, Math.sin(a) * 0.9 - 0.15, -2.4);
+    const spread = 0.34;
+    const dir = new THREE.Vector3(
+      Math.cos(a) * spread, Math.sin(a) * spread - 0.12, -1
+    ).normalize();
+    pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    const limb = new THREE.Mesh(
+      krakenLimb(6, 6.2 + (i % 2) * 0.9, 0.56, 0.12, KRAKEN.arm), limbMat
+    );
     pivot.add(limb);
-    pivot.rotation.z = a - Math.PI / 2;
-    pivot.userData.baseZ = pivot.rotation.z;
     pivot.userData.phase = i * 1.7;
     g.add(pivot);
-    arms.push(pivot);
+    arms.push({ pivot, limb });
   }
 
   // 긴 촉수 2가닥
   const tentacles = [];
   [-1, 1].forEach((side, i) => {
     const pivot = new THREE.Group();
-    pivot.position.set(side * 1.3, -0.6, -2.4);
-    const geo = krakenLimb(7, 8.5, 0.34, 0.1, KRAKEN.arm);
-    const limb = new THREE.Mesh(geo, limbMat);
+    pivot.position.set(side * 1.15, -0.5, -2.5);
+    const dir = new THREE.Vector3(side * 0.42, -0.16, -1).normalize();
+    pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    const limb = new THREE.Mesh(
+      krakenLimb(8, 10.5, 0.32, 0.08, KRAKEN.arm), limbMat
+    );
     pivot.add(limb);
-    pivot.rotation.z = side * 0.28;
-    pivot.userData.baseZ = pivot.rotation.z;
     pivot.userData.phase = 0.8 + i * 2.1;
     g.add(pivot);
-    tentacles.push(pivot);
+    tentacles.push({ pivot, limb });
   });
 
   // 몸통 발광 점

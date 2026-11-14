@@ -1160,16 +1160,20 @@ function updateBoss(dt) {
   // 다리·촉수 흔들림
   if (b.arms) {
     for (let i = 0; i < b.arms.length; i++) {
-      const a = b.arms[i];
-      a.rotation.z = a.userData.baseZ + Math.sin(b.phase * 1.1 + a.userData.phase) * 0.16;
-      a.rotation.x = 0.12 + Math.sin(b.phase * 0.9 + a.userData.phase * 1.3) * 0.22;
+      const arm = b.arms[i];
+      const ph = arm.pivot.userData.phase;
+      arm.limb.rotation.x = Math.sin(b.phase * 1.1 + ph) * 0.15;
+      arm.limb.rotation.y = Math.sin(b.phase * 0.8 + ph * 1.3) * 0.16;
+      arm.limb.rotation.z = Math.cos(b.phase * 0.9 + ph) * 0.1;
     }
   }
   if (b.tentacles) {
     for (let i = 0; i < b.tentacles.length; i++) {
       const tt = b.tentacles[i];
-      tt.rotation.z = tt.userData.baseZ + Math.sin(b.phase * 0.8 + tt.userData.phase) * 0.26;
-      tt.rotation.x = 0.1 + Math.sin(b.phase * 1.4 + tt.userData.phase) * 0.2;
+      const ph = tt.pivot.userData.phase;
+      tt.limb.rotation.x = Math.sin(b.phase * 0.7 + ph) * 0.22;
+      tt.limb.rotation.y = Math.sin(b.phase * 1.3 + ph) * 0.26;
+      tt.limb.rotation.z = Math.cos(b.phase * 0.6 + ph) * 0.14;
     }
   }
 
