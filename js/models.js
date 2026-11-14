@@ -774,15 +774,17 @@ export function kelpGeometry(height, width, seed) {
   const idx = [];
   const nor = [];
   const uv = [];
+  const sway = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs;
     const y = t * height;
-    const sway = Math.sin(t * 2.2 + seed) * 0.16 * t;
+    const swayZ = Math.sin(t * 2.2 + seed) * 0.16 * t;
     const w = width * (1 - t * 0.55);
-    pos.push(-w / 2, y, sway);
-    pos.push(w / 2, y, sway);
+    pos.push(-w / 2, y, swayZ);
+    pos.push(w / 2, y, swayZ);
     nor.push(0, 0, 1, 0, 0, 1);
     uv.push(0, t, 1, t);
+    sway.push(t, t);
     if (i < segs) {
       const a = i * 2;
       idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
@@ -792,6 +794,7 @@ export function kelpGeometry(height, width, seed) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aSway', new THREE.Float32BufferAttribute(sway, 1));
   g.setIndex(idx);
   const col = new THREE.Color().setHSL(0.28 + rnd() * 0.12, 0.55, 0.22 + rnd() * 0.12);
   return paint(g, col.getHex());

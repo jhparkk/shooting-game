@@ -46,7 +46,19 @@ export const ZONES = [
 const SEG_LEN = 70;
 const SEG_COUNT = 3;
 const FIELD_W = 96;
-const FLOOR_Y = -12;
+const FLOOR_Y = -10;
+
+/** 세그먼트 경계에서도 이어지는 해저 높이 (로컬 x,z 기준) */
+function floorHeight(x, z) {
+  const tz = ((z + SEG_LEN / 2) / SEG_LEN) * Math.PI * 2;
+  const h =
+    Math.sin(tz * 2) * 1.5 +
+    Math.cos(tz) * 1.1 +
+    Math.sin(x * 0.16 + tz) * 0.9 +
+    Math.cos(x * 0.37) * 0.4 +
+    Math.sin(x * 0.08) * 1.2;
+  return FLOOR_Y + h - 2.4;
+}
 
 function streakTexture() {
   const w = 128;
@@ -194,16 +206,7 @@ export class World {
     floorGeo.rotateX(-Math.PI / 2);
     const fp = floorGeo.attributes.position;
     for (let i = 0; i < fp.count; i++) {
-      const x = fp.getX(i);
-      const z = fp.getZ(i);
-      const tz = ((z + SEG_LEN / 2) / SEG_LEN) * Math.PI * 2;
-      const h =
-        Math.sin(tz * 2) * 1.5 +
-        Math.cos(tz) * 1.1 +
-        Math.sin(x * 0.16 + tz) * 0.9 +
-        Math.cos(x * 0.37) * 0.4 +
-        Math.sin(x * 0.08) * 1.2;
-      fp.setY(i, FLOOR_Y + h - 3.2);
+      fp.setY(i, floorHeight(fp.getX(i), fp.getZ(i)));
     }
     floorGeo.computeVertexNormals();
     paint(floorGeo, 0x2b4a4a);
@@ -220,7 +223,7 @@ export class World {
       m.makeRotationY(rnd() * Math.PI * 2);
       const x = (rnd() - 0.5) * 44;
       const z = (rnd() - 0.5) * SEG_LEN;
-      m.setPosition(x, FLOOR_Y - 2.6 + r * 0.35, z);
+      m.setPosition(x, floorHeight(x, z) + r * 0.2, z);
       geo.applyMatrix4(m);
       const shade = 0.16 + rnd() * 0.16;
       paint(geo, new THREE.Color().setHSL(0.52, 0.16, shade).getHex());
@@ -243,7 +246,9 @@ export class World {
       const m = new THREE.Matrix4();
       m.makeRotationY(rnd() * Math.PI * 2);
       m.scale(new THREE.Vector3(scale, scale * (0.8 + rnd() * 0.6), scale));
-      m.setPosition((rnd() - 0.5) * 36, FLOOR_Y - 1.4 + rnd() * 0.9, (rnd() - 0.5) * SEG_LEN);
+      const cx = (rnd() - 0.5) * 36;
+      const cz = (rnd() - 0.5) * SEG_LEN;
+      m.setPosition(cx, floorHeight(cx, cz) - 0.15, cz);
       geo.applyMatrix4(m);
       coralGeos.push(geo);
     }
@@ -259,7 +264,9 @@ export class World {
       const geo = kelpGeometry(h, w, 300 + seed * 13 + i);
       const m = new THREE.Matrix4();
       m.makeRotationY(rnd() * Math.PI * 2);
-      m.setPosition((rnd() - 0.5) * 42, FLOOR_Y - 1.6 + rnd() * 0.8, (rnd() - 0.5) * SEG_LEN);
+      const kx = (rnd() - 0.5) * 42;
+      const kz = (rnd() - 0.5) * SEG_LEN;
+      m.setPosition(kx, floorHeight(kx, kz) - 0.3, kz);
       geo.applyMatrix4(m);
       kelpGeos.push(geo);
     }
@@ -267,13 +274,13 @@ export class World {
     const kelpTime = this.kelpUniform;
     kelpMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = kelpTime;
-      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
+      shader.vertexShader = 'uniform float uTime;\nattribute float aSway;\n' + shader.vertexShader.replace(
         '#include <begin_vertex>',
         `
         vec3 transformed = vec3( position );
-        float hh = clamp((position.y + ${(FLOOR_Y - 2).toFixed(1)}) / 8.0, 0.0, 1.0);
-        float swayA = sin(uTime * 1.35 + position.x * 0.3 + position.z * 0.18) * 0.75 * hh * hh;
-        float swayB = cos(uTime * 0.9 + position.x * 0.16) * 0.45 * hh * hh;
+        float hh = aSway;
+        float swayA = sin(uTime * 1.35 + position.x * 0.3 + position.z * 0.18) * 0.85 * hh * hh;
+        float swayB = cos(uTime * 0.9 + position.x * 0.16) * 0.5 * hh * hh;
         transformed.x += swayA;
         transformed.z += swayB;
         `
