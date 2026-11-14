@@ -396,50 +396,55 @@ export function makeBoss() {
   g.add(mesh(bodyG, MET.darkFlesh));
 
   const headG = new THREE.SphereGeometry(1, 16, 12);
-  headG.scale(2.7, 2.4, 2.1);
-  g.add(mesh(headG, MET.darkFlesh, 0, 0.1, -2.9));
+  headG.scale(2.6, 2.3, 2.1);
+  g.add(mesh(headG, MET.darkFlesh, 0, 0.15, -3.3));
 
   // 아래턱 (회전 피벗)
   const jaw = new THREE.Group();
-  jaw.position.set(0, -0.9, -3.4);
+  jaw.position.set(0, -0.85, -3.6);
   const jawG = new THREE.SphereGeometry(1, 12, 8);
-  jawG.scale(2.3, 0.55, 1.9);
+  jawG.scale(2.2, 0.5, 1.7);
   const jawMesh = new THREE.Mesh(jawG, new THREE.MeshPhongMaterial({ color: 0x44596e, shininess: 22, specular: 0x557799 }));
-  jawMesh.position.set(0, -0.1, -0.4);
+  jawMesh.position.set(0, -0.22, -0.95);
   jaw.add(jawMesh);
   g.add(jaw);
 
   // 이빨
-  const toothG = new THREE.ConeGeometry(0.17, 0.75, 5);  for (let i = 0; i < 9; i++) {
-    const x = -1.85 + (i / 8) * 3.7;
+  const toothG = new THREE.ConeGeometry(0.17, 0.75, 5);
+  for (let i = 0; i < 9; i++) {
+    const x = -1.75 + (i / 8) * 3.5;
     const t = new THREE.Mesh(toothG, MET.bone);
-    t.position.set(x, -0.62, -3.9);
+    t.position.set(x, -0.4, -5.05);
     t.rotation.x = Math.PI;
-    t.rotation.z = (Math.random() - 0.5) * 0.25;
+    t.rotation.z = (Math.random() - 0.5) * 0.2;
     g.add(t);
     const t2 = new THREE.Mesh(toothG, MET.bone);
-    t2.position.set(x, -0.15, -3.85);
+    t2.position.set(x, -0.34, -1.55);
     t2.scale.setScalar(0.85);
     jaw.add(t2);
   }
 
   // 눈
   const eyeG = new THREE.SphereGeometry(0.36, 10, 8);
-  g.add(mesh(eyeG, MET.eyeYellow, -1.15, 1.15, -4.2));
-  g.add(mesh(eyeG, MET.eyeYellow, 1.15, 1.15, -4.2));
+  g.add(mesh(eyeG, MET.eyeYellow, -1.32, 1.0, -4.72));
+  g.add(mesh(eyeG, MET.eyeYellow, 1.32, 1.0, -4.72));
   const eg = spriteGlow(0xffd457, 4.5, 0.85);
-  eg.position.set(-1.15, 1.15, -4.3);
+  eg.position.set(-1.32, 1.0, -4.8);
   g.add(eg);
   const eg2 = eg.clone();
-  eg2.position.x = 1.15;
+  eg2.position.x = 1.32;
   g.add(eg2);
 
   // 몸통 생물발광 점
   const glowMat = new THREE.MeshBasicMaterial({ color: 0x7df6ff });
-  for (let i = 0; i < 10; i++) {
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 6, 5), glowMat);
+  for (let i = 0; i < 8; i++) {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 5), glowMat);
     const side = i % 2 === 0 ? -1 : 1;
-    dot.position.set(side * (2.45 - (i % 3) * 0.15), -1.4 + (i % 5) * 0.85, -1.2 + Math.floor(i / 2) * 1.15);
+    dot.position.set(
+      side * (2.25 - Math.floor(i / 2) * 0.18),
+      -1.05 + Math.floor(i / 2) * 0.74,
+      -4.5
+    );
     g.add(dot);
   }
   // 입 안쪽 발광
@@ -447,8 +452,8 @@ export function makeBoss() {
     new THREE.SphereGeometry(1, 10, 8),
     new THREE.MeshBasicMaterial({ color: 0xff6a4a })
   );
-  mouthGlow.scale.set(1.7, 0.42, 0.7);
-  mouthGlow.position.set(0, -0.55, -3.65);
+  mouthGlow.scale.set(1.65, 0.32, 0.45);
+  mouthGlow.position.set(0, -0.58, -5.08);
   g.add(mouthGlow);
 
   // 유인 돌기(루어)
