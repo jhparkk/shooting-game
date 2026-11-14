@@ -131,6 +131,7 @@ export class World {
     this._buildSky();
     this._buildLights();
     this._buildFloor();
+    this._buildHorizon();
     this._buildArches();
     this._buildRays();
     this._buildParticles();
@@ -309,6 +310,16 @@ export class World {
         this.chunks.push({ group, rockMat, coralMat, kelpMat });
       }
     }
+  }
+
+  _buildHorizon() {
+    const geo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
+    geo.rotateX(-Math.PI / 2);
+    this.horizonMat = new THREE.MeshBasicMaterial({ color: this.zone.fog });
+    const m = new THREE.Mesh(geo, this.horizonMat);
+    m.position.y = FLOOR_Y - 2.5;
+    m.frustumCulled = false;
+    this.scene.add(m);
   }
 
   /* ---------------- 바위 아치(수중 터널) ---------------- */
@@ -538,6 +549,7 @@ export class World {
     this.hemi.color.lerp(new THREE.Color(tz.hemiSky), k);
     this.hemi.groundColor.lerp(new THREE.Color(tz.hemiGround), k);
     this.ambient.color.lerp(new THREE.Color(tz.ambient), k);
+    if (this.horizonMat) this.horizonMat.color.lerp(new THREE.Color(tz.fog), k);
     this.ambient.intensity += (tz.ambientI - this.ambient.intensity) * k;
     this.sun.intensity += (tz.sunI - this.sun.intensity) * k;
     this.sun.color.lerp(new THREE.Color(tz.sun), k);
