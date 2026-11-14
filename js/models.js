@@ -176,14 +176,14 @@ export function makeSubmarine() {
 
   // 전조등 빛 원뿔(가짜 볼륨)
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xbdf4ff, transparent: true, opacity: 0.1,
+    color: 0xbdf4ff, transparent: true, opacity: 0.05,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
   });
-  const coneGeo = new THREE.ConeGeometry(2.6, 15, 14, 1, true);
-  coneGeo.rotateX(-Math.PI / 2);
-  coneGeo.translate(0, 0, -7.4);
+  const coneGeo = new THREE.ConeGeometry(1.9, 20, 16, 1, true);
+  coneGeo.rotateX(Math.PI / 2);
+  coneGeo.translate(0, 0, -10.4);
   const beam = new THREE.Mesh(coneGeo, coneMat);
-  beam.position.set(0, 0.18, -1.6);
+  beam.position.set(0, 0.18, -1.8);
   g.add(beam);
 
   // 안테나

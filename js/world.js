@@ -48,6 +48,8 @@ const SEG_COUNT = 3;
 const FIELD_W = 96;
 const FLOOR_Y = -10;
 
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
 /** 세그먼트 경계에서도 이어지는 해저 높이 (로컬 x,z 기준) */
 function floorHeight(x, z) {
   const tz = ((z + SEG_LEN / 2) / SEG_LEN) * Math.PI * 2;
@@ -209,7 +211,25 @@ export class World {
       fp.setY(i, floorHeight(fp.getX(i), fp.getZ(i)));
     }
     floorGeo.computeVertexNormals();
-    paint(floorGeo, 0x1d3a3c);
+    // 지형 명암: 모래 결정과 기복에 따른 색 변화
+    const fcol = new Float32Array(fp.count * 3);
+    const fc = new THREE.Color();
+    for (let i = 0; i < fp.count; i++) {
+      const x = fp.getX(i);
+      const y = fp.getY(i);
+      const z = fp.getZ(i);
+      const n =
+        Math.sin(x * 0.62 + z * 0.14) * 0.5 +
+        Math.cos(z * 0.48 - x * 0.2) * 0.5 +
+        Math.sin(x * 1.7) * Math.cos(z * 1.3) * 0.25;
+      const k = clamp01((n + 1.25) / 2.5);
+      const crest = clamp01((y - FLOOR_Y + 4.0) / 6.0);
+      fc.setHSL(0.48 - k * 0.04, 0.18, 0.075 + k * 0.06 + crest * 0.03);
+      fcol[i * 3] = fc.r;
+      fcol[i * 3 + 1] = fc.g;
+      fcol[i * 3 + 2] = fc.b;
+    }
+    floorGeo.setAttribute('color', new THREE.BufferAttribute(fcol, 3));
     const floorMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     group.add(floor);
@@ -425,10 +445,10 @@ export class World {
     let scale = 1;
     if (kind === 'whale') {
       obj = makeWhale();
-      scale = 1.15 + Math.random() * 0.35;
+      scale = 1.35 + Math.random() * 0.35;
     } else if (kind === 'manta') {
       obj = makeManta();
-      scale = 1.1 + Math.random() * 0.4;
+      scale = 1.4 + Math.random() * 0.5;
     } else {
       obj = makeTurtle();
       scale = 0.85 + Math.random() * 0.4;
@@ -438,15 +458,15 @@ export class World {
       kind,
       obj,
       t: 0,
-      baseX: side * (12 + Math.random() * (kind === 'whale' ? 26 : 16)),
-      y: kind === 'whale' ? 8 + Math.random() * 8 : 4 + Math.random() * 10,
+      baseX: side * (kind === 'whale' ? 9 + Math.random() * 12 : 13 + Math.random() * 14),
+      y: kind === 'whale' ? 6.5 + Math.random() * 6 : 4 + Math.random() * 10,
       driftX: -side * (0.8 + Math.random() * 0.8),
       driftY: (Math.random() - 0.5) * 0.9,
       speed: 1.05 + Math.random() * 0.35,
       phase: Math.random() * 6.28,
     };
     obj.group.scale.setScalar(scale);
-    obj.group.position.set(c.baseX, c.y, -150);
+    obj.group.position.set(c.baseX, c.y, -96);
     obj.group.rotation.y = c.baseX > 0 ? 0.5 : -0.5;
     this.scene.add(obj.group);
     this.creatures.push(c);
