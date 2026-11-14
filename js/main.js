@@ -378,7 +378,7 @@ function resetGame() {
   player.obj.visible = true;
   player.obj.position.set(0, 0, 0);
   player.obj.rotation.set(0, 0, 0);
-  player.obj.scale.setScalar(0.82);
+  player.obj.scale.setScalar(0.95);
 
   world.zoneIndex = -1;
   world.setZone(0);
@@ -896,11 +896,11 @@ function updateGame(dt) {
   const shakeY = G.shake > 0 ? rand(-1, 1) * G.shake * 0.5 : 0;
   const camTarget = tmpVec.set(
     player.x * 0.62 + shakeX,
-    player.y * 0.6 + 4.0 + shakeY,
-    13.0
+    player.y * 0.6 + 3.7 + shakeY,
+    11.6
   );
   camera.position.lerp(camTarget, 1 - Math.exp(-5.5 * dt));
-  camera.lookAt(player.x * 0.92, player.y + 0.25, -26);
+  camera.lookAt(player.x * 0.92, player.y + 0.35, -26);
   camera.rotation.z += player.roll * 0.06;
   G.shake = Math.max(0, G.shake - dt * 2.2);
 

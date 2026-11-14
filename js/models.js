@@ -309,8 +309,8 @@ export function makeJellyfish(color) {
   const bell = new THREE.Mesh(
     _jellyBell,
     new THREE.MeshPhongMaterial({
-      color: color, emissive: color, emissiveIntensity: 1.15,
-      transparent: true, opacity: 0.34, shininess: 90, side: THREE.DoubleSide,
+      color: color, emissive: color, emissiveIntensity: 0.75,
+      transparent: true, opacity: 0.4, shininess: 90, side: THREE.DoubleSide,
       depthWrite: false,
     })
   );
@@ -506,13 +506,13 @@ export function makeWhale() {
 
   // 긴 가슴지느러미(혹등고래)
   const finG = new THREE.SphereGeometry(1, 10, 8);
-  finG.scale(4.6, 0.26, 1.15);
-  const finL = mesh(finG, belly, -4.2, -0.9, -3.2);
-  finL.rotation.z = 0.55;
-  finL.rotation.y = 0.28;
-  const finR = mesh(finG, belly, 4.2, -0.9, -3.2);
-  finR.rotation.z = -0.55;
-  finR.rotation.y = -0.28;
+  finG.scale(3.6, 0.22, 1.0);
+  const finL = mesh(finG, belly, -3.4, -1.5, -1.6);
+  finL.rotation.z = 0.72;
+  finL.rotation.y = 0.5;
+  const finR = mesh(finG, belly, 3.4, -1.5, -1.6);
+  finR.rotation.z = -0.72;
+  finR.rotation.y = -0.5;
   g.add(finL, finR);
 
   // 등지느러미
