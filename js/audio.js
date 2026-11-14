@@ -1,205 +1,209 @@
 /* =========================================================
-   NEON STRIKER — 레트로 아케이드 효과음 엔진
-   Web Audio API 로 실시간 합성 (오디오 파일 없음)
+   ABYSS DIVER — 수중 음향 엔진 (Web Audio API 실시간 합성)
+   오디오 파일 없이 소나 핑 · 어뢰 · 폭발 · 기포음을 만든다.
    ========================================================= */
-(function () {
-  "use strict";
 
-  var ac = null;          // AudioContext
-  var master = null;      // 마스터 게인
-  var noiseBuf = null;    // 화이트 노이즈 버퍼 (폭발음용)
-  var muted = false;
-  var unlocked = false;
-  var lastShot = 0;       // 연사 사운드 스로틀
-  var lastHit = 0;
+export class Sound {
+  constructor() {
+    this.ac = null;
+    this.master = null;
+    this.muted = false;
+    this.noise = null;
+    this.drone = null;
+    this.lastShot = 0;
+    this.lastHit = 0;
+    this.ready = false;
+  }
 
-  function init() {
-    if (ac) return true;
-    var AC = window.AudioContext || window.webkitAudioContext;
+  init() {
+    if (this.ac) return true;
+    const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     try {
-      ac = new AC();
+      this.ac = new AC();
     } catch (e) {
-      ac = null;
+      this.ac = null;
       return false;
     }
-    master = ac.createGain();
-    master.gain.value = muted ? 0 : 0.55;
-    master.connect(ac.destination);
+    const ac = this.ac;
+    this.master = ac.createGain();
+    this.master.gain.value = this.muted ? 0 : 0.6;
+    this.master.connect(ac.destination);
 
-    // 폭발용 노이즈 1회 생성
-    try {
-      var len = Math.floor(ac.sampleRate * 0.7);
-      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
-      var d = noiseBuf.getChannelData(0);
-      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    } catch (e) {
-      noiseBuf = null;
-    }
+    // 폭발·기포용 노이즈 버퍼
+    const len = Math.floor(ac.sampleRate * 1.6);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    this.noise = buf;
+    this.ready = true;
     return true;
   }
 
-  // 첫 사용자 제스처에서 호출: 컨텍스트 생성 + 재개
-  function unlock() {
-    if (!init()) return;
-    if (ac.state === "suspended" && ac.resume) {
-      try { ac.resume(); } catch (e) {}
+  resume() {
+    if (!this.ac) this.init();
+    if (this.ac && this.ac.state === 'suspended') this.ac.resume();
+  }
+
+  setMuted(v) {
+    this.muted = !!v;
+    if (this.master) {
+      const t = this.ac.currentTime;
+      this.master.gain.cancelScheduledValues(t);
+      this.master.gain.setTargetAtTime(this.muted ? 0 : 0.6, t, 0.08);
     }
-    unlocked = true;
   }
 
-  function ok() {
-    return ac && master && !muted;
+  toggle() {
+    this.setMuted(!this.muted);
+    return this.muted;
   }
 
-  function tone(o) {
-    if (!ok()) return;
-    try {
-      var t0 = ac.currentTime + (o.delay || 0);
-      var dur = o.dur || 0.1;
-      var osc = ac.createOscillator();
-      var g = ac.createGain();
-      osc.type = o.type || "square";
-      osc.frequency.setValueAtTime(o.freq || 440, t0);
-      if (o.to) {
-        if (o.freq > 0 && o.to > 0) {
-          osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.to), t0 + dur);
-        } else {
-          osc.frequency.linearRampToValueAtTime(Math.max(1, o.to), t0 + dur);
-        }
-      }
-      var peak = o.gain === undefined ? 0.15 : o.gain;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(dur * 0.2, 0.02));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(g);
-      g.connect(master);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.03);
-    } catch (e) {}
+  /* ---------- 저수준 헬퍼 ---------- */
+  _osc(type, f0, f1, dur, gain, delay) {
+    const ac = this.ac;
+    if (!ac) return;
+    const t = ac.currentTime + (delay || 0);
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + Math.min(0.02, dur * 0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    g.connect(this.master);
+    o.start(t);
+    o.stop(t + dur + 0.02);
   }
 
-  function noise(o) {
-    if (!ok() || !noiseBuf) return;
-    try {
-      var t0 = ac.currentTime + (o.delay || 0);
-      var dur = o.dur || 0.3;
-      var src = ac.createBufferSource();
-      src.buffer = noiseBuf;
-      src.loop = true;
-      var f = ac.createBiquadFilter();
-      f.type = "lowpass";
-      f.Q.value = o.q === undefined ? 0.9 : o.q;
-      f.frequency.setValueAtTime(o.from || 1600, t0);
-      f.frequency.exponentialRampToValueAtTime(Math.max(60, o.to || 180), t0 + dur);
-      var g = ac.createGain();
-      var peak = o.gain === undefined ? 0.25 : o.gain;
-      g.gain.setValueAtTime(peak, t0);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(f);
-      f.connect(g);
-      g.connect(master);
-      src.start(t0);
-      src.stop(t0 + dur + 0.03);
-    } catch (e) {}
+  _noiseBurst(dur, gain, filterType, f0, f1, q, delay) {
+    const ac = this.ac;
+    if (!ac || !this.noise) return;
+    const t = ac.currentTime + (delay || 0);
+    const src = ac.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const flt = ac.createBiquadFilter();
+    flt.type = filterType || 'lowpass';
+    flt.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) flt.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    flt.Q.value = q || 1;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(flt);
+    flt.connect(g);
+    g.connect(this.master);
+    src.start(t);
+    src.stop(t + dur + 0.03);
   }
 
-  var SFX = {
-    unlock: unlock,
+  /* ---------- 수중 앰비언트 ---------- */
+  startAmbient() {
+    if (!this.ac || this.drone) return;
+    const ac = this.ac;
+    const t = ac.currentTime;
+    const g = ac.createGain();
+    g.gain.value = 0.0001;
+    g.gain.setTargetAtTime(0.11, t, 1.4);
+    const flt = ac.createBiquadFilter();
+    flt.type = 'lowpass';
+    flt.frequency.value = 300;
+    const o1 = ac.createOscillator();
+    o1.type = 'sine';
+    o1.frequency.value = 46;
+    const o2 = ac.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = 69.5;
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 0.09;
+    const lfoGain = ac.createGain();
+    lfoGain.gain.value = 90;
+    lfo.connect(lfoGain);
+    lfoGain.connect(flt.frequency);
+    o1.connect(flt);
+    o2.connect(flt);
+    flt.connect(g);
+    g.connect(this.master);
+    o1.start();
+    o2.start();
+    lfo.start();
+    this.drone = { g, o1, o2, lfo };
+  }
 
-    isMuted: function () { return muted; },
+  /* ---------- 게임 효과음 ---------- */
+  sonar() {
+    if (!this.ac) return;
+    this._osc('sine', 1180, 760, 0.85, 0.16);
+    this._osc('sine', 1180, 760, 1.5, 0.05, 0.26);
+  }
 
-    setMuted: function (v) {
-      muted = !!v;
-      if (master) {
-        try {
-          master.gain.value = muted ? 0 : 0.55;
-        } catch (e) {}
-      }
-    },
+  shoot() {
+    if (!this.ac) return;
+    const now = this.ac.currentTime;
+    if (now - this.lastShot < 0.055) return;
+    this.lastShot = now;
+    this._osc('triangle', 520, 190, 0.13, 0.055);
+    this._noiseBurst(0.1, 0.035, 'bandpass', 1400, 500, 1.4);
+  }
 
-    /* 플레이어 발사 */
-    shoot: function () {
-      if (!ok()) return;
-      var t = ac.currentTime;
-      if (t - lastShot < 0.055) return;
-      lastShot = t;
-      tone({ freq: 1250, to: 480, type: "square", dur: 0.055, gain: 0.035 });
-      tone({ freq: 2600, to: 1200, type: "triangle", dur: 0.03, gain: 0.015 });
-    },
+  hit() {
+    if (!this.ac) return;
+    const now = this.ac.currentTime;
+    if (now - this.lastHit < 0.04) return;
+    this.lastHit = now;
+    this._osc('square', 880, 1180, 0.05, 0.03);
+  }
 
-    /* 탄 명중 */
-    hit: function () {
-      if (!ok()) return;
-      var t = ac.currentTime;
-      if (t - lastHit < 0.045) return;
-      lastHit = t;
-      tone({ freq: 520, to: 300, type: "triangle", dur: 0.05, gain: 0.05 });
-    },
+  explode(size) {
+    if (!this.ac) return;
+    const big = size === 'big';
+    this._noiseBurst(big ? 1.1 : 0.42, big ? 0.5 : 0.22, 'lowpass', big ? 1100 : 900, 90, 1);
+    this._osc('sine', big ? 110 : 170, big ? 28 : 55, big ? 0.9 : 0.35, big ? 0.3 : 0.13);
+  }
 
-    /* 적 폭발 */
-    explode: function (big) {
-      noise({ dur: big ? 0.5 : 0.26, gain: big ? 0.34 : 0.2, from: big ? 1500 : 1900, to: big ? 90 : 220 });
-      tone({ freq: big ? 120 : 190, to: 40, type: "sine", dur: big ? 0.45 : 0.22, gain: big ? 0.3 : 0.16 });
-    },
+  pickup() {
+    if (!this.ac) return;
+    this._osc('sine', 660, 990, 0.12, 0.1);
+    this._osc('sine', 990, 1480, 0.16, 0.08, 0.09);
+  }
 
-    /* 보스 격파 */
-    bossDie: function () {
-      noise({ dur: 1.1, gain: 0.4, from: 2200, to: 60 });
-      tone({ freq: 160, to: 30, type: "sawtooth", dur: 1.0, gain: 0.28 });
-      tone({ freq: 320, to: 60, type: "square", dur: 0.7, gain: 0.12, delay: 0.1 });
-    },
+  damage() {
+    if (!this.ac) return;
+    this._noiseBurst(0.5, 0.4, 'lowpass', 700, 120, 2);
+    this._osc('sawtooth', 190, 48, 0.42, 0.16);
+  }
 
-    /* 플레이어 피격 */
-    hurt: function () {
-      noise({ dur: 0.4, gain: 0.3, from: 900, to: 120 });
-      tone({ freq: 240, to: 55, type: "sawtooth", dur: 0.42, gain: 0.24 });
-    },
+  bomb() {
+    if (!this.ac) return;
+    this._osc('sine', 1500, 180, 1.0, 0.22);
+    this._noiseBurst(1.2, 0.32, 'lowpass', 2400, 160, 1);
+  }
 
-    /* 실드 소모 */
-    shieldBreak: function () {
-      tone({ freq: 900, to: 200, type: "sine", dur: 0.25, gain: 0.2 });
-      tone({ freq: 1800, to: 700, type: "triangle", dur: 0.18, gain: 0.1, delay: 0.02 });
-    },
+  waveClear() {
+    if (!this.ac) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((f, i) => this._osc('sine', f, f, 0.3, 0.1, i * 0.09));
+  }
 
-    /* 아이템 획득 */
-    pickup: function () {
-      tone({ freq: 660, type: "square", dur: 0.09, gain: 0.14 });
-      tone({ freq: 990, type: "square", dur: 0.12, gain: 0.12, delay: 0.07 });
-      tone({ freq: 1320, type: "triangle", dur: 0.1, gain: 0.08, delay: 0.14 });
-    },
+  bossWarn() {
+    if (!this.ac) return;
+    this._osc('sawtooth', 72, 48, 1.6, 0.2);
+    this._osc('sawtooth', 108, 72, 1.6, 0.11, 0.05);
+    this._noiseBurst(1.4, 0.14, 'lowpass', 500, 90, 1);
+  }
 
-    /* 필살기 폭탄 */
-    bomb: function () {
-      noise({ dur: 0.9, gain: 0.4, from: 2600, to: 70 });
-      tone({ freq: 420, to: 32, type: "sine", dur: 0.85, gain: 0.32 });
-      tone({ freq: 1400, to: 120, type: "square", dur: 0.3, gain: 0.1, delay: 0.02 });
-    },
+  gameOver() {
+    if (!this.ac) return;
+    const notes = [440, 349.2, 261.6, 164.8];
+    notes.forEach((f, i) => this._osc('sine', f, f * 0.98, 0.5, 0.13, i * 0.16));
+  }
 
-    /* 웨이브 시작 */
-    wave: function () {
-      tone({ freq: 523, type: "square", dur: 0.09, gain: 0.1 });
-      tone({ freq: 659, type: "square", dur: 0.09, gain: 0.1, delay: 0.09 });
-      tone({ freq: 784, type: "square", dur: 0.14, gain: 0.1, delay: 0.18 });
-    },
-
-    /* 보스 경고 */
-    bossWarn: function () {
-      for (var i = 0; i < 3; i++) {
-        tone({ freq: 180, type: "sawtooth", dur: 0.16, gain: 0.13, delay: i * 0.3 });
-        tone({ freq: 132, type: "sawtooth", dur: 0.16, gain: 0.13, delay: i * 0.3 + 0.15 });
-      }
-    },
-
-    /* 게임 오버 */
-    gameover: function () {
-      var notes = [440, 349, 262, 175];
-      for (var i = 0; i < notes.length; i++) {
-        tone({ freq: notes[i], to: notes[i] * 0.82, type: "sawtooth", dur: 0.3, gain: 0.14, delay: i * 0.16 });
-      }
-      noise({ dur: 0.8, gain: 0.16, from: 800, to: 80, delay: 0.1 });
-    }
-  };
-
-  window.SFX = SFX;
-})();
+  bubble() {
+    if (!this.ac) return;
+    this._osc('sine', 420 + Math.random() * 300, 900, 0.09, 0.028);
+  }
+}
