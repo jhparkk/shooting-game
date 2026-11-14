@@ -68,7 +68,7 @@
 - 성능: `pixelRatio` 상한 2 + 자동 화질 하향, 지오메트리 병합, 적 머티리얼 공유,
   파티클은 단일 `Points` 드로우콜, 안개로 원거리 컬링
 - 아이폰 사파리 대응: `touch-action: none`, `user-scalable=no`, `overscroll-behavior: none`,
-  세이프 에어리어 패딩, Web Audio 첫 터치 언락
+  `js/zoom-guard.js`(핀치 줌·더블탭 줌·트랙패드 확대 차단), 세이프 에어리어 패딩, Web Audio 첫 터치 언락
 - 사운드는 Web Audio API 실시간 합성 (소나 핑, 어뢰, 폭발, 기포, 음파)
 
 ## 파일 구조
@@ -76,6 +76,7 @@
 ```
 index.html      화면 · HUD · importmap
 style.css       수중 UI 스타일
+js/zoom-guard.js 사파리 확대(핀치·더블탭 줌) 차단 가드
 js/main.js      게임 루프 · 플레이어 · 적 · 웨이브 · HUD
 js/world.js     해저 지형 · 산호초 · 빛줄기 · 관상용 생물
 js/models.js    절차적 3D 모델 빌더

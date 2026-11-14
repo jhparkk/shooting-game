@@ -19,7 +19,13 @@
   --safe-r: env(safe-area-inset-right, 0px);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 
 html, body {
   margin: 0;
@@ -35,6 +41,7 @@ html, body {
   user-select: none;
   -webkit-text-size-adjust: 100%;
   overflow: hidden;
+  touch-action: none;
 }
 
 body { touch-action: none; }
@@ -54,6 +61,26 @@ body { touch-action: none; }
   display: block;
   touch-action: none;
   cursor: crosshair;
+}
+
+/* ================= iOS 사파리 확대(줌) 차단 ================= */
+/* touch-action: manipulation 은 핀치 줌을 허용하므로 전부 none 으로 통일한다. */
+#game, #vignette, #flash,
+.hud, .hud *,
+.joystick, .joy-base, .joy-ring, .joy-knob, .joy-label,
+.pad-right, .alt-group,
+.icon-btn, .alt-btn, .fire-btn, .bomb-btn, .btn-primary, .btn-ghost {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 메뉴 화면은 내용이 길면 세로 스크롤만 허용(확대·가로 스크롤은 차단) */
+.screen {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 물빛 비네트 */

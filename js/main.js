@@ -186,6 +186,7 @@ function initThree() {
   updateSubTransform(0);
 
   buildPools();
+  bindTouchGuards();
   bindInput();
   bindButtons();
   window.addEventListener('resize', onResize);
@@ -232,6 +233,29 @@ function buildPools() {
     scene.add(m);
     orbs.push({ mesh: m, vel: new THREE.Vector3(), life: 0, active: false });
   }
+}
+
+/* ---------------- iOS 사파리 확대 차단 (게임 조작 영역) ---------------- */
+/* 문서·창 수준의 가드(제스처·핀치·더블탭·휠)는 js/zoom-guard.js 가 먼저 설치한다.
+   여기서는 게임 화면·HUD·조이스틱에서 한 손가락 터치의 기본 동작(스크롤·선택·콜아웃)을
+   막아, 조이스틱을 끄는 동안 화면이 밀리거나 확대되지 않게 한다.
+   클릭으로 동작하는 버튼은 건드리지 않는다. */
+function bindTouchGuards() {
+  const CLICKABLE = 'button, a, input, select, textarea, label, .screen';
+  const skip = (t) => !!(t && t.closest && t.closest(CLICKABLE));
+  const hold = (e) => {
+    if (e.cancelable !== false) e.preventDefault();
+  };
+  function guard(e) {
+    if (!e.touches || e.touches.length > 1) { hold(e); return; } // 두 손가락 = 핀치 줌
+    if (skip(e.target)) return;                                   // 버튼 클릭은 그대로
+    hold(e);
+  }
+  [canvas, el.hud, el.joystick].forEach((node) => {
+    if (!node) return;
+    node.addEventListener('touchstart', guard, { passive: false });
+    node.addEventListener('touchmove', guard, { passive: false });
+  });
 }
 
 /* ---------------- 입력 바인딩 ---------------- */
@@ -1446,7 +1470,18 @@ function bindButtons() {
   $('btn-restart').addEventListener('click', startGame);
   el.pause.addEventListener('click', () => togglePause(G.state === 'playing'));
   el.mute.addEventListener('click', toggleMute);
-  el.bombBtn.addEventListener('click', useBomb);
+  // 음파 폭탄: 조이스틱을 잡은 채 두 번째 손가락으로 누르면(멀티터치) 사파리가
+  // click 을 생략할 수 있어 pointerdown 에서 먼저 처리하고, 뒤따르는 click 은 중복으로 본다.
+  let bombUsedAt = -1e9;
+  el.bombBtn.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button > 0) return;
+    bombUsedAt = performance.now();
+    useBomb();
+  });
+  el.bombBtn.addEventListener('click', () => {
+    if (performance.now() - bombUsedAt < 700) return;
+    useBomb();
+  });
 }
 
 function boot() {
