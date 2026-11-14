@@ -79,4 +79,87 @@
   document.addEventListener('contextmenu', function (e) {
     if (!isInteractive(e.target)) stop(e);
   });
+
+  /* 6) ?zoomtest — 실기기 터치 대신 합성 이벤트로 가드가 걸리는지 점검 (진단용, 평소엔 돌지 않는다) */
+  if (location.search.indexOf('zoomtest') >= 0) {
+    window.addEventListener('load', function () {
+      setTimeout(runSelfTest, 700);
+    });
+  }
+
+  function runSelfTest() {
+    var result = {};
+    var game = document.getElementById('game');
+    var button = document.querySelector('.fire-btn');
+    if (!game || !button) { window.__zoomTest = { error: 'no-target' }; return; }
+    var touch = function (id, x, y, target) {
+      return new Touch({ identifier: id, target: target, clientX: x, clientY: y });
+    };
+    var fire = function (type, target, touches, changed) {
+      var ev = new TouchEvent(type, {
+        touches: touches, targetTouches: touches, changedTouches: changed || touches,
+        bubbles: true, cancelable: true,
+      });
+      target.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+
+    // Safari 제스처 이벤트
+    var gs = new Event('gesturestart', { bubbles: true, cancelable: true });
+    document.dispatchEvent(gs);
+    var gc = new Event('gesturechange', { bubbles: true, cancelable: true });
+    document.dispatchEvent(gc);
+    result.gestureBlocked = gs.defaultPrevented && gc.defaultPrevented;
+
+    // 두 손가락 (조이스틱 + 발사 버튼 동시)
+    var a = touch(1, 200, 800, game);
+    var b = touch(2, 1700, 800, game);
+    result.pinchStartBlocked = fire('touchstart', game, [a, b], [b]);
+    result.pinchMoveBlocked = fire('touchmove', game, [a, b]);
+    fire('touchend', game, [], [a, b]);
+
+    // 빠른 더블탭: 게임 화면은 막고, 버튼은 통과(클릭이 살아 있게)
+    var tap = function (target, x, y) {
+      var t = touch(7, x, y, target);
+      fire('touchstart', target, [t]);
+      return fire('touchend', target, [], [t]);
+    };
+    tap(game, 900, 500);
+    result.doubleTapOnGameBlocked = tap(game, 900, 500);
+    tap(button, 1700, 800);
+    result.doubleTapOnButtonBlocked = tap(button, 1700, 800);
+
+    // ctrl/⌘ + 휠 확대
+    var w1 = new WheelEvent('wheel', { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true });
+    window.dispatchEvent(w1);
+    var w2 = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+    window.dispatchEvent(w2);
+    result.wheelZoomBlocked = w1.defaultPrevented;
+    result.plainWheelAllowed = !w2.defaultPrevented;
+
+    // 계산된 touch-action
+    var cs = function (sel) {
+      var n = document.querySelector(sel);
+      return n ? getComputedStyle(n).touchAction : null;
+    };
+    result.touchAction = {
+      body: cs('body'),
+      canvas: cs('#game'),
+      hud: cs('#hud'),
+      joystick: cs('#joystick'),
+      fire: cs('.fire-btn'),
+      pauseBtn: cs('#btn-pause'),
+      screen: cs('#screen-start'),
+    };
+    result.counters = { gesture: stats.gesture, pinch: stats.pinch, doubleTap: stats.doubleTap, wheel: stats.wheel };
+
+    var ok = result.gestureBlocked && result.pinchStartBlocked && result.pinchMoveBlocked &&
+      result.doubleTapOnGameBlocked && result.doubleTapOnButtonBlocked === false &&
+      result.wheelZoomBlocked && result.plainWheelAllowed &&
+      result.touchAction.canvas === 'none' && result.touchAction.hud === 'none' &&
+      result.touchAction.joystick === 'none' && result.touchAction.fire === 'none' &&
+      result.touchAction.body === 'none';
+    result.pass = !!ok;
+    window.__zoomTest = result;
+  }
 })();
