@@ -251,7 +251,22 @@ export class World {
           fcol[i * 3 + 1] = fc.g;
           fcol[i * 3 + 2] = fc.b;
         }
-        floorGeo.computeVertexNormals();
+        // 청크 경계에서도 이어지는 해석적 노멀
+        const nrm = floorGeo.attributes.normal;
+        const eps = 0.6;
+        for (let i = 0; i < fp.count; i++) {
+          const wx = fp.getX(i) + ox;
+          const wz = fp.getZ(i) + oz;
+          const hL = terrainHeight(wx - eps, wz);
+          const hR = terrainHeight(wx + eps, wz);
+          const hD = terrainHeight(wx, wz - eps);
+          const hU = terrainHeight(wx, wz + eps);
+          const nx = hL - hR;
+          const ny = 2 * eps;
+          const nz = hD - hU;
+          const len = Math.hypot(nx, ny, nz) || 1;
+          nrm.setXYZ(i, nx / len, ny / len, nz / len);
+        }
         floorGeo.setAttribute('color', new THREE.BufferAttribute(fcol, 3));
         group.add(new THREE.Mesh(floorGeo, rockMat));
 
@@ -310,16 +325,6 @@ export class World {
         this.chunks.push({ group, rockMat, coralMat, kelpMat });
       }
     }
-  }
-
-  _buildHorizon() {
-    const geo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
-    geo.rotateX(-Math.PI / 2);
-    this.horizonMat = new THREE.MeshBasicMaterial({ color: this.zone.fog });
-    const m = new THREE.Mesh(geo, this.horizonMat);
-    m.position.y = FLOOR_Y - 2.5;
-    m.frustumCulled = false;
-    this.scene.add(m);
   }
 
   /* ---------------- 바위 아치(수중 터널) ---------------- */
@@ -549,7 +554,6 @@ export class World {
     this.hemi.color.lerp(new THREE.Color(tz.hemiSky), k);
     this.hemi.groundColor.lerp(new THREE.Color(tz.hemiGround), k);
     this.ambient.color.lerp(new THREE.Color(tz.ambient), k);
-    if (this.horizonMat) this.horizonMat.color.lerp(new THREE.Color(tz.fog), k);
     this.ambient.intensity += (tz.ambientI - this.ambient.intensity) * k;
     this.sun.intensity += (tz.sunI - this.sun.intensity) * k;
     this.sun.color.lerp(new THREE.Color(tz.sun), k);
