@@ -677,50 +677,53 @@ const KRAKEN = {
 
 /** 아래로 말리는 다리·촉수 한 가닥 */
 function krakenLimb(segCount, len, thick, curl, color) {
-  const parts = [];
-  let px = 0;
-  let py = 0;
-  let pz = 0;
+  // 곡선을 따라 가늘어지는 매끈한 다리 — TubeGeometry 를 직접 가공한다
+  const pts = [];
+  const p = new THREE.Vector3(0, 0, 0);
   let ang = 0;
-  let r = thick;
-  const suckerG = new THREE.SphereGeometry(0.07, 5, 4);
-  for (let i = 0; i < segCount; i++) {
+  for (let i = 0; i <= segCount; i++) {
+    pts.push(p.clone());
     const L = len / segCount;
-    const geo = new THREE.CylinderGeometry(r * 0.76, r, L, 9);
-    geo.rotateX(Math.PI / 2);
-    geo.translate(0, 0, -L / 2);
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(ang, 0, 0));
-    const m = new THREE.Matrix4().compose(
-      new THREE.Vector3(px, py, pz), q, new THREE.Vector3(1, 1, 1)
-    );
-    geo.applyMatrix4(m);
-    parts.push(paint(geo, color));
-
-    // 빨판
-    for (let s = 0; s < 2; s++) {
-      const sg = suckerG.clone();
-      const off = new THREE.Vector3(0, -r * 0.72, -(L * (0.3 + s * 0.5)))
-        .applyQuaternion(q);
-      sg.translate(px + off.x, py + off.y, pz + off.z);
-      parts.push(paint(sg, KRAKEN.sucker));
-    }
-
-    const dir = new THREE.Vector3(0, 0, -L).applyQuaternion(q);
-    px += dir.x;
-    py += dir.y;
-    pz += dir.z;
+    const dir = new THREE.Vector3(0, -Math.sin(ang), -Math.cos(ang));
+    p.addScaledVector(dir, L);
     ang += curl;
-    r *= 0.84;
   }
-  // 끝을 뾰족하게
-  const endQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(ang - curl, 0, 0));
-  const tipGeo = new THREE.ConeGeometry(r * 1.05, r * 3.0, 7);
-  tipGeo.rotateX(-Math.PI / 2);
-  tipGeo.translate(0, 0, -r * 1.5);
-  tipGeo.applyMatrix4(new THREE.Matrix4().compose(
-    new THREE.Vector3(px, py, pz), endQ, new THREE.Vector3(1, 1, 1)
-  ));
-  parts.push(paint(tipGeo, color));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const segs = segCount * 6;
+  const radial = 8;
+  const geo = new THREE.TubeGeometry(curve, segs, thick, radial, false);
+  const pos = geo.attributes.position;
+  const c = new THREE.Vector3();
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const k = 1 - Math.pow(t, 0.75) * 0.92;   // 끝으로 갈수록 가늘게
+    curve.getPointAt(t, c);
+    for (let j = 0; j <= radial; j++) {
+      const vi = i * (radial + 1) + j;
+      pos.setXYZ(
+        vi,
+        c.x + (pos.getX(vi) - c.x) * k,
+        c.y + (pos.getY(vi) - c.y) * k,
+        c.z + (pos.getZ(vi) - c.z) * k
+      );
+    }
+  }
+  geo.computeVertexNormals();
+  paint(geo, color);
+
+  // 빨판 (아랫면을 따라 작은 구슬)
+  const parts = [geo];
+  const suckerG = new THREE.SphereGeometry(0.075, 6, 5);
+  for (let i = 2; i < segs - 2; i += 3) {
+    const t = i / segs;
+    const k = 1 - Math.pow(t, 0.75) * 0.92;
+    curve.getPointAt(t, c);
+    const off = thick * k * 0.8;
+    const sg = suckerG.clone();
+    sg.scale(new THREE.Vector3(1, 0.6, 1));
+    sg.translate(c.x, c.y - off, c.z);
+    parts.push(paint(sg, KRAKEN.sucker));
+  }
   return mergeGeometries(parts, false);
 }
 
@@ -734,7 +737,7 @@ export function makeKraken() {
     color: KRAKEN.mantleDark, shininess: 30, specular: 0x7a5060,
   });
   const limbMat = new THREE.MeshPhongMaterial({
-    vertexColors: true, shininess: 36, specular: 0x9a6078,
+    vertexColors: true, shininess: 16, specular: 0x5a3a48,
     emissive: 0x24080f, emissiveIntensity: 0.5,
   });
 
