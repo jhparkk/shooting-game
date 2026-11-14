@@ -12,14 +12,21 @@ import {
 } from './models.js';
 
 export const SURFACE_Y = 34;
-export const FLOOR_Y = -14;
+export const FLOOR_Y = -50;   // 해구 바닥 (수심 약 113m)
+export const BANK_Y = 21;     // 산호 언덕 봉우리 (수심 약 18m)
+export const SHELF_Y = 9;     // 산호 지대 평지 (수심 약 34m)
+export const RIM_Y = 18;      // 아레나 외곽의 얕은 암벽
 export const ARENA = 168;
 
+/** 수심(m) 환산 계수 — 월드 1단위 = 1.35m */
+export const DEPTH_SCALE = 1.35;
+
+/* 수심 구간별 물빛 — 얕은 산호 언덕 → 해저 협곡 → 심해 해구 */
 export const ZONES = [
   {
-    name: '산호초 지대',
-    fog: 0x2fbfb2, density: 0.0048,
-    skyTop: 0xb8fff4, skyMid: 0x33b3b8, skyBottom: 0x0a5f74,
+    name: '산호 언덕',
+    fog: 0x49d8c4, density: 0.0036,
+    skyTop: 0xc4fff4, skyMid: 0x3fc0c2, skyBottom: 0x0a6b7e,
     hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 0.95,
     ambient: 0x9ff0e8, ambientI: 0.5,
     sun: 0xfffbee, sunI: 1.5,
@@ -27,39 +34,113 @@ export const ZONES = [
   },
   {
     name: '해저 협곡',
-    fog: 0x2ba5c4, density: 0.0055,
-    skyTop: 0xa9ecff, skyMid: 0x2596bb, skyBottom: 0x075a7c,
-    hemiSky: 0xd2f6ff, hemiGround: 0x1f7d94, hemi: 0.9,
-    ambient: 0x8fe0f5, ambientI: 0.48,
-    sun: 0xfdf8ec, sunI: 1.45,
+    fog: 0x1e93c8, density: 0.0064,
+    skyTop: 0x9fe6ff, skyMid: 0x1c7fb8, skyBottom: 0x063f6e,
+    hemiSky: 0xd2f6ff, hemiGround: 0x1a708c, hemi: 0.8,
+    ambient: 0x8fe0f5, ambientI: 0.44,
+    sun: 0xfdf8ec, sunI: 1.2,
     coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
   },
   {
-    name: '산호 군락',
-    fog: 0x1f8fbe, density: 0.0062,
-    skyTop: 0x98e4ff, skyMid: 0x1f86b4, skyBottom: 0x064c72,
-    hemiSky: 0xccf4ff, hemiGround: 0x1a708c, hemi: 0.85,
-    ambient: 0x86d8f2, ambientI: 0.45,
-    sun: 0xfdf6e6, sunI: 1.4,
-    coral: [0x7ff0ff, 0xc08bff, 0xff8ad4, 0x6cf0c0, 0xa8ffff],
+    name: '심해 해구',
+    fog: 0x0a2a72, density: 0.0105,
+    skyTop: 0x2f6bc0, skyMid: 0x0d2f6e, skyBottom: 0x020a20,
+    hemiSky: 0x6fa8ff, hemiGround: 0x081a3a, hemi: 0.5,
+    ambient: 0x3f6cc0, ambientI: 0.32,
+    sun: 0xd8e8ff, sunI: 0.55,
+    coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
   },
 ];
+
+/* 물빛이 바뀌는 수심(m) 경계 */
+export const ZONE_DEPTHS = [38, 72];
+/** 물빛 그라디언트가 완료되는 수심 */
+const DEPTH_GRADIENT_END = 95;
+
+export function zoneIndexForDepth(depth) {
+  return depth < ZONE_DEPTHS[0] ? 0 : depth < ZONE_DEPTHS[1] ? 1 : 2;
+}
 
 const CHUNKS = 3;
 const CHUNK_SIZE = (ARENA * 2) / CHUNKS;
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const smoothstep = (a, b, x) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+const mix = (a, b, t) => a + (b - a) * t;
 
-/** 바닥 높이 (월드 좌표) */
-export function terrainHeight(x, z) {
-  const h =
-    Math.sin(x * 0.021) * 2.6 +
-    Math.cos(z * 0.019) * 2.2 +
-    Math.sin((x + z) * 0.013) * 1.8 +
-    Math.cos(x * 0.052 + z * 0.041) * 0.9 +
-    Math.sin(x * 0.11) * Math.cos(z * 0.09) * 0.4;
-  const edge = Math.max(Math.abs(x), Math.abs(z)) / ARENA;
-  return FLOOR_Y + h + Math.pow(clamp01(edge), 3) * 16;
+/** 낮은 주파수 지형 노이즈 (사인 합성 — 청크 경계에서도 연속) */
+function terrainNoise(x, z) {
+  return (
+    Math.sin(x * 0.017 + Math.cos(z * 0.013) * 1.7) * 0.55 +
+    Math.cos(z * 0.021 + Math.sin(x * 0.011) * 1.3) * 0.45 +
+    Math.sin((x + z) * 0.009) * 0.35 +
+    Math.sin(x * 0.043 + z * 0.031) * 0.22
+  );
+}
+
+/** 넓은 범위의 함몰/융기 (평지 수심을 40~55m 사이로 흔든다) */
+function basinNoise(x, z) {
+  return (
+    Math.sin(x * 0.0072 + 0.8) * Math.cos(z * 0.0061 - 0.4) +
+    0.6 * Math.sin((x + z) * 0.0045 + 2.1)
+  );
+}
+
+/** 해저 협곡·해구의 세기 (0 = 평지, 1 = 골짜기 한가운데) */
+function trenchStrength(x, z) {
+  // 남북으로 굽이치는 주 협곡
+  const pathX = 52 * Math.sin(z * 0.0105) + 14 * Math.sin(z * 0.026 + 1.1);
+  const d1 = Math.abs(x - pathX);
+  const w1 = 27 + 9 * Math.sin(z * 0.021);
+  const v1 = Math.exp(-(d1 * d1) / (w1 * w1));
+  // 동서로 가로지르는 지협곡
+  const pathZ = -22 + 30 * Math.sin(x * 0.014 + 0.6);
+  const d2 = Math.abs(z - pathZ);
+  const w2 = 23 + 7 * Math.sin(x * 0.028);
+  const v2 = Math.exp(-(d2 * d2) / (w2 * w2));
+  return Math.min(1, v1 * 0.95 + v2 * 0.8);
+}
+
+/**
+ * 해저 높이 (월드 y)
+ *  · 산호 언덕 봉우리 y≈21 → 수심 약 18m
+ *  · 산호 지대 평지   y≈-5~9 → 수심 약 34~53m
+ *  · 해저 협곡 바닥   y≈-50   → 수심 약 113m
+ * 수심(m) = (SURFACE_Y - y) * DEPTH_SCALE
+ */
+export function getTerrainHeight(x, z) {
+  const hill = smoothstep(-0.35, 0.75, terrainNoise(x, z));
+  const shelf = SHELF_Y - 14 * (0.5 + 0.5 * Math.tanh(basinNoise(x, z) * 1.6));
+  let h = shelf + hill * (BANK_Y - shelf);
+  h += terrainNoise(x * 2.7, z * 2.7) * 0.9;
+
+  const v = trenchStrength(x, z);
+  const deep = FLOOR_Y +
+    5 * Math.sin(x * 0.05) * Math.cos(z * 0.047) +
+    2.5 * Math.sin((x + z) * 0.03);
+  h = h * (1 - v) + deep * v;
+
+  // 아레나 바깥은 얕은 암벽으로 둘러싼다
+  const rim = smoothstep(ARENA * 0.70, ARENA * 0.97, Math.max(Math.abs(x), Math.abs(z)));
+  return h + (RIM_Y - h) * rim;
+}
+
+/** 기존 호출부 호환 */
+export const terrainHeight = getTerrainHeight;
+
+/** 수심(m) */
+export function depthAt(x, z) {
+  return Math.max(0, (SURFACE_Y - getTerrainHeight(x, z)) * DEPTH_SCALE);
+}
+
+/** 경사(기울기) — 급한 벽에는 산호를 심지 않는다 */
+function slopeAt(x, z, e = 1.5) {
+  const dx = (getTerrainHeight(x + e, z) - getTerrainHeight(x - e, z)) / (2 * e);
+  const dz = (getTerrainHeight(x, z + e) - getTerrainHeight(x, z - e)) / (2 * e);
+  return Math.hypot(dx, dz);
 }
 
 function streakTexture() {
@@ -127,6 +208,21 @@ export class World {
     this.kelpUniform = { value: 0 };
     this.creatures = [];
     this.schools = [];
+    this.depthT = 0;
+
+    // 구역별 색을 매 프레임 새로 만들지 않도록 캐시
+    this.zoneCols = ZONES.map((z) => ({
+      fog: new THREE.Color(z.fog),
+      skyTop: new THREE.Color(z.skyTop),
+      skyMid: new THREE.Color(z.skyMid),
+      skyBottom: new THREE.Color(z.skyBottom),
+      hemiSky: new THREE.Color(z.hemiSky),
+      hemiGround: new THREE.Color(z.hemiGround),
+      ambient: new THREE.Color(z.ambient),
+      sun: new THREE.Color(z.sun),
+    }));
+    this._c = new THREE.Color();
+    this._c2 = new THREE.Color();
 
     this._buildSky();
     this._buildLights();
@@ -134,6 +230,7 @@ export class World {
     this._buildArches();
     this._buildRays();
     this._buildParticles();
+    this._buildSchools();
     this._buildCreatures();
     this.setZone(0);
   }
@@ -231,7 +328,7 @@ export class World {
         group.position.set(ox, 0, oz);
 
         /* 바닥 */
-        const floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, 22, 22);
+        const floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, 32, 32);
         floorGeo.rotateX(-Math.PI / 2);
         const fp = floorGeo.attributes.position;
         const fcol = new Float32Array(fp.count * 3);
@@ -245,7 +342,9 @@ export class World {
             Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
             Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
           const k = clamp01((n + 1.15) / 2.3);
-          fc.setHSL(0.40 - k * 0.05, 0.42, 0.2 + k * 0.16);
+          // 깊을수록 모래빛에서 차가운 푸른 빛으로, 어둡게
+          const dk = clamp01((SURFACE_Y - y) / 90);
+          fc.setHSL(0.40 + dk * 0.2 - k * 0.03, 0.44 - dk * 0.14, 0.34 - dk * 0.19 + k * 0.05);
           fcol[i * 3] = fc.r;
           fcol[i * 3 + 1] = fc.g;
           fcol[i * 3 + 2] = fc.b;
@@ -273,10 +372,10 @@ export class World {
         const rockGeos = [];
         const coralGeos = [];
         const kelpGeos = [];
-        for (let i = 0; i < 18; i++) {
+        for (let i = 0; i < 22; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.95;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.95;
-          const r = 1.0 + rnd() * 2.4;
+          const r = 1.0 + rnd() * 2.6;
           const geo = rockGeometry(r, 900 + seed * 13 + i);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
@@ -286,9 +385,15 @@ export class World {
           paint(geo, new THREE.Color().setHSL(0.36, 0.16, g).getHex());
           rockGeos.push(geo);
         }
-        for (let i = 0; i < 38; i++) {
+        for (let i = 0; i < 44; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.92;
+          const wx = ox + lx;
+          const wz = oz + lz;
+          const gy = terrainHeight(wx, wz);
+          // 깊은 골짜기 바닥과 급한 벽에는 산호를 심지 않는다
+          if (gy < -3) continue;
+          if (slopeAt(wx, wz) > 0.85) continue;
           const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
           const kind = rnd();
           let geo;
@@ -299,26 +404,31 @@ export class World {
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
-          m.setPosition(lx, terrainHeight(ox + lx, oz + lz) + 0.1, lz);
+          m.setPosition(lx, gy + 0.1, lz);
           geo.applyMatrix4(m);
           coralGeos.push(geo);
         }
-        for (let i = 0; i < 18; i++) {
+        for (let i = 0; i < 22; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.94;
+          const wx = ox + lx;
+          const wz = oz + lz;
+          const gy = terrainHeight(wx, wz);
+          if (gy < 2) continue;              // 해초 숲은 얕은 언덕에만
+          if (slopeAt(wx, wz) > 0.7) continue;
           const h = 4 + rnd() * 9;
           const w = 0.7 + rnd() * 0.7;
           const geo = kelpGeometry(h, w, 300 + seed * 13 + i);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
-          m.setPosition(lx, terrainHeight(ox + lx, oz + lz) - 0.3, lz);
+          m.setPosition(lx, gy - 0.3, lz);
           geo.applyMatrix4(m);
           kelpGeos.push(geo);
         }
 
-        group.add(new THREE.Mesh(mergeGeometries(rockGeos, false), rockMat));
-        group.add(new THREE.Mesh(mergeGeometries(coralGeos, false), coralMat));
-        group.add(new THREE.Mesh(mergeGeometries(kelpGeos, false), kelpMat));
+        if (rockGeos.length) group.add(new THREE.Mesh(mergeGeometries(rockGeos, false), rockMat));
+        if (coralGeos.length) group.add(new THREE.Mesh(mergeGeometries(coralGeos, false), coralMat));
+        if (kelpGeos.length) group.add(new THREE.Mesh(mergeGeometries(kelpGeos, false), kelpMat));
 
         this.scene.add(group);
         this.chunks.push({ group, rockMat, coralMat, kelpMat });
@@ -331,10 +441,10 @@ export class World {
     this.arches = [];
     const rnd = mulberry(4242);
     const spots = [
-      { x: -58, z: -52, r: 17, rot: 0.5 },
-      { x: 64, z: -18, r: 20, rot: -0.9 },
-      { x: -20, z: 74, r: 15, rot: 2.1 },
-      { x: 92, z: 66, r: 18, rot: 1.2 },
+      { x: -40, z: 20, r: 17, rot: 0.5 },
+      { x: 40, z: -70, r: 20, rot: -0.9 },
+      { x: -90, z: 40, r: 15, rot: 2.1 },
+      { x: -58, z: -52, r: 18, rot: 1.2 },
     ];
     for (const s of spots) {
       const geos = [];
@@ -465,13 +575,20 @@ export class World {
   /* ---------------- 물고기 떼 ---------------- */
   _buildSchools() {
     const rnd = mulberry(918);
-    for (let s = 0; s < 5; s++) {
+    for (let s = 0; s < 6; s++) {
       const count = 24;
       const inst = makeFishSchool(count);
+      const cx = (rnd() - 0.5) * 150;
+      const cz = (rnd() - 0.5) * 150;
+      const gy = terrainHeight(cx, cz);
       const school = {
         mesh: inst,
         offsets: [],
-        center: new THREE.Vector3((rnd() - 0.5) * 150, FLOOR_Y + 16 + rnd() * 22, (rnd() - 0.5) * 150),
+        center: new THREE.Vector3(
+          cx,
+          gy < -12 ? gy + 16 : gy + 9 + rnd() * 7,
+          cz
+        ),
         radius: 26 + rnd() * 44,
         angle: rnd() * 6.28,
         angular: (0.04 + rnd() * 0.08) * (rnd() > 0.5 ? 1 : -1),
@@ -533,7 +650,8 @@ export class World {
     this.zoneIndex = i;
     this.zone = ZONES[i];
     this.zoneTarget = ZONES[i];
-    const tint = new THREE.Color(this.zone.coral[0]).lerp(new THREE.Color(0xffffff), 0.9);
+    // 바닥 색은 항상 산호 지대 톤을 기본으로 (물빛은 update 에서 수심에 따라 변한다)
+    const tint = new THREE.Color(ZONES[0].coral[0]).lerp(new THREE.Color(0xffffff), 0.9);
     this.floorMats.forEach((m) => m.color.copy(tint));
   }
 
@@ -542,23 +660,42 @@ export class World {
     this.time += dt;
     this.kelpUniform.value = this.time;
 
-    // 안개/조명 전환
-    const tz = this.zoneTarget;
-    const k = Math.min(1, dt * 0.7);
-    if (this.scene.fog) {
-      this.scene.fog.color.lerp(new THREE.Color(tz.fog), k);
-      this.scene.fog.density += (tz.density - this.scene.fog.density) * k;
+    // 수심에 따른 물빛 전환 — 얕은 에메랄드에서 깊은 코발트로
+    const depth = Math.max(0, (SURFACE_Y - playerPos.y) * DEPTH_SCALE);
+    const t = clamp01(depth / DEPTH_GRADIENT_END);
+    this.depthT = t;
+    this.zoneIndex = zoneIndexForDepth(depth);
+    let a = 0;
+    let b = 1;
+    let u;
+    const split = 0.55;
+    if (t < split) {
+      a = 0; b = 1; u = t / split;
+    } else {
+      a = 1; b = 2; u = (t - split) / (1 - split);
     }
-    this.hemi.intensity += (tz.hemi - this.hemi.intensity) * k;
-    this.hemi.color.lerp(new THREE.Color(tz.hemiSky), k);
-    this.hemi.groundColor.lerp(new THREE.Color(tz.hemiGround), k);
-    this.ambient.color.lerp(new THREE.Color(tz.ambient), k);
-    this.ambient.intensity += (tz.ambientI - this.ambient.intensity) * k;
-    this.sun.intensity += (tz.sunI - this.sun.intensity) * k;
-    this.sun.color.lerp(new THREE.Color(tz.sun), k);
-    this.skyUniforms.top.value.lerp(new THREE.Color(tz.skyTop), k);
-    this.skyUniforms.mid.value.lerp(new THREE.Color(tz.skyMid), k);
-    this.skyUniforms.bottom.value.lerp(new THREE.Color(tz.skyBottom), k);
+    u = u * u * (3 - 2 * u);
+    const c0 = this.zoneCols[a];
+    const c1 = this.zoneCols[b];
+    const z0 = ZONES[a];
+    const z1 = ZONES[b];
+    const k = Math.min(1, dt * 2.2);
+    const tc = this._c;
+
+    if (this.scene.fog) {
+      this.scene.fog.color.lerp(tc.copy(c0.fog).lerp(c1.fog, u), k);
+      this.scene.fog.density += (mix(z0.density, z1.density, u) - this.scene.fog.density) * k;
+    }
+    this.hemi.intensity += (mix(z0.hemi, z1.hemi, u) - this.hemi.intensity) * k;
+    this.hemi.color.lerp(tc.copy(c0.hemiSky).lerp(c1.hemiSky, u), k);
+    this.hemi.groundColor.lerp(tc.copy(c0.hemiGround).lerp(c1.hemiGround, u), k);
+    this.ambient.color.lerp(tc.copy(c0.ambient).lerp(c1.ambient, u), k);
+    this.ambient.intensity += (mix(z0.ambientI, z1.ambientI, u) - this.ambient.intensity) * k;
+    this.sun.intensity += (mix(z0.sunI, z1.sunI, u) - this.sun.intensity) * k;
+    this.sun.color.lerp(tc.copy(c0.sun).lerp(c1.sun, u), k);
+    this.skyUniforms.top.value.lerp(tc.copy(c0.skyTop).lerp(c1.skyTop, u), k);
+    this.skyUniforms.mid.value.lerp(tc.copy(c0.skyMid).lerp(c1.skyMid, u), k);
+    this.skyUniforms.bottom.value.lerp(tc.copy(c0.skyBottom).lerp(c1.skyBottom, u), k);
 
     // 빛줄기 살랑임
     for (const r of this.rays) {
@@ -650,7 +787,11 @@ export class World {
       const R = c.radius;
       const cx = c.center.x + Math.cos(c.angle) * R;
       const cz = c.center.z + Math.sin(c.angle) * R;
-      const cy = c.center.y + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
+      const ground = terrainHeight(cx, cz) + 7;
+      const cy = Math.max(
+        c.center.y + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4,
+        ground
+      );
       const vx = -Math.sin(c.angle) * Math.sign(c.angular);
       const vz = Math.cos(c.angle) * Math.sign(c.angular);
       g.position.set(cx, cy, cz);

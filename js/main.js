@@ -4,8 +4,11 @@
    ========================================================= */
 import * as THREE from 'three';
 import { Sound } from './audio.js';
-import { World, ZONES, SURFACE_Y, ARENA, terrainHeight } from './world.js';
-import { makeSubmarine, makeShark, makeJellyfish, makeMine, makeBoss, spriteGlow } from './models.js';
+import { World, ZONES, SURFACE_Y, ARENA, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js';
+import {
+  makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
+  makeAnglerfish, makeJellyfish, makeKraken, spriteGlow,
+} from './models.js';
 import { FX } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +17,8 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const damp = (k, dt) => 1 - Math.exp(-k * dt);
 
 const BEST_KEY = 'abyss-diver-best';
-const START_POS = new THREE.Vector3(0, 4, 62);
+// 산호 언덕 위에서 시작 — 앞쪽으로 해저 협곡이 깊게 떨어진다
+const START_POS = new THREE.Vector3(-20, terrainHeight(-20, 60) + 7, 60);
 
 /* ---------------- DOM ---------------- */
 const canvas = $('game');
@@ -432,7 +436,9 @@ function refreshHud() {
   setText(el.score, G.score.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
   setText(el.depth, Math.floor(G.depth));
-  setText(el.zone, ZONES[G.zoneIndex].name);
+  const zi = zoneIndexForDepth(G.depth);
+  G.zoneIndex = zi;
+  setText(el.zone, ZONES[zi].name);
   setText(el.bombs, G.bombs);
   el.bombBtn.classList.toggle('empty', G.bombs <= 0);
   el.bombBtn.classList.toggle('ready', G.bombs > 0);
@@ -494,7 +500,6 @@ function resetGame() {
   player.obj.visible = true;
 
   world.reset();
-  applyZone(0);
   updateSubTransform(0);
   snapCamera();
 
@@ -577,26 +582,19 @@ function toggleMute() {
 }
 
 /* ---------------- 웨이브 ---------------- */
-function applyZone(i) {
-  G.zoneIndex = i;
-  world.setZone(i);
-}
-
 function startWave(n) {
   G.wave = n;
   G.kills = 0;
-  const zone = n <= 2 ? 0 : n <= 4 ? 1 : 2;
-  applyZone(zone);
   G.spawnTimer = 1.0;
 
   if (n % 3 === 0) {
     G.waveGoal = Infinity;
     spawnBoss(n);
-    banner(`웨이브 ${n} · 심해 포식자 출현`, 2600);
+    banner(`웨이브 ${n} · 크라켄 출현`, 2600);
     sound.bossWarn();
   } else {
     G.waveGoal = 5 + n * 2;
-    banner(`웨이브 ${n} · ${ZONES[zone].name}`, 2000);
+    banner(`웨이브 ${n} · ${ZONES[zoneIndexForDepth(G.depth)].name}`, 2000);
   }
   refreshHud();
 }
@@ -614,19 +612,22 @@ function waveCleared() {
 
 /* ---------------- 보스 ---------------- */
 function spawnBoss(wave) {
-  const b = makeBoss();
+  const b = makeKraken();
   const hp = 28 + Math.floor(wave / 3) * 12;
   computeForward(forward);
   b.group.position.copy(P.pos).addScaledVector(forward, 72);
+  b.group.position.y = clamp(
+    b.group.position.y,
+    terrainHeight(b.group.position.x, b.group.position.z) + 16,
+    SURFACE_Y - 16
+  );
   b.group.rotation.order = 'YXZ';
-  b.group.scale.setScalar(1.6 + Math.min(0.5, wave * 0.02));
+  b.group.scale.setScalar(1.45 + Math.min(0.5, wave * 0.02));
   scene.add(b.group);
   G.boss = {
     obj: b.group,
-    jaw: b.jaw,
-    tail: b.tail,
-    lure: b.lure,
-    lureGlow: b.lureGlow,
+    arms: b.arms,
+    tentacles: b.tentacles,
     hp,
     maxHp: hp,
     phase: Math.random() * 6.28,
@@ -657,62 +658,87 @@ function removeBoss() {
   el.bossBar.setAttribute('aria-hidden', 'true');
 }
 
-/* ---------------- 적 ---------------- */
-function spawnEnemy() {
-  const roll = Math.random();
-  let type = 'shark';
-  if (roll > 0.74) type = 'mine';
-  else if (roll > 0.42) type = 'jelly';
+/* ---------------- 적 (살아 있는 해양 생물) ---------------- */
+const ENEMY_STATS = {
+  shark: { hp: 2, r: 1.7, score: 130 },   // 백상아리
+  hammer: { hp: 3, r: 2.0, score: 180 },  // 귀상어
+  puffer: { hp: 2, r: 1.6, score: 90 },   // 독가시 복어
+  lion: { hp: 1, r: 1.5, score: 110 },    // 쏠배감펭
+  jelly: { hp: 1, r: 1.4, score: 90 },    // 발광 해파리
+  angler: { hp: 2, r: 1.6, score: 140 },  // 심해 아귀
+};
 
+/** 수심에 따라 그 깊이에 사는 생물이 나온다 */
+function pickEnemyType(depth) {
+  const roll = Math.random();
+  if (depth < 38) {
+    if (roll < 0.30) return 'puffer';
+    if (roll < 0.56) return 'lion';
+    if (roll < 0.80) return 'shark';
+    return 'jelly';
+  }
+  if (depth < 72) {
+    if (roll < 0.30) return 'shark';
+    if (roll < 0.52) return 'hammer';
+    if (roll < 0.70) return 'lion';
+    if (roll < 0.86) return 'jelly';
+    return 'puffer';
+  }
+  if (roll < 0.36) return 'angler';
+  if (roll < 0.58) return 'hammer';
+  if (roll < 0.80) return 'jelly';
+  return 'shark';
+}
+
+function makeEnemyModel(type) {
+  if (type === 'shark') return makeShark();
+  if (type === 'hammer') return makeHammerhead();
+  if (type === 'puffer') return makePuffer();
+  if (type === 'lion') return makeLionfish();
+  if (type === 'angler') return makeAnglerfish();
+  const palette = [0xb98bff, 0x7de8ff, 0xff9edb, 0xa8ffd8];
+  return makeJellyfish(palette[Math.floor(Math.random() * palette.length)]);
+}
+
+function spawnEnemy() {
   computeForward(forward);
   const ahead = Math.random() < 0.72 ? 1 : -0.35;
   const ang = Math.atan2(forward.x * ahead, forward.z * ahead) + rand(-1.15, 1.15);
   const dist = rand(52, 92);
   const x = P.pos.x + Math.sin(ang) * dist;
   const z = P.pos.z + Math.cos(ang) * dist;
-  const y = clamp(P.pos.y + rand(-13, 13), -4, SURFACE_Y - 8);
+  const ground = terrainHeight(x, z);
+  const y = clamp(P.pos.y + rand(-13, 13), ground + 3.5, SURFACE_Y - 8);
 
-  let obj;
-  let hp;
-  let r;
-  let score;
-  if (type === 'shark') {
-    const m = makeShark();
-    obj = m.group;
-    hp = 2;
-    r = 1.7;
-    score = 130;
-  } else if (type === 'jelly') {
-    const palette = [0xb98bff, 0x7de8ff, 0xff9edb, 0xa8ffd8];
-    const m = makeJellyfish(palette[Math.floor(Math.random() * palette.length)]);
-    obj = m.group;
-    hp = 1;
-    r = 1.4;
-    score = 90;
-  } else {
-    const m = makeMine();
-    obj = m.group;
-    hp = 2;
-    r = 1.4;
-    score = 70;
-  }
+  const type = pickEnemyType(G.depth);
+  const stats = ENEMY_STATS[type];
+  const model = makeEnemyModel(type);
+  const obj = model.group;
 
   obj.position.set(x, y, z);
   obj.rotation.order = 'YXZ';
-  const scale = 1.0 + Math.random() * 0.4;
+  const scale = 1.0 + Math.random() * 0.35;
   obj.scale.setScalar(scale);
   scene.add(obj);
+
+  const speed =
+    type === 'shark' ? rand(12, 16) :
+    type === 'hammer' ? rand(9, 12) :
+    type === 'jelly' ? rand(4, 7) :
+    type === 'angler' ? rand(4, 6.5) :
+    rand(2.4, 4.2);
 
   enemies.push({
     type,
     obj,
-    hp,
-    maxHp: hp,
-    r: r * scale,
-    score,
+    parts: model,
+    hp: stats.hp,
+    maxHp: stats.hp,
+    r: stats.r * scale,
+    score: stats.score,
     scale0: scale,
     phase: Math.random() * 6.28,
-    speed: type === 'shark' ? rand(12, 16) : type === 'jelly' ? rand(5, 8) : rand(2.5, 4.5),
+    speed,
     hit: 0,
     dead: false,
     swirl: rand(1.0, 2.2),
@@ -735,9 +761,14 @@ function damageEnemy(e, dmg) {
 
 function killEnemy(e) {
   const p = e.obj.position;
-  const big = e.type === 'shark';
+  const big = e.type === 'shark' || e.type === 'hammer';
+  const colors =
+    e.type === 'jelly' ? [0xd9a6ff, 0x9dfcff, 0xffffff] :
+    e.type === 'angler' ? [0x9dfcff, 0xd8fff4, 0xffffff] :
+    e.type === 'puffer' ? [0xffe08a, 0xffc06b, 0xffffff] :
+    [0xffd9a0, 0xff9a5a, 0xffffff];
   fx.burst(p.x, p.y, p.z, big ? 22 : 12, {
-    colors: e.type === 'jelly' ? [0xd9a6ff, 0x9dfcff, 0xffffff] : [0xffd9a0, 0xff9a5a, 0xffffff],
+    colors,
     speed: big ? 12 : 8, size: big ? 2.0 : 1.5, life: 0.7,
   });
   fx.flash(p, e.type === 'jelly' ? 0xd6b0ff : 0xffb070, big ? 7 : 5, 0.3);
@@ -920,7 +951,7 @@ function clampToWorld(pos, vel) {
       }
     }
   }
-  const ground = terrainHeight(pos.x, pos.z) + 5.5;
+  const ground = terrainHeight(pos.x, pos.z) + 4.5;
   if (pos.y < ground) {
     pos.y = ground;
     if (vel && vel.y < 0) vel.y = 0;
@@ -962,7 +993,7 @@ function updatePlayer(dt) {
   updateSubTransform(dt);
 
   // 수심
-  G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * 1.35);
+  G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
   if (G.depth > G.maxDepth) G.maxDepth = G.depth;
 
   // 기포 흘리기
@@ -1019,7 +1050,7 @@ function updateEnemies(dt) {
     const dist = tmpVec.length() || 1;
     tmpVec.multiplyScalar(1 / dist);
 
-    if (e.type === 'shark') {
+    if (e.type === 'shark' || e.type === 'hammer') {
       // 유도 돌진 + 좌우 흔들림
       const side = tmpVec2.set(-tmpVec.z, 0, tmpVec.x).normalize();
       o.position.addScaledVector(tmpVec, e.speed * dt);
@@ -1028,7 +1059,7 @@ function updateEnemies(dt) {
       o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.7;
       o.rotation.z = Math.sin(e.phase * 2) * 0.3;
-      if (o.children[1]) o.children[1].rotation.y = Math.sin(e.phase * 3.4) * 0.5;
+      if (e.parts.tail) e.parts.tail.rotation.y = Math.sin(e.phase * 3.4) * 0.5;
     } else if (e.type === 'jelly') {
       o.position.addScaledVector(tmpVec, e.speed * dt);
       o.position.x += Math.sin(e.phase) * dt * 2.2;
@@ -1037,21 +1068,42 @@ function updateEnemies(dt) {
       o.scale.setScalar(e.scale0 * pulse);
       o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
       o.rotation.z = Math.sin(e.phase) * 0.16;
+    } else if (e.type === 'puffer') {
+      // 느긋하게 다가오며 몸을 부풀린다
+      o.position.addScaledVector(tmpVec, e.speed * dt);
+      o.position.y += Math.sin(e.phase * 1.1) * 0.6 * dt;
+      const puff = 1 + Math.sin(e.phase * 1.5) * 0.16;
+      if (e.parts.body) e.parts.body.scale.setScalar(puff);
+      if (e.parts.spikes) e.parts.spikes.scale.setScalar(0.82 + puff * 0.22);
+      o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+      o.rotation.z = Math.sin(e.phase * 0.8) * 0.12;
+    } else if (e.type === 'lion') {
+      // 지느러미를 펄럭이며 떠다닌다
+      o.position.addScaledVector(tmpVec, e.speed * dt);
+      o.position.x += Math.sin(e.phase * 1.3) * dt * 1.8;
+      o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+      o.rotation.z = Math.sin(e.phase * 1.1) * 0.14;
+      if (e.parts.fins) e.parts.fins.rotation.z = Math.sin(e.phase * 2.2) * 0.2;
     } else {
-      o.position.addScaledVector(tmpVec, e.speed * dt * 0.6);
-      o.rotation.y += dt * 0.7;
-      o.rotation.x += dt * 0.3;
-      const bl = o.children[1];
-      if (bl && bl.material) {
-        bl.material.opacity = 0.35 + Math.abs(Math.sin(e.phase * 2)) * 0.65;
-        bl.visible = Math.sin(e.phase * 3) > -0.3;
-      }
+      // 심해 아귀 — 유인 돌기를 흔들며 다가온다
+      o.position.addScaledVector(tmpVec, e.speed * dt);
+      o.position.y += Math.sin(e.phase * 0.9) * 0.8 * dt;
+      o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+      o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.3;
+      if (e.parts.jaw) e.parts.jaw.rotation.x = 0.08 + Math.abs(Math.sin(e.phase * 1.4)) * 0.5;
+      if (e.parts.lure) e.parts.lure.position.z = -1.6 + Math.sin(e.phase * 1.8) * 0.25;
+      if (e.parts.glow && e.parts.lure) e.parts.glow.position.copy(e.parts.lure.position);
     }
+
+    // 수면·해저 지형 클램프
+    const ground = terrainHeight(o.position.x, o.position.z) + 2.2;
+    if (o.position.y < ground) o.position.y = ground;
+    if (o.position.y > SURFACE_Y - 3) o.position.y = SURFACE_Y - 3;
 
     if (e.hit > 0) {
       e.hit -= dt;
-      if (e.type !== 'jelly') o.scale.setScalar(e.scale0 * (1 + e.hit * 0.9));
-    } else if (e.type !== 'jelly') {
+      if (e.type !== 'jelly' && e.type !== 'puffer') o.scale.setScalar(e.scale0 * (1 + e.hit * 0.9));
+    } else if (e.type !== 'jelly' && e.type !== 'puffer') {
       o.scale.setScalar(e.scale0);
     }
 
@@ -1061,11 +1113,12 @@ function updateEnemies(dt) {
     const dz = o.position.z - pp.z;
     const rr = e.r + 2.0;
     if (dx * dx + dy * dy + dz * dz < rr * rr) {
-      if (e.type === 'mine') {
-        fx.burst(o.position.x, o.position.y, o.position.z, 22, {
-          colors: [0xffd9a0, 0xff7b4a, 0xffffff], speed: 13, size: 2.2, life: 0.7,
+      if (e.type === 'puffer' || e.type === 'angler') {
+        // 가시·이빨에 닿으면 크게 터진다
+        fx.burst(o.position.x, o.position.y, o.position.z, 20, {
+          colors: [0xffe08a, 0xffb06b, 0xffffff], speed: 12, size: 2.0, life: 0.7,
         });
-        fx.flash(o.position, 0xffaa66, 10, 0.35);
+        fx.flash(o.position, 0xffb066, 9, 0.32);
         sound.explode('big');
       }
       hurtPlayer(1);
@@ -1081,7 +1134,6 @@ function updateEnemies(dt) {
     }
   }
 }
-
 /* ---------------- 보스 갱신 ---------------- */
 function updateBoss(dt) {
   const b = G.boss;
@@ -1105,17 +1157,32 @@ function updateBoss(dt) {
   o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.35;
   o.rotation.z = Math.sin(b.phase * 1.2) * 0.08;
 
-  b.tail.rotation.y = Math.sin(b.phase * 2.2) * 0.35;
-  const jawOpen = 0.16 + Math.abs(Math.sin(b.phase * 1.6)) * 0.4;
-  b.jaw.rotation.x = -jawOpen;
-  if (b.lure) b.lure.position.y = 4.3 + Math.sin(b.phase * 1.3) * 0.35;
-  if (b.lureGlow) b.lureGlow.position.copy(b.lure.position);
+  // 다리·촉수 흔들림
+  if (b.arms) {
+    for (let i = 0; i < b.arms.length; i++) {
+      const a = b.arms[i];
+      a.rotation.z = a.userData.baseZ + Math.sin(b.phase * 1.1 + a.userData.phase) * 0.16;
+      a.rotation.x = 0.12 + Math.sin(b.phase * 0.9 + a.userData.phase * 1.3) * 0.22;
+    }
+  }
+  if (b.tentacles) {
+    for (let i = 0; i < b.tentacles.length; i++) {
+      const tt = b.tentacles[i];
+      tt.rotation.z = tt.userData.baseZ + Math.sin(b.phase * 0.8 + tt.userData.phase) * 0.26;
+      tt.rotation.x = 0.1 + Math.sin(b.phase * 1.4 + tt.userData.phase) * 0.2;
+    }
+  }
+
+  // 해저·수면을 뚫지 않는다
+  const ground = terrainHeight(o.position.x, o.position.z) + 12;
+  if (o.position.y < ground) o.position.y = ground;
+  if (o.position.y > SURFACE_Y - 14) o.position.y = SURFACE_Y - 14;
 
   if (b.hit > 0) {
     b.hit -= dt;
-    o.scale.setScalar(1.6 * (1 + b.hit * 0.4));
+    o.scale.setScalar(1.45 * (1 + b.hit * 0.4));
   } else {
-    o.scale.setScalar(1.6 + Math.min(0.5, G.wave * 0.02));
+    o.scale.setScalar(1.45 + Math.min(0.5, G.wave * 0.02));
   }
 
   // 발사
@@ -1334,16 +1401,16 @@ function updateIdle(dt) {
     P.yaw = Math.sin(G.elapsed * 0.18) * 0.5;
     P.pitch = Math.sin(G.elapsed * 0.3) * 0.06;
     player.obj.visible = true;
-    player.obj.position.set(0, 4 + Math.sin(P.bob) * 0.3, START_POS.z);
+    player.obj.position.set(START_POS.x, START_POS.y + Math.sin(P.bob) * 0.3, START_POS.z);
     player.obj.rotation.set(P.pitch, P.yaw, Math.sin(G.elapsed * 0.4) * 0.1);
     player.prop.rotation.z += dt * 8;
     const orbit = G.elapsed * 0.12;
     camera.position.set(
-      Math.sin(orbit) * 17,
-      6.5 + Math.sin(G.elapsed * 0.3) * 1.2,
-      START_POS.z + Math.cos(orbit) * 17
+      START_POS.x + Math.sin(orbit) * 15,
+      START_POS.y + 5 + Math.sin(G.elapsed * 0.3) * 1.2,
+      START_POS.z + Math.cos(orbit) * 15
     );
-    camera.lookAt(0, 3.6, START_POS.z - 8);
+    camera.lookAt(START_POS.x, START_POS.y - 2, START_POS.z - 14);
     if (G.pingTimer !== undefined) {
       G.pingTimer -= dt;
       if (G.pingTimer <= 0) {
@@ -1495,7 +1562,7 @@ function boot() {
   setText(el.startBest, G.best.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
   snapCamera();
-  G.depth = (SURFACE_Y - P.pos.y) * 1.35;
+  G.depth = (SURFACE_Y - P.pos.y) * DEPTH_SCALE;
   G.maxDepth = G.depth;
   world.update(0, P.pos);
   renderer.render(scene, camera);
