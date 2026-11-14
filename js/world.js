@@ -88,6 +88,13 @@ function streakTexture() {
   ctx.globalCompositeOperation = 'destination-in';
   ctx.fillStyle = fade;
   ctx.fillRect(0, 0, w, h);
+  const fadeH = ctx.createLinearGradient(0, 0, w, 0);
+  fadeH.addColorStop(0, 'rgba(0,0,0,0)');
+  fadeH.addColorStop(0.22, 'rgba(0,0,0,1)');
+  fadeH.addColorStop(0.78, 'rgba(0,0,0,1)');
+  fadeH.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = fadeH;
+  ctx.fillRect(0, 0, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -123,7 +130,6 @@ export class World {
 
     this._buildSky();
     this._buildLights();
-    this._buildSurface();
     this._buildFloor();
     this._buildArches();
     this._buildRays();
@@ -189,50 +195,6 @@ export class World {
     this.rim = new THREE.DirectionalLight(0x8ff0ff, 0.35);
     this.rim.position.set(60, -20, -60);
     this.scene.add(this.rim);
-  }
-
-  /* ---------------- 수면 ---------------- */
-  _buildSurface() {
-    const geo = new THREE.PlaneGeometry(2600, 2600, 1, 1);
-    geo.rotateX(-Math.PI / 2);
-    this.surfaceUniforms = {
-      uTime: { value: 0 },
-      uA: { value: new THREE.Color(0xdafff8) },
-      uB: { value: new THREE.Color(0x7ae8e0) },
-    };
-    const mat = new THREE.ShaderMaterial({
-      uniforms: this.surfaceUniforms,
-      transparent: true,
-      opacity: 0.5,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform vec3 uA;
-        uniform vec3 uB;
-        varying vec2 vUv;
-        void main() {
-          float w = sin(vUv.x * 90.0 + uTime * 1.4) * cos(vUv.y * 74.0 - uTime * 1.1);
-          float w2 = sin((vUv.x + vUv.y) * 150.0 + uTime * 2.2);
-          float m = clamp(w * 0.6 + w2 * 0.4, -1.0, 1.0);
-          vec3 c = mix(uB, uA, m * 0.5 + 0.5);
-          gl_FragColor = vec4(c, 0.42);
-          #include <colorspace_fragment>
-        }
-      `,
-    });
-    this.surface = new THREE.Mesh(geo, mat);
-    this.surface.position.y = SURFACE_Y;
-    this.surface.renderOrder = -5;
-    this.scene.add(this.surface);
   }
 
   /* ---------------- 해저 ---------------- */
@@ -564,7 +526,6 @@ export class World {
   update(dt, playerPos) {
     this.time += dt;
     this.kelpUniform.value = this.time;
-    this.surfaceUniforms.uTime.value = this.time;
 
     // 안개/조명 전환
     const tz = this.zoneTarget;
@@ -701,8 +662,6 @@ export class World {
 
     // 하늘 돔은 플레이어를 따라간다
     this.sky.position.set(playerPos.x * 0.2, 0, playerPos.z * 0.2);
-    this.surface.position.x = playerPos.x;
-    this.surface.position.z = playerPos.z;
   }
 
   reset() {
