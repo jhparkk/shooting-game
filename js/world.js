@@ -481,12 +481,12 @@ export class World {
   _buildCreatures() {
     const rnd = mulberry(3131);
     const plan = [
-      { kind: 'whale', radius: 92, y: 20, scale: 1.6, angular: 0.035 },
-      { kind: 'whale', radius: 128, y: 26, scale: 1.35, angular: -0.026 },
-      { kind: 'manta', radius: 84, y: 14, scale: 1.7, angular: 0.06 },
-      { kind: 'manta', radius: 118, y: 8, scale: 1.4, angular: -0.05 },
-      { kind: 'turtle', radius: 58, y: 6, scale: 1.0, angular: 0.09 },
-      { kind: 'turtle', radius: 76, y: 11, scale: 1.2, angular: -0.08 },
+      { kind: 'whale', radius: 112, y: 22, scale: 1.6, angular: 0.035 },
+      { kind: 'whale', radius: 140, y: 28, scale: 1.35, angular: -0.026 },
+      { kind: 'manta', radius: 104, y: 16, scale: 1.7, angular: 0.055 },
+      { kind: 'manta', radius: 132, y: 12, scale: 1.4, angular: -0.05 },
+      { kind: 'turtle', radius: 88, y: 12, scale: 1.0, angular: 0.08 },
+      { kind: 'turtle', radius: 108, y: 15, scale: 1.2, angular: -0.07 },
     ];
     for (const p of plan) {
       let obj;
