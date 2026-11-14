@@ -595,7 +595,7 @@ function spawnBoss(wave) {
   computeForward(forward);
   b.group.position.copy(P.pos).addScaledVector(forward, 72);
   b.group.rotation.order = 'YXZ';
-  b.group.scale.setScalar(1.35 + Math.min(0.5, wave * 0.02));
+  b.group.scale.setScalar(1.6 + Math.min(0.5, wave * 0.02));
   scene.add(b.group);
   G.boss = {
     obj: b.group,
@@ -1069,8 +1069,8 @@ function updateBoss(dt) {
   const dist = tmpVec.length() || 1;
   tmpVec.multiplyScalar(1 / dist);
 
-  if (dist > 42) {
-    o.position.addScaledVector(tmpVec, 13 * dt);
+  if (dist > 32) {
+    o.position.addScaledVector(tmpVec, 14 * dt);
   } else {
     // 선회
     const side = tmpVec2.set(-tmpVec.z, 0, tmpVec.x).normalize();
@@ -1089,9 +1089,9 @@ function updateBoss(dt) {
 
   if (b.hit > 0) {
     b.hit -= dt;
-    o.scale.setScalar(1.4 * (1 + b.hit * 0.4));
+    o.scale.setScalar(1.6 * (1 + b.hit * 0.4));
   } else {
-    o.scale.setScalar(1.4 + Math.min(0.5, G.wave * 0.02));
+    o.scale.setScalar(1.6 + Math.min(0.5, G.wave * 0.02));
   }
 
   // 발사
