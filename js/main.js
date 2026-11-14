@@ -991,7 +991,7 @@ function updateEnemies(dt, t) {
       o.position.x += (targetX - o.position.x) * Math.min(1, dt * 0.9);
       o.position.y += (player.y - o.position.y) * Math.min(1, dt * 0.45) + Math.sin(e.phase * 2) * dt * 1.4;
       o.rotation.z = Math.sin(e.phase * 2) * 0.35;
-      o.rotation.y = Math.sin(e.phase) * 0.22;
+      o.rotation.y = Math.PI + Math.sin(e.phase) * 0.22;
       if (o.children[1]) o.children[1].rotation.y = Math.sin(e.phase * 3.4) * 0.5;
     } else if (e.type === 'jelly') {
       o.position.z += (G.speed * 0.72 + e.speed) * dt;
@@ -1000,6 +1000,7 @@ function updateEnemies(dt, t) {
       const pulse = 1 + Math.sin(e.phase * 2.6) * 0.09;
       o.scale.setScalar(e.scale0 * pulse);
       o.rotation.z = Math.sin(e.phase) * 0.16;
+      o.rotation.y = Math.PI;
     } else {
       o.position.z += G.speed * 0.6 * dt;
       o.rotation.y += dt * 0.8;
@@ -1065,7 +1066,7 @@ function updateBoss(dt, t) {
   b.y = 0.5 + Math.sin(b.phase * 0.8) * 2.4;
   o.position.x += (b.x - o.position.x) * Math.min(1, dt * 1.6);
   o.position.y += (b.y - o.position.y) * Math.min(1, dt * 1.6);
-  o.rotation.y = -Math.cos(b.phase * 0.55) * 0.35;
+  o.rotation.y = Math.PI - Math.cos(b.phase * 0.55) * 0.35;
   o.rotation.z = Math.sin(b.phase * 0.8) * 0.1;
 
   b.tail.rotation.y = Math.sin(b.phase * 2.2) * 0.35;

@@ -467,7 +467,7 @@ export class World {
     };
     obj.group.scale.setScalar(scale);
     obj.group.position.set(c.baseX, c.y, -96);
-    obj.group.rotation.y = c.baseX > 0 ? 0.5 : -0.5;
+    obj.group.rotation.y = Math.PI + (c.baseX > 0 ? 0.55 : -0.55);
     this.scene.add(obj.group);
     this.creatures.push(c);
   }
