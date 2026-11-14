@@ -491,8 +491,8 @@ function waveCleared() {
 function spawnBoss(wave) {
   const b = makeBoss();
   const hp = 26 + Math.floor(wave / 3) * 10;
-  b.group.position.set(0, 0.5, -78);
-  b.group.scale.setScalar(1.05 + Math.min(0.5, wave * 0.02));
+  b.group.position.set(0, 0.5, -70);
+  b.group.scale.setScalar(1.35 + Math.min(0.5, wave * 0.02));
   scene.add(b.group);
   G.boss = {
     obj: b.group,
@@ -1052,10 +1052,10 @@ function updateBoss(dt, t) {
   if (!b) return;
   b.phase += dt;
   const o = b.obj;
-  const baseScale = 1.05 + Math.min(0.5, G.wave * 0.02);
+  const baseScale = 1.35 + Math.min(0.5, G.wave * 0.02);
   o.scale.setScalar(baseScale);
 
-  const targetZ = -34;
+  const targetZ = -30;
   if (o.position.z < targetZ) {
     o.position.z += 16 * dt;
   } else {
@@ -1344,7 +1344,7 @@ function boot() {
 
   G.pingTimer = 4;
   if (new URLSearchParams(location.search).has('debug')) {
-    window.__abyss = { G, enemies, world, startWave, startGame, spawnBoss, damageBoss, removeBoss };
+    window.__abyss = { G, enemies, world, startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy };
   }
   loop();
 }

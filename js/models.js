@@ -66,7 +66,7 @@ const MET = {
   eyeRed: new THREE.MeshBasicMaterial({ color: 0xff3b3b }),
   eyeYellow: new THREE.MeshBasicMaterial({ color: 0xffd457 }),
   bone: new THREE.MeshLambertMaterial({ color: 0xf4f7ea }),
-  darkFlesh: new THREE.MeshPhongMaterial({ color: 0x1d2b3a, shininess: 30 }),
+  darkFlesh: new THREE.MeshPhongMaterial({ color: 0x33475c, shininess: 26, specular: 0x4a6a88, emissive: 0x0a1a28, emissiveIntensity: 0.7 }),
 };
 
 function mesh(geo, mat, x, y, z) {
@@ -404,7 +404,7 @@ export function makeBoss() {
   jaw.position.set(0, -0.9, -3.4);
   const jawG = new THREE.SphereGeometry(1, 12, 8);
   jawG.scale(2.3, 0.55, 1.9);
-  const jawMesh = new THREE.Mesh(jawG, new THREE.MeshPhongMaterial({ color: 0x2c3a4c, shininess: 20 }));
+  const jawMesh = new THREE.Mesh(jawG, new THREE.MeshPhongMaterial({ color: 0x44596e, shininess: 22, specular: 0x557799 }));
   jawMesh.position.set(0, -0.1, -0.4);
   jaw.add(jawMesh);
   g.add(jaw);
@@ -450,7 +450,7 @@ export function makeBoss() {
   lureGlow.position.copy(lure.position);
   g.add(lureGlow);
 
-  const light = new THREE.PointLight(0x8ffce8, 60, 46, 1.5);
+  const light = new THREE.PointLight(0x8ffce8, 160, 70, 1.4);
   light.position.copy(lure.position);
   g.add(light);
 
