@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#021a26" />
+<meta name="theme-color" content="#0a5f74" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="ABYSS DIVER" />
 <meta name="format-detection" content="telephone=no" />
-<meta name="description" content="3인칭 3D 심해 탐험 슈팅. 잠수정을 몰고 산호초와 해저 협곡, 심해 발광 지대를 유영하며 고래와 가오리를 만나고 기계 상어를 격파하세요. 아이폰 사파리와 PC 모두 지원." />
-<title>ABYSS DIVER · 심해 탐험 3D 슈팅</title>
+<meta name="description" content="3인칭 3D 심해 자유 탐험 슈팅. 잠수정을 직접 몰고 맑은 산호초 바다를 유영하며 고래와 가오리를 만나고 기계 상어를 격파하세요. 아이폰 사파리와 PC 모두 지원." />
+<title>ABYSS DIVER · 심해 자유 탐험 3D 슈팅</title>
 <link rel="stylesheet" href="style.css" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23021a26'/%3E%3Cpath d='M12 34c8-10 32-10 40 0-8 10-32 10-40 0z' fill='%2340e0d0'/%3E%3Ccircle cx='42' cy='31' r='2.6' fill='%23021a26'/%3E%3Cpath d='M14 34l-6-6v12z' fill='%2340e0d0'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a5f74'/%3E%3Cpath d='M12 34c8-10 32-10 40 0-8 10-32 10-40 0z' fill='%2340e0d0'/%3E%3Ccircle cx='42' cy='31' r='2.6' fill='%230a5f74'/%3E%3Cpath d='M14 34l-6-6v12z' fill='%2340e0d0'/%3E%3C/svg%3E" />
 <script type="importmap">
 {
   "imports": {
@@ -31,16 +31,25 @@
   <!-- ================= HUD ================= -->
   <div id="hud" class="hud hud-hidden">
     <div class="hud-top">
-      <div class="stat">
-        <span class="stat-label">점수</span>
-        <span id="hud-score" class="stat-value">0</span>
-        <span class="stat-sub">최고 <b id="hud-best">0</b></span>
+      <div class="hud-left">
+        <div class="stat">
+          <span class="stat-label">점수</span>
+          <span id="hud-score" class="stat-value">0</span>
+          <span class="stat-sub">최고 <b id="hud-best">0</b></span>
+        </div>
+        <div class="hull-wrap">
+          <div id="hud-hull" class="hearts" aria-label="잠수정 내구도"></div>
+          <div id="hud-shield" class="shield hidden"><span aria-hidden="true">🛡</span><b id="shield-val">0</b></div>
+        </div>
+        <div id="powerups" class="powerups"></div>
       </div>
+
       <div class="stat stat-center">
         <span class="stat-label">수심</span>
         <span class="stat-value"><span id="hud-depth-val">0</span><small>m</small></span>
         <span id="hud-zone" class="stat-sub">산호초 지대</span>
       </div>
+
       <div class="hud-actions">
         <button id="btn-mute" class="icon-btn" type="button" aria-label="소리 켜기/끄기">
           <span id="mute-icon" aria-hidden="true">🔊</span>
@@ -72,15 +81,29 @@
     <div id="toast" class="toast" aria-live="polite"></div>
 
     <div class="hud-bottom">
-      <div class="hull-wrap">
-        <div id="hud-hull" class="hearts" aria-label="잠수정 내구도"></div>
-        <div id="hud-shield" class="shield hidden"><span aria-hidden="true">🛡</span><b id="shield-val">0</b></div>
+      <!-- 이동 조이스틱 -->
+      <div id="joystick" class="joystick" aria-label="이동 조이스틱">
+        <div class="joy-base">
+          <div class="joy-ring" aria-hidden="true"></div>
+          <div id="joy-knob" class="joy-knob" aria-hidden="true"></div>
+        </div>
+        <span class="joy-label">이동</span>
       </div>
-      <div id="powerups" class="powerups"></div>
-      <button id="btn-bomb" class="bomb-btn" type="button" aria-label="음파 폭탄 사용">
-        <span class="bomb-ico" aria-hidden="true">〰</span>
-        <span id="hud-bombs" class="bomb-count">0</span>
-      </button>
+
+      <!-- 발사 · 고도 -->
+      <div class="pad-right">
+        <button id="btn-bomb" class="bomb-btn" type="button" aria-label="음파 폭탄 사용">
+          <span class="bomb-ico" aria-hidden="true">〰</span>
+          <span id="hud-bombs" class="bomb-count">0</span>
+        </button>
+        <div class="alt-group">
+          <button id="btn-up" class="alt-btn" type="button" aria-label="상승">▲</button>
+          <button id="btn-down" class="alt-btn" type="button" aria-label="하강">▼</button>
+        </div>
+        <button id="btn-fire" class="fire-btn" type="button" aria-label="발사">
+          <span>FIRE</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -93,8 +116,8 @@
         <div class="logo-line"></div>
       </div>
       <p class="tagline">
-        잠수정을 몰고 심해를 유영하세요.<br />
-        고래와 가오리가 스쳐 가고, 기계 상어 떼가 길을 막습니다.
+        맑은 산호초 바다를 자유롭게 유영하세요.<br />
+        고래와 가오리가 함께 헤엄치고, 기계 상어 떼가 다가옵니다.
       </p>
       <div class="best-card">
         <span class="best-label">최고 기록</span>
@@ -103,12 +126,12 @@
       <button id="btn-start" class="btn-primary" type="button">잠수 시작</button>
 
       <ul class="howto">
-        <li><b>📱 모바일</b><span>화면을 드래그해 조종 · 자동 어뢰</span></li>
-        <li><b>🖥 PC</b><span>마우스 · 방향키 / WASD</span></li>
-        <li><b>〰 음파</b><span>버튼 또는 Space 로 주변 정리</span></li>
-        <li><b>🎧 소리</b><span>우상단 스피커 또는 M</span></li>
+        <li><b>📱 조이스틱</b><span>왼쪽 드래그로 전진·회전, ▲▼로 상승·하강</span></li>
+        <li><b>🔥 발사</b><span>오른쪽 FIRE 를 누르고 있으면 연사</span></li>
+        <li><b>🖥 PC</b><span>WASD 이동 · Q/E 고도 · Space/클릭 발사</span></li>
+        <li><b>〰 음파</b><span>폭탄 버튼 또는 B 로 주변 정리</span></li>
       </ul>
-      <div class="start-foot">3인칭 심해 탐험 · 웨이브 3마다 거대 보스</div>
+      <div class="start-foot">3인칭 자유 유영 · 웨이브 3마다 거대 보스</div>
     </div>
   </div>
 
