@@ -131,7 +131,6 @@ export class World {
     this._buildSky();
     this._buildLights();
     this._buildFloor();
-    this._buildHorizon();
     this._buildArches();
     this._buildRays();
     this._buildParticles();
