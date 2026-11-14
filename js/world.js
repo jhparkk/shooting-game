@@ -296,16 +296,16 @@ export class World {
         const rockGeos = [];
         const coralGeos = [];
         const kelpGeos = [];
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 18; i++) {
           const lx = (rnd() - 0.5) * CHUNK_SIZE * 0.95;
           const lz = (rnd() - 0.5) * CHUNK_SIZE * 0.95;
-          const r = 1.2 + rnd() * 4.4;
+          const r = 1.0 + rnd() * 2.4;
           const geo = rockGeometry(r, 900 + seed * 13 + i);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.setPosition(lx, terrainHeight(ox + lx, oz + lz) + r * 0.15, lz);
           geo.applyMatrix4(m);
-          const g = 0.14 + rnd() * 0.12;
+          const g = 0.2 + rnd() * 0.14;
           paint(geo, new THREE.Color().setHSL(0.36, 0.16, g).getHex());
           rockGeos.push(geo);
         }

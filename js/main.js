@@ -959,7 +959,7 @@ function updatePlayer(dt) {
 /* ---------------- 카메라 ---------------- */
 function snapCamera() {
   computeForward(forward);
-  camera.position.copy(P.pos).addScaledVector(forward, -15).add(new THREE.Vector3(0, 5.4, 0));
+  camera.position.copy(P.pos).addScaledVector(forward, -14.5).add(new THREE.Vector3(0, 6.2, 0));
   camera.lookAt(P.pos.x + forward.x * 30, P.pos.y + forward.y * 30 + 0.6, P.pos.z + forward.z * 30);
 }
 
@@ -967,10 +967,12 @@ function updateCamera(dt) {
   computeForward(forward);
   const shakeX = G.shake > 0 ? rand(-1, 1) * G.shake * 0.55 : 0;
   const shakeY = G.shake > 0 ? rand(-1, 1) * G.shake * 0.55 : 0;
-  const target = tmpVec.copy(P.pos).addScaledVector(forward, -15.5);
-  target.y += 5.4 + shakeY;
+  const target = tmpVec.copy(P.pos).addScaledVector(forward, -14.5);
+  target.y += 6.2 + shakeY;
   target.x += shakeX;
   camera.position.lerp(target, damp(5.0, dt));
+  const minY = terrainHeight(camera.position.x, camera.position.z) + 3.2;
+  if (camera.position.y < minY) camera.position.y = minY;
   camera.lookAt(
     P.pos.x + forward.x * 34,
     P.pos.y + forward.y * 34 + 0.8,
