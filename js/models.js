@@ -1598,12 +1598,12 @@ function orcaGeometry() {
   // 눈 뒤 흰 패치 (postocular patch)
   for (const s of [-1, 1]) {
     const r = radiusAt(profile, -3.35) * 0.93;
-    ellipsePatch(parts, WHITE, [r * 0.96 * s, 0.1, -3.35], [r * 0.3, 0.22, 0.6]);
+    ellipsePatch(parts, WHITE, [r * 0.98 * s, 0.1, -3.35], [r * 0.16, 0.22, 0.62]);
   }
   // 안장 무늬 (등지느러미 뒤 옅은 회색)
-  ellipsePatch(parts, 0x9aa7ae, [0, radiusAt(profile, 1.5) * 0.93, 1.5], [0.44, 0.22, 0.62]);
+  ellipsePatch(parts, 0x9aa7ae, [0, radiusAt(profile, 1.5) * 0.96, 1.5], [0.46, 0.14, 0.64]);
   // 흰 턱
-  ellipsePatch(parts, WHITE, [0, -radiusAt(profile, -3.9) * 0.78, -3.9], [0.5, 0.24, 0.75]);
+  ellipsePatch(parts, WHITE, [0, -radiusAt(profile, -3.9) * 0.82, -3.9], [0.52, 0.18, 0.78]);
 
   // 높고 날렵한 등지느러미
   parts.push(xf(vfin([
@@ -1722,11 +1722,11 @@ function spermGeometry() {
 
   // 몸통 주름 — 배와 옆면의 가로 홈
   const rnd = mulberry(5150);
-  for (let i = 0; i < 11; i++) {
-    const z = -0.4 + i * 0.68;
-    const r = radiusAt(profile, z) * 0.99;
-    const ring = new THREE.TorusGeometry(r, 0.032, 4, 22);
-    parts.push(xf(paint(ring, 0x453f36), [0, 0, z], [0, 0, 0], [1, 0.95, 1]));
+  for (let i = 0; i < 13; i++) {
+    const z = 0.2 + i * 0.55;
+    const r = radiusAt(profile, z) * 0.995;
+    const ring = new THREE.TorusGeometry(r, 0.018, 4, 24);
+    parts.push(xf(paint(ring, 0x4c463c), [0, 0, z], [0, 0, 0], [1, 0.95, 1]));
   }
 
   // 등 혹 (작은 등지느러미)
@@ -1907,6 +1907,7 @@ function wingGeometry(spec) {
   const span = spec.span;
   const top = new THREE.Color(spec.top);
   const bot = new THREE.Color(spec.bottom);
+  const spotCol = spec.spot ? new THREE.Color(spec.spot.color) : null;
   const pos = [];
   const col = [];
   const idx = [];
@@ -1929,10 +1930,10 @@ function wingGeometry(spec) {
         pos.push(x * (spec.flip ? -1 : 1), y, z);
         if (side === 0) {
           tmp.copy(top);
-          if (spec.spot) {
+          if (spotCol) {
             const h = Math.sin(x * 3.7 + z * 5.1) * 43758.5453;
             const f = h - Math.floor(h);
-            if (f > spec.spot.threshold) tmp.lerp(spec.spot.color, spec.spot.mix * (0.35 + 0.65 * u));
+            if (f > spec.spot.threshold) tmp.lerp(spotCol, spec.spot.mix * (0.2 + 0.8 * u));
           }
         } else {
           tmp.copy(bot);
@@ -2001,7 +2002,7 @@ function mantaWings() {
     dihedral: (u) => -0.1 + u * u * 0.55,
     top: 0x36485a,
     bottom: 0xf0f4f4,
-    spot: { color: 0x2b3a49, threshold: 0.9, mix: 0.4 },
+    spot: { color: 0x8ba0b2, threshold: 0.93, mix: 0.35 },
   });
   return _mantaWing;
 }
@@ -2115,7 +2116,7 @@ function eagleWings() {
     dihedral: (u) => -0.15 + u * u * 0.75,
     top: 0x1c2836,
     bottom: 0xdfe6e6,
-    spot: { color: 0xeaf2f2, threshold: 0.62, mix: 0.92 },
+    spot: { color: 0xeaf2f2, threshold: 0.78, mix: 0.9 },
   });
   return _eagleWing;
 }
