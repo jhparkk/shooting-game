@@ -12,7 +12,7 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116g';
+} from './models.js?v=20261116h';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -1201,8 +1201,9 @@ export class World {
       const cz = c.center.z + Math.sin(c.angle) * R;
       const ground = getTerrainHeight(cx, cz) + c.clearance;
       const wantY = SURFACE_Y - c.depth / DEPTH_SCALE;
-      // 바다가 충분히 깊지 않은 곳에서는 그 종이 머물 수 없다 — 숨긴다
-      const hide = wantY < ground - 3;
+      // 이 종이 머물 수 있는 가장 얕은 수심조차 해저보다 아래라면 숨긴다
+      const shallowestY = SURFACE_Y - c.band[0] / DEPTH_SCALE;
+      const hide = shallowestY < ground - 3;
       if (g.visible === hide) g.visible = !hide;
       if (hide) continue;
       let cy = wantY + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
