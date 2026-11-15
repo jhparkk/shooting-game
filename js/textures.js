@@ -217,6 +217,75 @@ function bakeRock(size) {
 }
 
 /* =========================================================
+   밝은 산호 모래 — 하얀 모래알 + 분홍·주황 산호 부스러기
+   (참고 이미지의 맑은 산호초 지대 바닥)
+   ========================================================= */
+function bakeCoralSand(size) {
+  return bakePair(size, (u, v, o) => {
+    const warp = fbm(u, v, 4, 3, 1213);
+    const rip = Math.sin((v * 9 + u * 1.6 + warp * 1.7) * TAU);
+    const rip2 = Math.sin((v * 23 - u * 2.2 + warp * 2.4) * TAU);
+    const grain = noise2(u * 260, v * 260, 260, 1201);
+    // 산호 부스러기 — 작은 조각이 흩어져 있다
+    const bits = worley(u, v, 34, 1217);
+    const piece = 1 - smooth(0.0, 0.24, bits.f1);
+    const warm = fbm(u, v, 11, 2, 1223);
+    let shade = 0.92 + rip * 0.035 + rip2 * 0.02 + (grain - 0.5) * 0.09;
+    shade *= 1 - piece * 0.10;
+    const pink = smooth(0.62, 0.92, warm) * piece;
+    o[0] = clamp01(shade * 1.0 + pink * 0.16) * 255;
+    o[1] = clamp01(shade * 0.985 - pink * 0.05) * 255;
+    o[2] = clamp01(shade * 0.955 + pink * 0.02) * 255;
+    o[3] = clamp01(0.5 + rip * 0.26 + (grain - 0.5) * 0.26 - piece * 0.2) * 255;
+  });
+}
+
+/* =========================================================
+   산호석 · 석회암 암초 — 다공질에 분홍·주황·보랏빛이 흩어진 암초
+   ========================================================= */
+function bakeReef(size) {
+  return bakePair(size, (u, v, o) => {
+    const cell = worley(u, v, 15, 1311);
+    const pore = 1 - smooth(0.0, 0.3, cell.f1);       // 산호 구멍
+    const cell2 = worley(u, v, 6, 1319);
+    const lump = fbm(u, v, 6, 4, 1321);
+    const fine = noise2(u * 210, v * 210, 210, 1327);
+    let shade = 0.82 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.1;
+    shade *= 1 - pore * 0.34;
+    shade *= 0.86 + smooth(0.03, 0.2, cell2.f2 - cell2.f1) * 0.2;
+    // 색 — 분홍 · 주황 · 보랏빛 산호 알갱이가 패치로
+    const pick = fbm(u, v, 9, 3, 1333);
+    const pink = smooth(0.56, 0.82, pick) * 0.55;
+    const orange = smooth(0.44, 0.30, pick) * 0.4;
+    const violet = smooth(0.86, 0.98, pick) * 0.35;
+    o[0] = clamp01(shade * 1.02 + pink * 0.26 + orange * 0.3 + violet * 0.12) * 255;
+    o[1] = clamp01(shade * 0.97 + pink * 0.06 + orange * 0.16 - violet * 0.06) * 255;
+    o[2] = clamp01(shade * 0.97 + pink * 0.16 - orange * 0.1 + violet * 0.3) * 255;
+    o[3] = clamp01(0.58 + (lump - 0.5) * 0.5 - pore * 0.42 + (fine - 0.5) * 0.2) * 255;
+  });
+}
+
+/* =========================================================
+   이끼 · 해조류가 낀 암반 — 녹청색 조류가 흐르는 바위
+   ========================================================= */
+function bakeAlgaeRock(size) {
+  return bakePair(size, (u, v, o) => {
+    const strata = fbm(u * 0.7, v * 5.5, 6, 4, 1409);
+    const lump = fbm(u, v, 5, 4, 1411);
+    const fine = noise2(u * 190, v * 190, 190, 1417);
+    // 위로 자라 오르는 해조류 결
+    const weed = smooth(0.5, 0.86, fbm(u * 1.3, v * 0.55, 7, 3, 1423));
+    const fuzzy = smooth(0.55, 0.95, fbm(u, v, 26, 2, 1429));
+    let shade = 0.5 + (strata - 0.5) * 0.3 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.1;
+    const green = weed * (0.32 + fuzzy * 0.34);
+    o[0] = clamp01(shade * 0.94 - green * 0.2) * 255;
+    o[1] = clamp01(shade * 1.02 + green * 0.34) * 255;
+    o[2] = clamp01(shade * 0.9 - green * 0.04) * 255;
+    o[3] = clamp01(0.52 + (strata - 0.5) * 0.6 + (fine - 0.5) * 0.22 + green * 0.2) * 255;
+  });
+}
+
+/* =========================================================
    심해 현무암 — 주상 절리 균열
    ========================================================= */
 function bakeBasalt(size) {
@@ -343,6 +412,9 @@ export function getTextures() {
   const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
 
   const [sandCv, sandH] = bakeSand(256);
+  const [cSandCv, cSandH] = bakeCoralSand(256);
+  const [reefCv, reefH] = bakeReef(256);
+  const [algaeCv, algaeH] = bakeAlgaeRock(256);
   const [rockCv, rockH] = bakeRock(256);
   const [basCv, basH] = bakeBasalt(256);
   const [coralCv, coralH] = bakeCoral(128);
@@ -354,6 +426,12 @@ export function getTextures() {
     /* 해저 지형 */
     sand: toTexture(sandCv, { srgb: true, aniso: 8 }),
     sandBump: toTexture(bakeScaled(sandH, 128), { aniso: 4 }),
+    coralSand: toTexture(cSandCv, { srgb: true, aniso: 8 }),
+    coralSandBump: toTexture(bakeScaled(cSandH, 128), { aniso: 4 }),
+    reef: toTexture(reefCv, { srgb: true, aniso: 8 }),
+    reefBump: toTexture(bakeScaled(reefH, 128), { aniso: 4 }),
+    algae: toTexture(algaeCv, { srgb: true, aniso: 8 }),
+    algaeBump: toTexture(bakeScaled(algaeH, 128), { aniso: 4 }),
     rock: toTexture(rockCv, { srgb: true, aniso: 8 }),
     rockBump: toTexture(bakeScaled(rockH, 128), { aniso: 4 }),
     basalt: toTexture(basCv, { srgb: true, aniso: 8 }),

@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116e';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116e';
+import { Sound } from './audio.js?v=20261116f';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116f';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116e';
-import { FX } from './fx.js?v=20261116e';
+} from './models.js?v=20261116f';
+import { FX } from './fx.js?v=20261116f';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1074,17 +1074,18 @@ function makeEnemyModel(type) {
   return makeJellyfish(palette[Math.floor(Math.random() * palette.length)]);
 }
 
-function spawnEnemy() {
+function spawnEnemy(opt) {
+  const o = opt || {};
   computeForward(forward);
   const ahead = Math.random() < 0.72 ? 1 : -0.35;
   const ang = Math.atan2(forward.x * ahead, forward.z * ahead) + rand(-1.15, 1.15);
   const dist = rand(52, 92);
-  const x = P.pos.x + Math.sin(ang) * dist;
-  const z = P.pos.z + Math.cos(ang) * dist;
+  const x = o.x !== undefined ? o.x : P.pos.x + Math.sin(ang) * dist;
+  const z = o.z !== undefined ? o.z : P.pos.z + Math.cos(ang) * dist;
   const ground = terrainHeight(x, z);
-  const y = clamp(P.pos.y + rand(-13, 13), ground + 3.5, SURFACE_Y - 8);
+  const y = o.y !== undefined ? o.y : clamp(P.pos.y + rand(-13, 13), ground + 3.5, SURFACE_Y - 8);
 
-  const type = pickEnemyType(G.depth);
+  const type = o.type || pickEnemyType(G.depth);
   const stats = ENEMY_STATS[type];
   const model = makeEnemyModel(type);
   const obj = model.group;
@@ -1122,6 +1123,7 @@ function spawnEnemy() {
     age: 0,
     swayAmp: rand(1.5, 4),
   });
+  return enemies[enemies.length - 1];
 }
 
 function damageEnemy(e, dmg) {
@@ -1175,19 +1177,84 @@ function dropItem(x, y, z, forced) {
 }
 
 /* ---------------- 발사 ---------------- */
+/* 상하 소프트 자동 조준 —
+   정면 기준 좌우 ±12°, 상하 ±15° 창 안의 가장 가까운 적을 찾아
+   어뢰의 **상하(pitch) 각도만** 부드럽게 보정한다. 좌우 방향은 플레이어 조준을 존중한다. */
+const AIM_WIN_YAW = (12 * Math.PI) / 180;
+const AIM_WIN_PITCH = (15 * Math.PI) / 180;
+const assistDir = new THREE.Vector3();
+const noseVec = new THREE.Vector3();
+const assistInfo = { on: false, dyaw: 0, dpitch: 0, corr: 0, d: 0, target: null };
+
+function softAim(fromPos, dir) {
+  const aimYaw = Math.atan2(-dir.x, -dir.z);              // 화면 정면의 수평 방위
+  const aimPitch = Math.asin(clamp(dir.y, -1, 1));        // 화면 정면의 상하 각도
+  let best = null;
+  let bestScore = Infinity;
+
+  const consider = (p) => {
+    const vx = p.x - fromPos.x;
+    const vy = p.y - fromPos.y;
+    const vz = p.z - fromPos.z;
+    const d = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    if (d < 2 || d > 170) return;                         // 바로 앞·사거리 밖은 건너뛴다
+    const hd = Math.hypot(vx, vz) || 1e-4;
+    const dyaw = angDiff(Math.atan2(-vx, -vz), aimYaw);
+    const dpitch = Math.atan2(vy, hd) - aimPitch;
+    if (Math.abs(dyaw) > AIM_WIN_YAW) return;             // 좌우 ±12° 밖은 조준을 존중
+    if (Math.abs(dpitch) > AIM_WIN_PITCH) return;         // 상하 ±15° 밖은 보정하지 않는다
+    const score = Math.abs(dpitch) * 1.7 + Math.abs(dyaw) + d * 0.0015;
+    if (score < bestScore) {
+      bestScore = score;
+      best = { dyaw, dpitch, d };
+    }
+  };
+
+  for (const e of enemies) {
+    if (e.exiting !== undefined) continue;                // 떠나가는 개체는 겨냥하지 않는다
+    consider(e.obj.position);
+  }
+  if (G.boss && !G.boss.dead) consider(G.boss.obj.position);
+
+  if (!best) {
+    assistInfo.on = false;
+    assistInfo.dyaw = 0;
+    assistInfo.dpitch = 0;
+    assistInfo.corr = 0;
+    assistInfo.target = null;
+    return dir;
+  }
+
+  // 창 가장자리에서는 조금만, 정면에 가까울수록 끝까지 — 부드럽게 끌어당긴다
+  const k = Math.min(1, Math.abs(best.dpitch) / AIM_WIN_PITCH);
+  const weight = 1 - k * 0.5;
+  const corr = best.dpitch * weight;
+  const newPitch = clamp(aimPitch + corr, -1.3, 1.1);
+  const cp = Math.cos(newPitch);
+
+  assistInfo.on = true;
+  assistInfo.dyaw = best.dyaw;
+  assistInfo.dpitch = best.dpitch;
+  assistInfo.corr = newPitch - aimPitch;
+  assistInfo.d = best.d;
+
+  return assistDir.set(-Math.sin(aimYaw) * cp, Math.sin(newPitch), -Math.cos(aimYaw) * cp);
+}
+
 function fire() {
   // 화면 중앙(조준선) 방향으로 발사 — 카메라를 돌리면 그쪽으로 나간다
-  const nose = tmpVec.copy(P.pos).addScaledVector(aim, 2.2);
+  noseVec.copy(P.pos).addScaledVector(aim, 2.2);
+  const dir = softAim(noseVec, aim);
   const count = G.multi > 0 ? 3 : 1;
   for (let i = 0; i < count; i++) {
     const t = torpedoes.find((x) => !x.active);
     if (!t) break;
     const spread = count === 0 ? 0 : (i - (count - 1) / 2) * 0.1;
-    const v = aim.clone().applyAxisAngle(UP, spread);
+    const v = dir.clone().applyAxisAngle(UP, spread);
     t.active = true;
     t.life = 1.8;
     t.mesh.visible = true;
-    t.mesh.position.copy(nose);
+    t.mesh.position.copy(noseVec);
     t.mesh.position.x += (i - (count - 1) / 2) * 0.4;
     t.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), v.clone().normalize());
     t.vel.copy(v).multiplyScalar(96);
@@ -1440,18 +1507,26 @@ function updatePlayer(dt) {
   G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
   if (G.depth > G.maxDepth) G.maxDepth = G.depth;
 
-  // 기포 흘리기
+  // 기포 흘리기 — 잠수정 뒤로 맑은 공기방울이 솟아오른다
   G.bubbleTimer -= dt;
   if (G.bubbleTimer <= 0) {
     G.bubbleTimer = 0.11;
     computeForward(forward);
+    const bx = P.pos.x - forward.x * 2.4 + rand(-0.3, 0.3);
+    const by = P.pos.y - forward.y * 2.4 - 0.2;
+    const bz = P.pos.z - forward.z * 2.4;
     fx.emit(
-      P.pos.x - forward.x * 2.4 + rand(-0.3, 0.3),
-      P.pos.y - forward.y * 2.4 - 0.2,
-      P.pos.z - forward.z * 2.4,
+      bx, by, bz,
       rand(-0.8, 0.8), rand(0.4, 1.4), rand(-0.8, 0.8),
       0xe6ffff, rand(0.7, 1.5), rand(1.2, 2.0), 0.9, 0.7
     );
+    // 잠수정 프로펠러가 만들어 내는 진짜 공기방울
+    if (Math.random() < 0.6) {
+      fx.bubble(
+        bx + rand(-0.5, 0.5), by + rand(-0.3, 0.3), bz + rand(-0.5, 0.5),
+        rand(0.45, 1.1), rand(2.2, 3.6), rand(2.2, 4.2)
+      );
+    }
   }
 }
 
@@ -2081,6 +2156,44 @@ function updateIdle(dt) {
   fx.update(dt, camera);
 }
 
+/* ---------------- 해저 기포 분출구 ----------------
+   참고 이미지처럼 바닥에서 맑은 공기방울 기둥이 수직으로 솟아오른다. */
+const vents = [];
+function updateVentBubbles(dt) {
+  // 주변에 분출구가 모자라면 해저에 새로 생긴다
+  for (let tries = 0; tries < 10 && vents.length < 3; tries++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 16 + Math.random() * 72;
+    const x = P.pos.x + Math.cos(a) * r;
+    const z = P.pos.z + Math.sin(a) * r;
+    const gy = terrainHeight(x, z);
+    if (gy > SURFACE_Y - 8) continue;
+    if (Math.abs(gy - P.pos.y) > 70) continue;      // 너무 위·아래 바닥은 건너뛴다
+    vents.push({ x, y: gy + 0.5, z, t: Math.random() * 0.9 });
+  }
+  for (let i = vents.length - 1; i >= 0; i--) {
+    const v = vents[i];
+    const away = Math.hypot(v.x - P.pos.x, v.z - P.pos.z);
+    if (away > 165) {
+      vents.splice(i, 1);
+      continue;
+    }
+    v.t -= dt;
+    if (v.t > 0) continue;
+    v.t = 0.1 + Math.random() * 0.16;
+    fx.bubble(
+      v.x + rand(-0.7, 0.7), v.y + rand(0, 1.4), v.z + rand(-0.7, 0.7),
+      rand(0.5, 1.5), rand(3.4, 5.2), rand(2.4, 4.2)
+    );
+    if (Math.random() < 0.28) {
+      fx.bubble(
+        v.x + rand(-1.4, 1.4), v.y + rand(1.0, 4.0), v.z + rand(-1.4, 1.4),
+        rand(0.4, 0.9), rand(2.6, 4.0), rand(2.0, 3.4)
+      );
+    }
+  }
+}
+
 function updateGame(dt) {
   G.elapsed += dt;
   const t = G.elapsed;
@@ -2088,6 +2201,7 @@ function updateGame(dt) {
   updatePlayer(dt);
   updateCamera(dt);
   world.update(dt, P.pos);
+  updateVentBubbles(dt);
 
   // 발사
   if (input.fire) {
@@ -2647,6 +2761,81 @@ function boot() {
         const c = {};
         for (const e of enemies) c[e.type] = (c[e.type] || 0) + 1;
         return c;
+      },
+      /* ---- 자동 조준·기포·고래 꼬리 검증용 ---- */
+      assist: () => Object.assign({}, assistInfo),
+      spawnAt: (type, x, y, z) => {
+        const e = spawnEnemy({ type, x, y, z });
+        if (!e) return null;
+        return {
+          type: e.type, hp: e.hp, r: +e.r.toFixed(2),
+          pos: [+e.obj.position.x.toFixed(2), +e.obj.position.y.toFixed(2), +e.obj.position.z.toFixed(2)],
+        };
+      },
+      clearEnemies: () => {
+        for (const e of enemies) scene.remove(e.obj);
+        enemies.length = 0;
+        return true;
+      },
+      torpInfo: () => torpedoes.filter((t) => t.active).map((t) => {
+        const sp = t.vel.length() || 1;
+        return {
+          pos: [+t.mesh.position.x.toFixed(2), +t.mesh.position.y.toFixed(2), +t.mesh.position.z.toFixed(2)],
+          pitch: +((Math.asin(clamp(t.vel.y / sp, -1, 1)) * 180) / Math.PI).toFixed(2),
+          speed: +sp.toFixed(1),
+        };
+      }),
+      bubbles: () => fx.bubblesAlive(),
+      /* 고래 꼬리지느러미가 몸통과 한 곡선으로 이어지는지 수치로 확인 */
+      seamInfo: (kind) => {
+        const makers = {
+          humpback: makeHumpbackWhale, orca: makeOrca,
+          sperm: makeSpermWhale, blue: makeBlueWhale,
+        };
+        const make = makers[kind || 'humpback'] || makeHumpbackWhale;
+        const m = make();
+        m.group.position.set(0, 0, 0);
+        m.group.updateMatrixWorld(true);
+        const meshes = [];
+        m.core.traverse((o) => {
+          if (o.isMesh && o.geometry.attributes && o.geometry.attributes.aBend) meshes.push(o);
+        });
+        if (meshes.length < 2) return { kind, meshes: meshes.length, pass: false };
+        meshes.sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count);
+        const body = meshes[0];
+        const fluke = meshes[meshes.length - 1];
+        const zr = (mesh) => {
+          const p = mesh.geometry.attributes.position;
+          let lo = Infinity;
+          let hi = -Infinity;
+          const ab = mesh.geometry.attributes.aBend;
+          let abLo = Infinity;
+          let abHi = -Infinity;
+          for (let i = 0; i < p.count; i++) {
+            const z = p.getZ(i);
+            if (z < lo) lo = z;
+            if (z > hi) hi = z;
+            const b = ab.getX(i);
+            if (b < abLo) abLo = b;
+            if (b > abHi) abHi = b;
+          }
+          return { zMin: +lo.toFixed(3), zMax: +hi.toFixed(3), bendMin: +abLo.toFixed(3), bendMax: +abHi.toFixed(3) };
+        };
+        const bw = new THREE.Vector3();
+        const fw = new THREE.Vector3();
+        body.getWorldPosition(bw);
+        fluke.getWorldPosition(fw);
+        const bz = zr(body);
+        const fz = zr(fluke);
+        return {
+          kind: kind || 'humpback',
+          body: bz, fluke: fz,
+          sameMaterial: body.material === fluke.material,
+          sameWorldOrigin: +bw.distanceTo(fw).toFixed(5),
+          overlap: +(bz.zMax - fz.zMin).toFixed(3),   // 몸통 끝과 꼬리 앞날이 겹치는 길이
+          bendContinuous: !(fz.bendMin > bz.bendMax + 0.001),
+          pass: body.material === fluke.material && bw.distanceTo(fw) < 1e-4 && bz.zMax - fz.zMin > 0,
+        };
       },
       spawnTable: (depth, n) => {
         const c = {};

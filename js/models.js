@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261116e';
+import { getTextures } from './textures.js?v=20261116f';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -425,6 +425,15 @@ function heaveCore(g) {
   while (g.children.length) core.add(g.children[0]);
   g.add(core);
   return core;
+}
+
+/** 꼬리지느러미를 몸통 좌표계에 그대로 붙인다.
+ *  지오메트리를 꼬리자루 위치(dz, dy)로 옮긴 뒤 몸통과 **같은 aBend(굽힘 계수)** 를 심는다.
+ *  그러면 별도 그룹 이동·회전 없이 몸통 정점 셰이더가 꼬리 끝까지 하나의 연속된 곡선으로 휜다
+ *  → 꼬리자루(peduncle)와 꼬리지느러미 사이에 틈이나 어긋남이 생기지 않는다. */
+function flukeInBody(geo, dz, dy, z0, z1) {
+  geo.translate(0, dy, dz);
+  return bendify(geo, z0, z1);
 }
 
 /** 굽힘 계수를 모두 0 으로 — 꼬리 조각은 그룹 변환으로만 움직인다 */
@@ -1618,7 +1627,10 @@ function humpbackFlukeGeometry() {
     [2.6, -0.52], [1.4, -0.78], [0.5, -0.66], [0, -0.56], [-0.5, -0.66],
     [-1.4, -0.78], [-2.6, -0.52],
   ];
-  _humpFluke = noBend(hfin(pts, 0.18, 0x2b3a42, { smooth: true, curveSegments: 10 }));
+  _humpFluke = flukeInBody(
+    hfin(pts, 0.18, 0x2b3a42, { smooth: true, curveSegments: 10 }),
+    7.1, 0.08, -1.4, 7.5
+  );
   return _humpFluke;
 }
 
@@ -1654,9 +1666,8 @@ export function makeHumpbackWhale() {
   g.add(core);
   core.add(new THREE.Mesh(geo, _humpMat));
 
-  const fluke = new THREE.Group();
-  fluke.position.set(0, 0.08, 7.1);
-  fluke.add(new THREE.Mesh(humpbackFlukeGeometry(), _humpMat));
+  // 꼬리지느러미 — 몸통과 같은 메시 좌표계·같은 굽힘 필드 (일체형 유영)
+  const fluke = new THREE.Mesh(humpbackFlukeGeometry(), _humpMat);
   core.add(fluke);
 
   const fins = [];
@@ -1669,17 +1680,13 @@ export function makeHumpbackWhale() {
   }
 
   return {
-    group: g, core, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: null,
     update(t) {
       const b = HUMP_SWIM;
       const rate = b.rateU ? b.rateU.value : b.speed;
       const f = rate / b.speed;
       const seed = g.position.x * 0.11 + g.position.z * 0.07;
-      // 몸통 파동과 같은 위상으로 꼬리지느러미가 뒤따라 친다
-      const ph = t * rate + seed - b.freq;
-      fluke.position.y = 0.08 + Math.sin(ph) * b.amp;
-      fluke.rotation.x = Math.cos(ph) * 0.5;
-      fluke.rotation.z = Math.sin(ph * 0.5) * 0.05;
+      // 꼬리지느러미는 몸통 셰이더가 같은 위상으로 함께 휜다 (JS 이동 없음)
       // 가슴지느러미 — 노 젓듯 크게 위아래로, 앞뒤로도 살짝
       const fa = t * 0.6 * f + seed;
       for (const fin of fins) {
@@ -1753,7 +1760,10 @@ function orcaFlukeGeometry() {
     [-1.55, -0.06], [-1.0, 0.28], [-0.4, 0.36], [0, 0.2], [0.4, 0.36],
     [1.0, 0.28], [1.55, -0.06], [0.7, -0.32], [0, -0.38], [-0.7, -0.32],
   ];
-  _orcaFluke = noBend(hfin(pts, 0.12, 0x11171c, { smooth: true, curveSegments: 8 }));
+  _orcaFluke = flukeInBody(
+    hfin(pts, 0.12, 0x11171c, { smooth: true, curveSegments: 8 }),
+    4.55, 0.02, -1.2, 4.8
+  );
   return _orcaFluke;
 }
 
@@ -1779,9 +1789,7 @@ export function makeOrca() {
   g.add(core);
   core.add(new THREE.Mesh(geo, _orcaMat));
 
-  const fluke = new THREE.Group();
-  fluke.position.set(0, 0.02, 4.55);
-  fluke.add(new THREE.Mesh(orcaFlukeGeometry(), _orcaMat));
+  const fluke = new THREE.Mesh(orcaFlukeGeometry(), _orcaMat);
   core.add(fluke);
 
   const fins = [];
@@ -1794,16 +1802,12 @@ export function makeOrca() {
   }
 
   return {
-    group: g, core, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: null,
     update(t) {
       const b = ORCA_SWIM;
       const rate = b.rateU ? b.rateU.value : b.speed;
       const f = rate / b.speed;
       const seed = g.position.x * 0.11 + g.position.z * 0.07;
-      const ph = t * rate + seed - b.freq;
-      fluke.position.y = 0.02 + Math.sin(ph) * b.amp;
-      fluke.rotation.x = Math.cos(ph) * 0.58;
-      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
       const fa = t * 0.85 * f + seed;
       for (const fin of fins) {
         const beat = Math.sin(fa + (fin.sign > 0 ? 0.4 : 0));
@@ -1902,7 +1906,10 @@ function spermFlukeGeometry() {
     [0.4, 0.44], [1.2, 0.62], [2.2, 0.4], [3.0, -0.1],
     [1.6, -0.46], [0.6, -0.62], [0, -0.5], [-0.6, -0.62], [-1.6, -0.46],
   ];
-  _spermFluke = noBend(hfin(pts, 0.15, 0x424038, { smooth: true, curveSegments: 8 }));
+  _spermFluke = flukeInBody(
+    hfin(pts, 0.15, 0x424038, { smooth: true, curveSegments: 8 }),
+    7.2, 0.08, -1.6, 7.5
+  );
   return _spermFluke;
 }
 
@@ -1917,21 +1924,15 @@ export function makeSpermWhale() {
   const core = new THREE.Group();
   g.add(core);
   core.add(new THREE.Mesh(geo, _spermMat));
-  const fluke = new THREE.Group();
-  fluke.position.set(0, 0.08, 7.2);
-  fluke.add(new THREE.Mesh(spermFlukeGeometry(), _spermMat));
+  const fluke = new THREE.Mesh(spermFlukeGeometry(), _spermMat);
   core.add(fluke);
   return {
-    group: g, core, fluke, fins: [], tail: fluke,
+    group: g, core, fluke, fins: [], tail: null,
     update(t) {
       const b = SPERM_SWIM;
       const rate = b.rateU ? b.rateU.value : b.speed;
       const f = rate / b.speed;
       const seed = g.position.x * 0.11 + g.position.z * 0.07;
-      const ph = t * rate + seed - b.freq;
-      fluke.position.y = 0.08 + Math.sin(ph) * b.amp;
-      fluke.rotation.x = Math.cos(ph) * 0.46;
-      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
       core.position.y = Math.sin(t * 0.36 * f + seed) * 0.12;
     },
   };
@@ -1999,7 +2000,10 @@ function blueFlukeGeometry() {
     [0.6, 0.5], [1.9, 0.66], [3.3, 0.46], [4.2, -0.1],
     [2.2, -0.46], [1.0, -0.64], [0, -0.5], [-1.0, -0.64], [-2.2, -0.46],
   ];
-  _blueFluke = noBend(hfin(pts, 0.15, 0x44586b, { smooth: true, curveSegments: 8 }));
+  _blueFluke = flukeInBody(
+    hfin(pts, 0.15, 0x44586b, { smooth: true, curveSegments: 8 }),
+    10.2, 0.06, -2.0, 10.6
+  );
   return _blueFluke;
 }
 
@@ -2022,9 +2026,7 @@ export function makeBlueWhale() {
   g.add(core);
   core.add(new THREE.Mesh(geo, _blueMat));
 
-  const fluke = new THREE.Group();
-  fluke.position.set(0, 0.06, 10.2);
-  fluke.add(new THREE.Mesh(blueFlukeGeometry(), _blueMat));
+  const fluke = new THREE.Mesh(blueFlukeGeometry(), _blueMat);
   core.add(fluke);
 
   const fins = [];
@@ -2036,16 +2038,12 @@ export function makeBlueWhale() {
     fins.push({ pivot, sign: s });
   }
   return {
-    group: g, core, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: null,
     update(t) {
       const b = BLUE_SWIM;
       const rate = b.rateU ? b.rateU.value : b.speed;
       const f = rate / b.speed;
       const seed = g.position.x * 0.11 + g.position.z * 0.07;
-      const ph = t * rate + seed - b.freq;
-      fluke.position.y = 0.06 + Math.sin(ph) * b.amp;
-      fluke.rotation.x = Math.cos(ph) * 0.42;
-      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
       const fa = t * 0.5 * f + seed;
       for (const fin of fins) {
         const beat = Math.sin(fa + (fin.sign > 0 ? 0.4 : 0));
@@ -2671,7 +2669,7 @@ export function makeFishSchool(count) {
   }
   const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const palette = [0xffd166, 0xff8f6b, 0x6be0ff, 0xff9ecb, 0xa6ff9e, 0xfff3b0];
+  const palette = [0xff9a3c, 0xffb347, 0xffd166, 0xff8f6b, 0xffc14d, 0x6be0ff, 0xff9ecb];
   const c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     c.setHex(palette[i % palette.length]);
@@ -2731,6 +2729,46 @@ export function blobCoralGeometry(color, seed) {
   const geo = new THREE.SphereGeometry(0.30 + rnd() * 0.26, 10, 8);
   geo.scale(1 + rnd() * 0.45, 0.5 + rnd() * 0.4, 1 + rnd() * 0.35);
   geo.translate(0, 0.2, 0);
+  return paint(geo, color);
+}
+
+/** 부채산호 — 부챗살처럼 펼쳐진 얇은 판 (참고 이미지의 부채 산호) */
+export function fanCoralGeometry(color, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const R = 0.95 + rnd() * 0.75;
+  const n = 6 + Math.floor(rnd() * 4);
+  for (let i = 0; i < n; i++) {
+    const a = (i / (n - 1) - 0.5) * 1.45;
+    const h = R * (0.6 + Math.cos(a * 1.05) * 0.7) * (0.7 + rnd() * 0.5);
+    const b = new THREE.BoxGeometry(0.055, h, 0.022 + rnd() * 0.02);
+    b.translate(0, h / 2, 0);
+    const m = new THREE.Matrix4().makeRotationZ(a);
+    b.applyMatrix4(m);
+    parts.push(paint(b, color));
+  }
+  // 부채 받침 줄기
+  const stem = new THREE.CylinderGeometry(0.07, 0.1, 0.42, 5);
+  stem.translate(0, 0.21, 0);
+  parts.push(paint(stem, color));
+  return mergeGeometries(parts, false);
+}
+
+/** 뇌산호 — 반구 위에 굽이치는 골(정맥) */
+export function brainCoralGeometry(color, seed) {
+  const rnd = mulberry(seed);
+  const r = 0.44 + rnd() * 0.34;
+  const geo = new THREE.SphereGeometry(r, 14, 9, 0, Math.PI * 2, 0, Math.PI * 0.62);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const groove = Math.sin(x * 15 + Math.sin(z * 9.5) * 1.7) * 0.5 + 0.5;
+    const k = 1 - groove * 0.05;
+    pos.setXYZ(i, x * k, y * 0.9, z * k);
+  }
+  geo.computeVertexNormals();
   return paint(geo, color);
 }
 

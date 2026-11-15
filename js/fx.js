@@ -2,7 +2,36 @@
    ABYSS DIVER — 파티클 / 폭발 / 음파 링 이펙트
    ========================================================= */
 import * as THREE from 'three';
-import { glowTexture } from './models.js?v=20261116e';
+import { glowTexture } from './models.js?v=20261116f';
+
+/** 기포(공기방울) 스프라이트 — 밝은 테두리 + 속이 빈 맑은 원 */
+let _bubbleTex = null;
+function bubbleTexture() {
+  if (_bubbleTex) return _bubbleTex;
+  const s = 64;
+  const cv = document.createElement('canvas');
+  cv.width = s;
+  cv.height = s;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(s * 0.40, s * 0.36, s * 0.04, s * 0.5, s * 0.5, s * 0.5);
+  g.addColorStop(0, 'rgba(255,255,255,0.92)');
+  g.addColorStop(0.34, 'rgba(228,250,255,0.20)');
+  g.addColorStop(0.72, 'rgba(214,246,255,0.26)');
+  g.addColorStop(0.90, 'rgba(240,255,255,0.80)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(233,253,255,0.6)';
+  ctx.lineWidth = s * 0.045;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2);
+  ctx.stroke();
+  _bubbleTex = new THREE.CanvasTexture(cv);
+  _bubbleTex.colorSpace = THREE.SRGBColorSpace;
+  return _bubbleTex;
+}
 
 export class FX {
   constructor(scene, max = 420) {
@@ -93,6 +122,121 @@ export class FX {
       this.scene.add(s);
       this.flashes.push({ sprite: s, t: 0, life: 1, size: 4, active: false });
     }
+
+    /* ---------------- 기포 풀 ---------------- */
+    this.bubMax = 260;
+    this.bubHead = 0;
+    this.bTime = 0;
+    const B = this.bubMax;
+    this.bPos = new Float32Array(B * 3);
+    this.bSize = new Float32Array(B);
+    this.bAlpha = new Float32Array(B);
+    this.bLife = new Float32Array(B);
+    this.bMaxLife = new Float32Array(B);
+    this.bRise = new Float32Array(B);
+    this.bPhase = new Float32Array(B);
+    this.bBase = new Float32Array(B);
+    this.bTint = new Float32Array(B * 3);
+    const bgeo = new THREE.BufferGeometry();
+    bgeo.setAttribute('position', new THREE.BufferAttribute(this.bPos, 3));
+    bgeo.setAttribute('aColor', new THREE.BufferAttribute(this.bTint, 3));
+    bgeo.setAttribute('aSize', new THREE.BufferAttribute(this.bSize, 1));
+    bgeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.bAlpha, 1));
+    bgeo.setDrawRange(0, B);
+    const bmat = new THREE.ShaderMaterial({
+      uniforms: { uMap: { value: bubbleTexture() } },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      vertexShader: `
+        attribute float aSize;
+        attribute float aAlpha;
+        attribute vec3 aColor;
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vColor = aColor;
+          vAlpha = aAlpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = aSize * (420.0 / max(1.0, -mv.z));
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D uMap;
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vec4 t = texture2D(uMap, gl_PointCoord);
+          float a = t.a * vAlpha;
+          if (a < 0.01) discard;
+          gl_FragColor = vec4(vColor * t.rgb, a);
+        }
+      `,
+    });
+    this.bubblePoints = new THREE.Points(bgeo, bmat);
+    this.bubblePoints.frustumCulled = false;
+    this.bubblePoints.renderOrder = 2;
+    this.scene.add(this.bubblePoints);
+  }
+
+  /* ---------------- 기포 ---------------- */
+  /** 공기방울 하나 — 위로 봉긋 솟아오르며 좌우로 흔들린다 */
+  bubble(x, y, z, size, life, rise, tint) {
+    const i = this.bubHead;
+    this.bubHead = (this.bubHead + 1) % this.bubMax;
+    this.bPos[i * 3] = x;
+    this.bPos[i * 3 + 1] = y;
+    this.bPos[i * 3 + 2] = z;
+    this.bSize[i] = size || 1;
+    this.bBase[i] = size || 1;
+    this.bLife[i] = life || 3;
+    this.bMaxLife[i] = life || 3;
+    this.bRise[i] = rise === undefined ? 5 : rise;
+    this.bPhase[i] = Math.random() * 6.28;
+    const c = tint === undefined ? 0xeafcff : tint;
+    const col = new THREE.Color(c);
+    this.bTint[i * 3] = col.r;
+    this.bTint[i * 3 + 1] = col.g;
+    this.bTint[i * 3 + 2] = col.b;
+    this.bAlpha[i] = 0.0;
+  }
+
+  /** 살아 있는 기포 수 (검증용) */
+  bubblesAlive() {
+    let n = 0;
+    for (let i = 0; i < this.bubMax; i++) if (this.bLife[i] > 0) n++;
+    return n;
+  }
+
+  _updateBubbles(dt) {
+    this.bTime += dt;
+    const t = this.bTime;
+    for (let i = 0; i < this.bubMax; i++) {
+      if (this.bLife[i] <= 0) {
+        if (this.bAlpha[i] !== 0) this.bAlpha[i] = 0;
+        continue;
+      }
+      this.bLife[i] -= dt;
+      if (this.bLife[i] <= 0) {
+        this.bAlpha[i] = 0;
+        this.bSize[i] = 0;
+        continue;
+      }
+      const ph = this.bPhase[i];
+      this.bPos[i * 3 + 1] += this.bRise[i] * dt;
+      this.bPos[i * 3] += Math.sin(t * 2.1 + ph) * 1.1 * dt;
+      this.bPos[i * 3 + 2] += Math.cos(t * 1.7 + ph * 1.3) * 0.9 * dt;
+      const k = this.bLife[i] / this.bMaxLife[i];
+      const pop = k > 0.9 ? (1 - k) / 0.1 : 1;       // 생길 때 살짝 커진다
+      this.bAlpha[i] = 0.72 * Math.min(1, k * 4) * pop;
+      this.bSize[i] = this.bBase[i] * (0.7 + (1 - k) * 0.5);
+    }
+    const g = this.bubblePoints.geometry;
+    g.attributes.position.needsUpdate = true;
+    g.attributes.aColor.needsUpdate = true;
+    g.attributes.aSize.needsUpdate = true;
+    g.attributes.aAlpha.needsUpdate = true;
   }
 
   _slot() {
@@ -222,6 +366,8 @@ export class FX {
       f.sprite.scale.setScalar(f.size * (1 + k * 1.6));
       f.sprite.material.opacity = (1 - k) * 0.95;
     }
+
+    this._updateBubbles(dt);
   }
 
   clear() {
@@ -237,6 +383,11 @@ export class FX {
     for (const f of this.flashes) {
       f.active = false;
       f.sprite.visible = false;
+    }
+    for (let i = 0; i < this.bubMax; i++) {
+      this.bLife[i] = 0;
+      this.bAlpha[i] = 0;
+      this.bSize[i] = 0;
     }
   }
 }

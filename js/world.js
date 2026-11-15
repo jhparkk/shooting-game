@@ -11,9 +11,10 @@ import {
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
   makeFishSchool, glowTexture, setSwimRate,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
+  fanCoralGeometry, brainCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116e';
-import { getTextures } from './textures.js?v=20261116e';
+} from './models.js?v=20261116f';
+import { getTextures } from './textures.js?v=20261116f';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -34,20 +35,20 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x39c6bb, density: 0.0042,
-    skyTop: 0xbdf9ef, skyMid: 0x35b2b6, skyBottom: 0x0a5f74,
-    hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 0.95,
-    ambient: 0x9ff0e8, ambientI: 0.5,
-    sun: 0xfffbee, sunI: 1.5,
-    coral: [0xff8a72, 0xffbe5c, 0xef86e0, 0xffa8cf, 0xfff07a, 0x86efd8],
+    fog: 0x1f9fdc, density: 0.0034,
+    skyTop: 0xa9f4ff, skyMid: 0x2f9fe2, skyBottom: 0x0a5aa8,
+    hemiSky: 0xd8fbff, hemiGround: 0x2c86b6, hemi: 1.0,
+    ambient: 0xa8e4ff, ambientI: 0.55,
+    sun: 0xfffdf2, sunI: 1.6,
+    coral: [0xff5f8a, 0xff8a3c, 0xffc247, 0xe86ee0, 0xb07bff, 0x35e0c8, 0xff8fb8, 0xffe07a],
   },
   {
     name: '중층 해저 협곡',
-    fog: 0x1a86bb, density: 0.0058,
-    skyTop: 0x8fdcf8, skyMid: 0x1673ab, skyBottom: 0x053358,
-    hemiSky: 0xc2ecff, hemiGround: 0x16607c, hemi: 0.7,
-    ambient: 0x7fd0ea, ambientI: 0.4,
-    sun: 0xfdf8ec, sunI: 0.9,
+    fog: 0x0d74c4, density: 0.0052,
+    skyTop: 0x6cc8f4, skyMid: 0x0d74c4, skyBottom: 0x073a76,
+    hemiSky: 0xc2ecff, hemiGround: 0x1a6a94, hemi: 0.74,
+    ambient: 0x7fd0f0, ambientI: 0.42,
+    sun: 0xfdf8ec, sunI: 0.95,
     coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
   },
   {
@@ -496,7 +497,10 @@ export class World {
     });
     const uni = {
       uSand: { value: t.sand },
+      uCoralSand: { value: t.coralSand },
       uRock: { value: t.rock },
+      uAlgae: { value: t.algae },
+      uReef: { value: t.reef },
       uBasalt: { value: t.basalt },
       uCaustics: { value: t.caustics },
       uTime: { value: 0 },
@@ -515,21 +519,46 @@ export class World {
         );
       shader.fragmentShader =
         'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
-        'uniform sampler2D uSand;\nuniform sampler2D uRock;\n' +
-        'uniform sampler2D uBasalt;\nuniform sampler2D uCaustics;\n' +
-        'uniform float uTime;\nuniform float uCausticI;\n' +
+        'uniform sampler2D uSand;\nuniform sampler2D uCoralSand;\nuniform sampler2D uRock;\n' +
+        'uniform sampler2D uAlgae;\nuniform sampler2D uReef;\nuniform sampler2D uBasalt;\n' +
+        'uniform sampler2D uCaustics;\nuniform float uTime;\nuniform float uCausticI;\n' +
+        // 패치 바이옴용 값 노이즈 — 월드 좌표로 텍스처가 자연스럽게 섞이게 한다
+        'float abyssHash(vec2 p){ p = fract(p * vec2(127.13, 311.7)); p += dot(p, p + 34.53); return fract(p.x * p.y); }\n' +
+        'float abyssNoise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); ' +
+        'float a = abyssHash(i); float b = abyssHash(i + vec2(1.0, 0.0)); float c = abyssHash(i + vec2(0.0, 1.0)); ' +
+        'float d = abyssHash(i + vec2(1.0, 1.0)); return mix(mix(a, b, f.x), mix(c, d, f.x), f.y); }\n' +
+        'float abyssFbm(vec2 p){ float s = 0.0; float a = 0.5; for (int i = 0; i < 3; i++) { s += abyssNoise(p) * a; p *= 2.03; a *= 0.5; } return s / 0.875; }\n' +
         shader.fragmentShader.replace(
           '#include <map_fragment>',
           `
           vec2 tuv = vMapUv;
           vec3 cSand = texture2D( uSand, tuv ).rgb;
+          vec3 cCoralSand = texture2D( uCoralSand, tuv * 1.37 ).rgb;
           vec3 cRock = texture2D( uRock, tuv * 0.72 ).rgb;
+          vec3 cAlgae = texture2D( uAlgae, tuv * 0.86 ).rgb;
+          vec3 cReef = texture2D( uReef, tuv * 1.12 ).rgb;
           vec3 cBasalt = texture2D( uBasalt, tuv * 0.9 ).rgb;
+
+          // 패치 바이옴 — 같은 언덕 안에서도 모래밭·해조 암반·산호초 암벽이 섞인다
+          float pBig = abyssFbm( vWPosV.xz * 0.021 );
+          float pMid = abyssFbm( vWPosV.xz * 0.075 + 11.3 );
+          float pFine = abyssNoise( vWPosV.xz * 0.34 + 3.7 );
+
           float sandK = smoothstep( -12.0, 15.0, vWPosV.y );
           float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
           float flatK = smoothstep( 0.40, 0.82, vWNrmV.y );
           float sandW = sandK * flatK;
-          vec3 detail = mix( cRock, cSand, sandW );
+
+          // 평지 — 보통 모래 ↔ 밝고 분홍빛이 도는 산호 모래
+          vec3 sandy = mix( cSand, cCoralSand, smoothstep( 0.36, 0.78, pMid ) );
+          // 벽면 — 회색 암벽 ↔ 이끼·해조류 낀 암반 ↔ 다채로운 산호석 암초
+          vec3 rocky = mix( cRock, cAlgae, smoothstep( 0.40, 0.70, pBig ) );
+          rocky = mix( rocky, cReef, smoothstep( 0.46, 0.84, pMid ) * ( 0.6 + 0.4 * pFine ) );
+
+          vec3 detail = mix( rocky, sandy, sandW );
+          // 얕은 산호 지대 — 암초에 분홍·주황 기운을 살짝 얹어 힐링감을 더한다
+          float reefK = smoothstep( -34.0, 4.0, vWPosV.y ) * smoothstep( 0.38, 0.92, pFine ) * ( 1.0 - sandW * 0.45 );
+          detail = mix( detail, detail * vec3( 1.24, 0.90, 1.03 ), reefK * 0.42 );
           detail = mix( detail, cBasalt, deepK );
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
@@ -569,11 +598,13 @@ export class World {
 
   /* ---------------- 지형 소품 템플릿 (한 번만 만들어 재사용) ---------------- */
   _buildTemplates() {
-    this.tpl = { rock: [], branch: [], blob: [], tube: [] };
+    this.tpl = { rock: [], branch: [], blob: [], tube: [], fan: [], brain: [] };
     for (let i = 0; i < 5; i++) this.tpl.rock.push(paint(rockGeometry(1, 500 + i * 91), 0xffffff));
     for (let i = 0; i < 7; i++) this.tpl.branch.push(branchCoralGeometry(0xffffff, 610 + i * 37));
     for (let i = 0; i < 7; i++) this.tpl.blob.push(blobCoralGeometry(0xffffff, 720 + i * 41));
     for (let i = 0; i < 5; i++) this.tpl.tube.push(tubeCoralGeometry(0xffffff, 830 + i * 43));
+    for (let i = 0; i < 6; i++) this.tpl.fan.push(fanCoralGeometry(0xffffff, 940 + i * 47));
+    for (let i = 0; i < 5; i++) this.tpl.brain.push(brainCoralGeometry(0xffffff, 1050 + i * 53));
     this._tint = new THREE.Color();
   }
 
@@ -821,30 +852,62 @@ export class World {
     rec.terrain.geometry = terrainGeo;
     terrainGeo.computeBoundingSphere();
 
-    /* --- 산호 --- */
+    /* --- 산호초 --- */
     if (detail) {
       const coralGeos = [];
       const zone = this.zone;
-      for (let i = 0; i < 26; i++) {
-        const lx = (rnd() - 0.5) * CHUNK * 0.92;
-        const lz = (rnd() - 0.5) * CHUNK * 0.92;
+      const tmpCol = new THREE.Color();
+      for (let i = 0; i < 36; i++) {
+        const lx = (rnd() - 0.5) * CHUNK * 0.94;
+        const lz = (rnd() - 0.5) * CHUNK * 0.94;
         const wx = ox + lx;
         const wz = oz + lz;
         const gy = getTerrainHeight(wx, wz);
-        if (gy < -34) continue;                // 수심 90m 보다 깊은 곳에는 산호를 심지 않는다
-        if (slopeAt(wx, wz) > 0.85) continue;  // 급한 벽에도 심지 않는다
+        if (gy < -34) continue;                 // 수심 90m 보다 깊은 곳에는 산호를 심지 않는다
+        const slope = slopeAt(wx, wz);
+        if (slope > 1.45) continue;             // 수직에 가까운 벽에는 심지 않는다
+        const steep = slope > 0.7;              // 절벽 경사면 — 작고 단단한 산호 위주
         const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
         const kind = rnd();
         let tpl;
-        if (kind < 0.45) tpl = this.tpl.branch[Math.floor(rnd() * this.tpl.branch.length)];
-        else if (kind < 0.78) tpl = this.tpl.blob[Math.floor(rnd() * this.tpl.blob.length)];
+        if (kind < 0.26) tpl = this.tpl.branch[Math.floor(rnd() * this.tpl.branch.length)];
+        else if (kind < 0.46) tpl = this.tpl.fan[Math.floor(rnd() * this.tpl.fan.length)];
+        else if (kind < 0.64) tpl = this.tpl.brain[Math.floor(rnd() * this.tpl.brain.length)];
+        else if (kind < 0.82) tpl = this.tpl.blob[Math.floor(rnd() * this.tpl.blob.length)];
         else tpl = this.tpl.tube[Math.floor(rnd() * this.tpl.tube.length)];
-        const geo = this._clonePainted(tpl, color);
-        const sc = 2.0 + rnd() * 3.0;
+
+        // 산호 군락 — 한 자리에 1~3 개를 모아 심어 밀도를 높인다
+        const clump = 1 + Math.floor(rnd() * (steep ? 2 : 3));
+        for (let c = 0; c < clump; c++) {
+          const dx = c === 0 ? 0 : (rnd() - 0.5) * 4.2;
+          const dz = c === 0 ? 0 : (rnd() - 0.5) * 4.2;
+          const cgy = c === 0 ? gy : getTerrainHeight(wx + dx, wz + dz);
+          const geo = this._clonePainted(tpl, color);
+          const sc = (1.38 + rnd() * 2.0) * (steep ? 0.78 : 1.0);
+          const m = new THREE.Matrix4();
+          m.makeRotationY(rnd() * Math.PI * 2);
+          m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
+          m.setPosition(lx + dx, cgy + 0.08, lz + dz);
+          geo.applyMatrix4(m);
+          coralGeos.push(geo);
+        }
+      }
+      // 색이 산호 같은 작은 암초 덩이 — 바닥에 다채로운 색 반점을 준다
+      for (let i = 0; i < 7; i++) {
+        const lx = (rnd() - 0.5) * CHUNK * 0.9;
+        const lz = (rnd() - 0.5) * CHUNK * 0.9;
+        const wx = ox + lx;
+        const wz = oz + lz;
+        const gy = getTerrainHeight(wx, wz);
+        if (gy < -30) continue;
+        const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+        const cc = zone.coral[Math.floor(rnd() * zone.coral.length)];
+        const geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xd8cfc0), 0.42).getHex());
+        const sc = 0.7 + rnd() * 1.5;
         const m = new THREE.Matrix4();
         m.makeRotationY(rnd() * Math.PI * 2);
-        m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
-        m.setPosition(lx, gy + 0.1, lz);
+        m.scale(new THREE.Vector3(sc, sc * 0.8, sc));
+        m.setPosition(lx, gy + sc * 0.1, lz);
         geo.applyMatrix4(m);
         coralGeos.push(geo);
       }
@@ -859,22 +922,26 @@ export class World {
     /* --- 해초 --- */
     if (detail) {
       const kelpGeos = [];
-      for (let i = 0; i < 13; i++) {
+      for (let i = 0; i < 22; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.94;
         const lz = (rnd() - 0.5) * CHUNK * 0.94;
         const wx = ox + lx;
         const wz = oz + lz;
         const gy = getTerrainHeight(wx, wz);
-        if (gy < 2) continue;              // 해초 숲은 얕은 언덕에만
-        if (slopeAt(wx, wz) > 0.7) continue;
-        const h = 4 + rnd() * 9;
-        const w = 0.7 + rnd() * 0.7;
-        const geo = kelpGeometry(h, w, 300 + seed * 13 + i);
-        const m = new THREE.Matrix4();
-        m.makeRotationY(rnd() * Math.PI * 2);
-        m.setPosition(lx, gy - 0.3, lz);
-        geo.applyMatrix4(m);
-        kelpGeos.push(geo);
+        if (gy < 1) continue;              // 해초 숲은 얕은 언덕에만
+        if (slopeAt(wx, wz) > 0.95) continue;
+        const h = 4.5 + rnd() * 11;
+        const w = 0.7 + rnd() * 0.8;
+        // 다시마 군락 — 같은 자리에 2~3 포기를 다른 높이로
+        const n = 1 + Math.floor(rnd() * 3);
+        for (let k = 0; k < n; k++) {
+          const geo = kelpGeometry(h * (0.65 + rnd() * 0.6), w, 300 + seed * 13 + i * 7 + k);
+          const m = new THREE.Matrix4();
+          m.makeRotationY(rnd() * Math.PI * 2);
+          m.setPosition(lx + (rnd() - 0.5) * 3.4, gy - 0.3, lz + (rnd() - 0.5) * 3.4);
+          geo.applyMatrix4(m);
+          kelpGeos.push(geo);
+        }
       }
       if (kelpGeos.length) {
         const g = mergeGeometries(kelpGeos, false);
@@ -1137,8 +1204,8 @@ export class World {
   _buildSchools() {
     const rnd = mulberry(918);
     this._schoolRnd = rnd;
-    for (let s = 0; s < 6; s++) {
-      const count = 24;
+    for (let s = 0; s < 8; s++) {
+      const count = 28;
       const inst = makeFishSchool(count);
       const school = {
         mesh: inst,
