@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116n';
-import { getTextures } from './textures.js?v=20261116n';
+} from './models.js?v=20261116p';
+import { getTextures } from './textures.js?v=20261116p';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -570,17 +570,18 @@ export class World {
           vec2 cuv = vWPosV.xz * 0.14;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.012, uTime * 0.008 ) ).r;
           float cb = texture2D( uCaustics, cuv * 2.31 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
-          // 셀 경계의 날카로운 선 대신, 부드러운 빛 덩어리로 나타나게
-          float cshape = smoothstep( 0.12, 0.92, ca * 0.78 + cb * 0.42 );
-          float caustic = cshape * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.2;
+          // 셀 경계의 날카로운 선 대신, 큰 패치 안에서만 부드럽게 번지는 빛
+          float cshape = smoothstep( 0.30, 1.05, ca * 0.72 + cb * 0.5 );
+          float cpatch = smoothstep( 0.34, 0.78, abyssFbm( vWPosV.xz * 0.045 + 21.0 ) );
+          float caustic = cshape * cpatch * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
+          detail *= 1.0 + caustic * 0.42;
           diffuseColor.rgb *= detail;
           `
         ).replace(
           'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
           `
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.05;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.03;
           `
         );
     };
