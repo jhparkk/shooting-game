@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261116g';
+import { getTextures } from './textures.js?v=20261116h';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2789,36 +2789,59 @@ export function tubeCoralGeometry(color, seed) {
   return mergeGeometries(parts, false);
 }
 
-/** 해초 잎 (병합 + 정점 셰이더 흔들림) */
+/** 해초 잎 — 여러 가닥이 모인 다시마 군락 (병합 + 정점 셰이더 흔들림) */
 export function kelpGeometry(height, width, seed) {
   const rnd = mulberry(seed);
-  const segs = 7;
-  const pos = [];
-  const idx = [];
-  const nor = [];
-  const uv = [];
-  const sway = [];
-  for (let i = 0; i <= segs; i++) {
-    const t = i / segs;
-    const y = t * height;
-    const swayZ = Math.sin(t * 2.2 + seed) * 0.16 * t;
-    const w = width * (1 - t * 0.55);
-    pos.push(-w / 2, y, swayZ);
-    pos.push(w / 2, y, swayZ);
-    nor.push(0, 0, 1, 0, 0, 1);
-    uv.push(0, t, 1, t);
-    sway.push(t, t);
-    if (i < segs) {
-      const a = i * 2;
-      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  const blades = 3 + Math.floor(rnd() * 3);
+  const parts = [];
+  const base = new THREE.Color();
+  const tipC = new THREE.Color();
+  const c = new THREE.Color();
+  for (let b = 0; b < blades; b++) {
+    const h = height * (0.55 + rnd() * 0.65);
+    const w = width * (0.32 + rnd() * 0.4);
+    const segs = 7;
+    const lean = (rnd() - 0.5) * 0.9;          // 바깥으로 기우는 방향
+    const leanZ = (rnd() - 0.5) * 0.9;
+    const twist = (rnd() - 0.5) * 1.2;         // 잎이 비틀리는 정도
+    const ox = (rnd() - 0.5) * width * 0.9;
+    const oz = (rnd() - 0.5) * width * 0.9;
+    const pos = [];
+    const nor = [];
+    const uv = [];
+    const sway = [];
+    const col = [];
+    const idx = [];
+    base.setHSL(0.29 + rnd() * 0.09, 0.52, 0.14 + rnd() * 0.07);
+    tipC.setHSL(0.25 + rnd() * 0.08, 0.55, 0.34 + rnd() * 0.12);
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const y = t * h;
+      const cx = ox + lean * t * t * h * 0.22;
+      const cz = oz + leanZ * t * t * h * 0.22;
+      const ww = w * (0.45 + Math.sin(Math.min(1, t * 1.45) * Math.PI * 0.75)) * (1 - t * 0.55);
+      const a = twist * t;
+      const dx = Math.cos(a) * ww * 0.5;
+      const dz = Math.sin(a) * ww * 0.5;
+      pos.push(cx - dx, y, cz - dz, cx + dx, y, cz + dz);
+      nor.push(0, 0, 1, 0, 0, 1);
+      uv.push(0, t, 1, t);
+      sway.push(t, t);
+      c.copy(base).lerp(tipC, Math.min(1, t * 1.25));
+      col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      if (i < segs) {
+        const o = i * 2;
+        idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+      }
     }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute('aSway', new THREE.Float32BufferAttribute(sway, 1));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    parts.push(g);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute('aSway', new THREE.Float32BufferAttribute(sway, 1));
-  g.setIndex(idx);
-  const col = new THREE.Color().setHSL(0.28 + rnd() * 0.12, 0.55, 0.22 + rnd() * 0.12);
-  return paint(g, col.getHex());
+  return mergeGeometries(parts, false);
 }

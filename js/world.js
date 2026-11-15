@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116g';
-import { getTextures } from './textures.js?v=20261116g';
+} from './models.js?v=20261116h';
+import { getTextures } from './textures.js?v=20261116h';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -567,18 +567,18 @@ export class World {
           // 수중 빛무늬 — 표면색을 밝히고(곱셈) 약간의 빛을 더한다(덧셈)
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.13;
-          float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
-          float cb = texture2D( uCaustics, cuv * 2.71 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
+          vec2 cuv = vWPosV.xz * 0.26;
+          float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.012, uTime * 0.008 ) ).r;
+          float cb = texture2D( uCaustics, cuv * 2.71 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
           float caustic = ( ca + cb * 0.55 ) * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.55;
+          detail *= 1.0 + caustic * 0.30;
           diffuseColor.rgb *= detail;
           `
         ).replace(
           'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
           `
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.05;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.035;
           `
         );
     };
@@ -733,9 +733,9 @@ export class World {
         const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
-        const hue = 0.11 + dk * 0.47 + (1 - flatness) * 0.28;
-        const sat = 0.05 + flatness * 0.03;
-        const lit = (0.52 - dk * 0.26 + kk * 0.04) * (0.80 + flatness * 0.20);
+        const hue = 0.10 + dk * 0.45 + (1 - flatness) * 0.14;
+        const sat = 0.07 + flatness * 0.10;
+        const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18);
         fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
@@ -903,9 +903,9 @@ export class World {
         if (gy < -30) continue;
         const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
         const cc = zone.coral[Math.floor(rnd() * zone.coral.length)];
-        let geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xd8cfc0), 0.42).getHex());
+        let geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xcfc6b4), 0.62).getHex());
         if (geo.index) geo = geo.toNonIndexed();
-        const sc = 0.7 + rnd() * 1.5;
+        const sc = 0.55 + rnd() * 1.1;
         const m = new THREE.Matrix4();
         m.makeRotationY(rnd() * Math.PI * 2);
         m.scale(new THREE.Vector3(sc, sc * 0.8, sc));
