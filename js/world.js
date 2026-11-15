@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180e';
-import { getTextures } from './textures.js?v=202611180e';
+} from './models.js?v=202611180f';
+import { getTextures } from './textures.js?v=202611180f';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -506,8 +506,8 @@ export class World {
           vec2 cuv = vWPosV.xz * 0.13;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
           float cb = texture2D( uCaustics, cuv * 2.71 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
-          float cw = max( ca, cb * 0.9 );
-          float caustic = cw * cFade * ( 0.20 + 0.80 * upK ) * uCausticI * 0.22;
+          float cw = ca + cb * 0.55;
+          float caustic = cw * cFade * ( 0.20 + 0.80 * upK ) * uCausticI * 0.34;
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
             + vec3( 0.58, 0.93, 1.0 ) * caustic;
           `

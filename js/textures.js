@@ -229,9 +229,15 @@ function bakeCaustics(size) {
       // 두 겹의 셀 경계를 겹쳐 물결처럼 흔든다 — 가는 선만 남긴다
       const a = worley(u, v, 5, 91);
       const b = worley(u + 0.31, v + 0.17, 8, 457);
-      const ea = 1 - smooth(0.0, 0.090, a.f2 - a.f1);
-      const eb = 1 - smooth(0.0, 0.070, b.f2 - b.f1);
-      let c = (ea * 0.8 + eb * 0.6) * 0.9;
+      // 두 겹의 셀 경계를 겹쳐 물결처럼 흔든다 — 가는 선만 남긴다
+      const a = worley(u, v, 5, 91);
+      const b = worley(u + 0.31, v + 0.17, 8, 457);
+      const ea = 1 - smooth(0.0, 0.058, a.f2 - a.f1);
+      const eb = 1 - smooth(0.0, 0.044, b.f2 - b.f1);
+      let c = Math.pow(ea * 0.82 + eb * 0.58, 1.35) * 1.3;
+      // 큰 덩어리로 나타났다 사라지는 패치 (진짜 수중 빛무늬처럼)
+      const patch = fbm(u, v, 3, 3, 1301);
+      c *= 0.30 + 0.95 * smooth(0.25, 0.75, patch);
       c = clamp01(c);
       const i = (y * size + x) * 4;
       D[i] = (c * 255) | 0;
