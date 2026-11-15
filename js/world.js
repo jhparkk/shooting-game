@@ -9,11 +9,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-  makeFishSchool, glowTexture,
+  makeFishSchool, glowTexture, setSwimRate,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116d';
-import { getTextures } from './textures.js?v=20261116d';
+} from './models.js?v=20261116e';
+import { getTextures } from './textures.js?v=20261116e';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1404,7 +1404,8 @@ export class World {
     const eul = new THREE.Euler(0, 0, 0, 'YXZ');
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
-    const yAxis = new THREE.Vector3(0, 1, 0);
+    let speedSum = 0;
+    let speedN = 0;
     for (const s of this.schools) {
       const far = Math.hypot(s.center.x - playerPos.x, s.center.z - playerPos.z) > 250;
       if (far) this._seedSchool(s, s.rnd, playerPos.x, playerPos.z);
@@ -1415,6 +1416,9 @@ export class World {
       const heading = Math.atan2(-Math.sin(s.angle) * Math.sign(s.angular), Math.cos(s.angle) * Math.sign(s.angular));
       // 떼 전체가 선회 방향 안쪽으로 기울고, 한 마리씩 조금씩 다른 자세로 흔들린다
       const bank = -Math.sign(s.angular) * 0.2;
+      // 떼가 빨리 도는 동안에는 꼬리질도 자주 해진다
+      speedSum += Math.abs(s.angular) * s.radius;
+      speedN += 1;
       for (let i = 0; i < s.offsets.length; i++) {
         const o = s.offsets[i];
         pos.set(
@@ -1433,6 +1437,11 @@ export class World {
         s.mesh.setMatrixAt(i, m);
       }
       s.mesh.instanceMatrix.needsUpdate = true;
+    }
+    if (speedN) {
+      const want = Math.min(1.25, Math.max(0.8, speedSum / speedN / 5));
+      this.schoolRate = this.schoolRate === undefined ? want : this.schoolRate + (want - this.schoolRate) * Math.min(1, dt * 0.6);
+      setSwimRate('school', this.schoolRate);
     }
 
     // 대형 생물 — 플레이어의 수심대에 맞는 종이 주변에 머문다

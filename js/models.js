@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261116d';
+import { getTextures } from './textures.js?v=20261116e';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1259,7 +1259,7 @@ function anglerGeometries() {
     _anglerMat = swimMaterial({
       vertexColors: true, shininess: 30, specular: 0x3a5468,
       emissive: 0x081420, emissiveIntensity: 0.55,
-    }, ANGLER_BEND);
+    }, ANGLER_BEND, 'angler');
     _anglerJawMat = swimMaterial({
       vertexColors: true, shininess: 20, specular: 0x2a3a48,
     }, ANGLER_BEND);
