@@ -1447,7 +1447,7 @@ function humpbackGeometry() {
   const body = bodyGeometry(profile, { radial: 26, sx: 0.94, sy: 0.95 });
   paintSkin(body, {
     back: BACK, belly: BELLY, halfHeight: 1.95, blend: [-0.52, 0.06], wave: 0.16,
-    stripe: { color: 0x8ba0a8, freq: 1.2, phase: 0, mix: 0.14, soft: 0.5, wobble: 0.9 },
+    stripe: { color: 0x93a8b0, freq: 1.15, phase: 0, mix: 0.22, soft: 0.45, wobble: 0.9 },
   });
   const parts = [body];
 
@@ -1470,8 +1470,8 @@ function humpbackGeometry() {
     const z = -8.5 + rnd() * 2.6;
     const r = radiusAt(profile, z);
     const a = (rnd() - 0.5) * 2.1;
-    const g = new THREE.SphereGeometry(0.07 + rnd() * 0.07, 6, 5);
-    parts.push(xf(paint(g, 0x5c6f78), [
+    const g = new THREE.SphereGeometry(0.09 + rnd() * 0.08, 6, 5);
+    parts.push(xf(paint(g, 0x8a9aa0), [
       Math.sin(a) * r * 0.86,
       Math.cos(a) * r * 0.86,
       z,
@@ -1483,9 +1483,20 @@ function humpbackGeometry() {
     [-0.55, 0], [-0.42, 0.42], [-0.2, 0.6], [0.04, 0.46], [0.22, 0],
   ], 0.1, FIN), [0, 1.5, 2.05], [0, 0, 0], [1, 1, 1]));
 
-  // 눈
+  // 입 라인 — 아래턱을 따라 길게 이어지는 선
+  const jawPts = [];
+  for (let k = 0; k <= 10; k++) {
+    const z = -8.5 + k * 0.42;
+    const r = radiusAt(profile, z) * 0.94;
+    jawPts.push(new THREE.Vector3(r * 0.97, -r * 0.42, z));
+  }
+  parts.push(tubeAlong(jawPts, 0.055, 0x5f7078, 18, 4));
+
+  // 눈 — 몸통 표면에 살짝 나오게
   for (const s of [-1, 1]) {
-    eyeParts(parts, 1.1 * s, -0.28, -6.5, 0.1, s);
+    const ez = -6.4;
+    const ex = radiusAt(profile, ez) * 0.94 * 0.96;
+    eyeParts(parts, ex * s, -0.26, ez, 0.13, s);
   }
 
   _humpGeo = assemble(parts, -1.4, 7.5);
@@ -1495,11 +1506,12 @@ function humpbackGeometry() {
 function humpbackFlukeGeometry() {
   if (_humpFluke) return _humpFluke;
   const pts = [
-    [-3.35, -0.12], [-2.6, 0.5], [-1.5, 0.74], [-0.55, 0.58], [0, 0.32],
-    [0.55, 0.58], [1.5, 0.74], [2.6, 0.5], [3.35, -0.12],
-    [1.9, -0.5], [0.8, -0.74], [0, -0.58], [-0.8, -0.74], [-1.9, -0.5],
+    [-4.0, -0.14], [-3.2, 0.52], [-2.1, 0.82], [-1.1, 0.72], [-0.42, 0.44],
+    [0, 0.3], [0.42, 0.44], [1.1, 0.72], [2.1, 0.82], [3.2, 0.52], [4.0, -0.14],
+    [2.6, -0.52], [1.4, -0.78], [0.5, -0.66], [0, -0.56], [-0.5, -0.66],
+    [-1.4, -0.78], [-2.6, -0.52],
   ];
-  _humpFluke = hfin(pts, 0.17, 0x2b3a42, { smooth: true, curveSegments: 8 });
+  _humpFluke = hfin(pts, 0.18, 0x2b3a42, { smooth: true, curveSegments: 10 });
   return _humpFluke;
 }
 
@@ -1598,9 +1610,11 @@ function orcaGeometry() {
     [-0.62, 0], [-0.4, 1.35], [-0.12, 1.78], [0.1, 1.42], [0.2, 0.72], [0.34, 0],
   ], 0.13, BLACK), [0, 1.05, 0.1], [0, 0, 0], [1, 1, 1]));
 
-  // 눈
+  // 눈 — 흰 패치 안쪽
   for (const s of [-1, 1]) {
-    eyeParts(parts, 0.62 * s, -0.02, -3.7, 0.085, s);
+    const ez = -3.7;
+    const ex = radiusAt(profile, ez) * 0.93 * 0.96;
+    eyeParts(parts, ex * s, 0.02, ez, 0.1, s);
   }
   // 입 라인
   const mouth = new THREE.BoxGeometry(1.1, 0.06, 0.5);
@@ -1730,7 +1744,9 @@ function spermGeometry() {
 
   // 눈 (머리 뒤 아래)
   for (const s of [-1, 1]) {
-    eyeParts(parts, 1.35 * s, -0.62, -2.1, 0.09, s);
+    const ez = -2.1;
+    const ex = radiusAt(profile, ez) * 0.92 * 0.96;
+    eyeParts(parts, ex * s, -0.5, ez, 0.12, s);
   }
   // 왼쪽 앞머리 분기공
   const blow = new THREE.SphereGeometry(0.18, 8, 6);
@@ -1819,7 +1835,9 @@ function blueGeometry() {
 
   // 눈
   for (const s of [-1, 1]) {
-    eyeParts(parts, 0.86 * s, -0.3, -8.6, 0.075, s);
+    const ez = -8.6;
+    const ex = radiusAt(profile, ez) * 0.9 * 0.96;
+    eyeParts(parts, ex * s, -0.28, ez, 0.1, s);
   }
 
   _blueGeo = assemble(parts, -2.0, 10.6);
@@ -2148,9 +2166,9 @@ export function makeEagleRay() {
 
   for (const s of [-1, 1]) {
     const e = new THREE.SphereGeometry(0.1, 8, 6);
-    g.add(new THREE.Mesh(xf(paint(e, 0xf6f8ea), [0.52 * s, 0.16, -2.0]), _eagleMat));
+    g.add(new THREE.Mesh(xf(paint(e, 0xf6f8ea), [0.4 * s, 0.18, -1.95]), _eagleMat));
     const p = new THREE.SphereGeometry(0.055, 6, 5);
-    g.add(new THREE.Mesh(xf(paint(p, 0x080a0c), [0.56 * s, 0.17, -2.05]), _eagleMat));
+    g.add(new THREE.Mesh(xf(paint(p, 0x080a0c), [0.44 * s, 0.19, -2.0]), _eagleMat));
   }
 
   // 긴 채찍 꼬리
