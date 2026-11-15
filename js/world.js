@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116j';
-import { getTextures } from './textures.js?v=20261116j';
+} from './models.js?v=20261116k';
+import { getTextures } from './textures.js?v=20261116k';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -734,8 +734,11 @@ export class World {
         const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
-        const hue = 0.10 + dk * 0.45 + (1 - flatness) * 0.13;
-        const sat = 0.07 + flatness * 0.10 + (1 - flatness) * (0.04 + Math.max(0, Math.sin(wx * 0.041 + wz * 0.017)) * 0.06);
+        // 벽면은 큰 패치로 색이 갈린다 — 회백색 암벽 · 이끼 초록 · 산호 분홍/보라
+        const wall = 1 - flatness;
+        const wpatch = Math.sin(wx * 0.041 + wz * 0.017) * 0.5 + Math.cos(wz * 0.031 - wx * 0.026) * 0.5;
+        const hue = 0.10 + dk * 0.45 + wall * (0.09 + wpatch * 0.19);
+        const sat = 0.07 + flatness * 0.10 + wall * (0.08 + Math.max(0, wpatch) * 0.10);
         const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18);
         fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
         vcol[k3] = fc.r;
@@ -902,7 +905,7 @@ export class World {
         const wz = oz + lz;
         const gy = getTerrainHeight(wx, wz);
         if (gy < -30) continue;
-        if (slopeAt(wx, wz) > 1.6) continue;
+        if (slopeAt(wx, wz) > 2.0) continue;
         const tpl = this.tpl.tuft[Math.floor(rnd() * this.tpl.tuft.length)];
         const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
         let geo = this._clonePainted(tpl, color);
