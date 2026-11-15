@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117d';
-import { getTextures } from './textures.js?v=20261117d';
+} from './models.js?v=20261117e';
+import { getTextures } from './textures.js?v=20261117e';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -488,11 +488,13 @@ export class World {
           vec3 cBasalt = texture2D( uBasalt, tuv * 0.9 ).rgb;
           float sandK = smoothstep( -12.0, 15.0, vWPosV.y );
           float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
-          vec3 detail = mix( cRock, cSand, sandK );
+          float flatK = smoothstep( 0.40, 0.82, vWNrmV.y );
+          float sandW = sandK * flatK;
+          vec3 detail = mix( cRock, cSand, sandW );
           detail = mix( detail, cBasalt, deepK );
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
-          detail *= mix( vec3( 1.0 ), vec3( 1.30, 1.22, 0.98 ), sandK );
+          detail *= mix( vec3( 1.0 ), vec3( 1.30, 1.22, 0.98 ), sandW );
           diffuseColor.rgb *= detail;
           `
         ).replace(
@@ -623,6 +625,7 @@ export class World {
     const vcol = new Float32Array(N * N * 3);
     const vnor = new Float32Array(N * N * 3);
     const fc = new THREE.Color();
+    const vuv = new Float32Array(N * N * 2);
     for (let j = 0; j < N; j++) {
       for (let i = 0; i < N; i++) {
         const k3 = (j * N + i) * 3;
@@ -634,16 +637,8 @@ export class World {
         vpos[k3 + 2] = lz;
         const wx = ox + lx;
         const wz = oz + lz;
-        const n =
-          Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
-          Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
-        const kk = clamp01((n + 1.15) / 2.3);
-        const dkRaw = clamp01((SURFACE_Y - y) / 1000);
-        const dk = Math.pow(dkRaw, 0.7);
-        fc.setHSL(0.13 + dk * 0.45 - kk * 0.02, 0.16 - dk * 0.10, 0.44 - dk * 0.24 + kk * 0.05);
-        vcol[k3] = fc.r;
-        vcol[k3 + 1] = fc.g;
-        vcol[k3 + 2] = fc.b;
+
+        // 노멀 (이웃 높이에서)
         const hL = hAt(i - 1, j);
         const hR = hAt(i + 1, j);
         const hD = hAt(i, j - 1);
@@ -652,9 +647,44 @@ export class World {
         const ny = 2 * d;
         const nz = hD - hU;
         const len = Math.hypot(nx, ny, nz) || 1;
-        vnor[k3] = nx / len;
-        vnor[k3 + 1] = ny / len;
-        vnor[k3 + 2] = nz / len;
+        const unx = nx / len;
+        const uny = ny / len;
+        const unz = nz / len;
+        vnor[k3] = unx;
+        vnor[k3 + 1] = uny;
+        vnor[k3 + 2] = unz;
+
+        // 색 — 평평한 바닥은 모래, 벽면은 암벽(gray)
+        const flatness = clamp01((uny - 0.35) / 0.55);   // 1 = 평지
+        const n =
+          Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
+          Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
+        const kk = clamp01((n + 1.15) / 2.3);
+        const dkRaw = clamp01((SURFACE_Y - y) / 1000);
+        const dk = Math.pow(dkRaw, 0.7);
+        const hue = 0.11 + dk * 0.47 - kk * 0.02 + (1 - flatness) * 0.10;
+        const sat = 0.11 + (1 - flatness) * 0.06 - dk * 0.03;
+        const lit = (0.48 - dk * 0.28 + kk * 0.04) * (0.80 + flatness * 0.20);
+        fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
+        vcol[k3] = fc.r;
+        vcol[k3 + 1] = fc.g;
+        vcol[k3 + 2] = fc.b;
+
+        // uv — 면이 향한 방향에 맞춰 투영 (벽이늘어나지 않게)
+        const ax = Math.abs(unx);
+        const ay = Math.abs(uny);
+        const az = Math.abs(unz);
+        const u2 = (j * N + i) * 2;
+        if (ay >= ax && ay >= az) {
+          vuv[u2] = wx * UV_WORLD;
+          vuv[u2 + 1] = wz * UV_WORLD;
+        } else if (ax >= az) {
+          vuv[u2] = wz * UV_WORLD;
+          vuv[u2 + 1] = y * UV_WORLD;
+        } else {
+          vuv[u2] = wx * UV_WORLD;
+          vuv[u2 + 1] = y * UV_WORLD;
+        }
       }
     }
     // 정점 격자 → 삼각형 (비인덱스, 위를 향하는 감김)
@@ -685,9 +715,8 @@ export class World {
           fcolOut[o18 + 2] = vcol[s + 2];
           o18 += 3;
           const vi = order[t];
-          // uv 를 월드 좌표로 — 청크가 바뀜 없이 텍스처가 이어지도록
-          fuv[o12] = (vpos[vi * 3] + ox) * UV_WORLD;
-          fuv[o12 + 1] = (vpos[vi * 3 + 2] + oz) * UV_WORLD;
+          fuv[o12] = vuv[vi * 2];
+          fuv[o12 + 1] = vuv[vi * 2 + 1];
           o12 += 2;
         }
       }
@@ -709,7 +738,7 @@ export class World {
       const r = (detail ? 1.1 : 2.0) + rnd() * (detail ? 3.0 : 5.0);
       const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
       const g = rnd() < 0.84 ? 0.2 + rnd() * 0.14 : 0.34 + rnd() * 0.12;
-      const geo = this._clonePainted(tpl, rockCol.setHSL(0.36, 0.16, g).getHex());
+      const geo = this._clonePainted(tpl, rockCol.setHSL(0.09, 0.12, g).getHex());
       const m = new THREE.Matrix4();
       m.makeRotationY(rnd() * Math.PI * 2);
       m.scale(new THREE.Vector3(r, r, r));
