@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b';
-import { getTextures } from './textures.js?v=20261117b';
+} from './models.js?v=20261117c';
+import { getTextures } from './textures.js?v=20261117c';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -501,12 +501,13 @@ export class World {
           // 수중 빛무늬 — 얕은 곳에서 또렷하고 심해로 갈수록 사라진다
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.05;
+          vec2 cuv = vWPosV.xz * 0.13;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
-          float cb = texture2D( uCaustics, cuv * 1.47 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
-          float caustic = ca * cb * 1.7 * cFade * ( 0.25 + 0.75 * upK ) * uCausticI;
+          float cb = texture2D( uCaustics, cuv * 1.63 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
+          float cw = max( ca, cb * 0.9 );
+          float caustic = cw * cFade * ( 0.22 + 0.78 * upK ) * uCausticI * 0.42;
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.60, 0.94, 1.0 ) * caustic * 0.42;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic;
           `
         );
     };
@@ -639,7 +640,7 @@ export class World {
         const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
-        fc.setHSL(0.38 + dk * 0.2 - kk * 0.04, 0.52 - dk * 0.3, 0.31 - dk * 0.13 + kk * 0.05);
+        fc.setHSL(0.36 + dk * 0.22 - kk * 0.03, 0.26 - dk * 0.16, 0.40 - dk * 0.20 + kk * 0.05);
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
         vcol[k3 + 2] = fc.b;
