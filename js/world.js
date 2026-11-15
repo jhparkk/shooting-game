@@ -12,7 +12,7 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116h';
+} from './models.js?v=20261116i';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -38,29 +38,29 @@ export const ZONES = [
   },
   {
     name: '중층 해저 협곡',
-    fog: 0x1e93c8, density: 0.0058,
-    skyTop: 0x9fe6ff, skyMid: 0x1c7fb8, skyBottom: 0x063f6e,
-    hemiSky: 0xd2f6ff, hemiGround: 0x1a708c, hemi: 0.8,
-    ambient: 0x8fe0f5, ambientI: 0.44,
-    sun: 0xfdf8ec, sunI: 1.2,
+    fog: 0x1a86bb, density: 0.0058,
+    skyTop: 0x8fdcf8, skyMid: 0x1673ab, skyBottom: 0x053358,
+    hemiSky: 0xc2ecff, hemiGround: 0x16607c, hemi: 0.7,
+    ambient: 0x7fd0ea, ambientI: 0.4,
+    sun: 0xfdf8ec, sunI: 0.9,
     coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
   },
   {
     name: '심해 해구',
-    fog: 0x0a2a72, density: 0.0068,
-    skyTop: 0x2f6bc0, skyMid: 0x0d2f6e, skyBottom: 0x020a20,
-    hemiSky: 0x6fa8ff, hemiGround: 0x081a3a, hemi: 0.5,
-    ambient: 0x3f6cc0, ambientI: 0.32,
-    sun: 0xd8e8ff, sunI: 0.55,
+    fog: 0x071d4e, density: 0.0068,
+    skyTop: 0x1d4a96, skyMid: 0x07204f, skyBottom: 0x01060f,
+    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.4,
+    ambient: 0x2f4f96, ambientI: 0.3,
+    sun: 0xc8d8ff, sunI: 0.22,
     coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
   },
   {
     name: '초심해 심연',
     fog: 0x040a1e, density: 0.0078,
     skyTop: 0x0b1f4a, skyMid: 0x030a20, skyBottom: 0x000206,
-    hemiSky: 0x2a4c92, hemiGround: 0x03060e, hemi: 0.42,
-    ambient: 0x22386f, ambientI: 0.34,
-    sun: 0x9db8e8, sunI: 0.24,
+    hemiSky: 0x223f80, hemiGround: 0x02040a, hemi: 0.36,
+    ambient: 0x1c3060, ambientI: 0.3,
+    sun: 0x8faddd, sunI: 0.1,
     coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
   },
 ];
