@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261116b';
+import { getTextures } from './textures.js?v=20261116c';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2186,7 +2186,7 @@ export function makeMantaRay() {
   if (!_mantaMat) {
     _mantaMat = flapMaterial(
       { vertexColors: true, shininess: 22, specular: 0x3c4e5e },
-      { amp: 0.68, freq: 4.4, speed: 2.0, span: 5.8 }
+      { amp: 0.5, freq: 4.2, speed: 2.0, span: 5.8 }
     );
   }
   const g = new THREE.Group();
@@ -2269,12 +2269,12 @@ export function makeMantaRay() {
       const beat = t * 2.0;
       for (const w of wings) {
         // 어깨 관절이 크게 오르내리고, 날개 끝은 셰이더가 조금 늦게 따라온다
-        w.pivot.rotation.z = w.sign * (0.2 + Math.sin(beat + (w.sign > 0 ? 0.06 : 0)) * 0.62);
+        w.pivot.rotation.z = w.sign * (0.14 + Math.sin(beat + (w.sign > 0 ? 0.06 : 0)) * 0.46);
         w.pivot.rotation.x = Math.sin(beat + 1.4) * 0.07;
         w.pivot.rotation.y = w.sign * Math.sin(beat * 0.5) * 0.05;
       }
       // 날갯짓 박자에 맞춘 부력 — 몸통 전체가 떠오르고 가라앉는다
-      core.position.y = Math.cos(beat + 0.35) * 0.34;
+      core.position.y = Math.cos(beat + 0.35) * 0.26;
       core.rotation.z = Math.sin(beat + 1.0) * 0.05;
       // 뒤따라 흐르는 꼬리 물결
       tail.rotation.z = Math.sin(t * 1.05 - 0.8) * 0.16;
@@ -2310,7 +2310,7 @@ export function makeEagleRay() {
   if (!_eagleMat) {
     _eagleMat = flapMaterial(
       { vertexColors: true, shininess: 24, specular: 0x3a4a58 },
-      { amp: 0.52, freq: 4.8, speed: 2.3, span: 4.4 }
+      { amp: 0.4, freq: 4.6, speed: 2.3, span: 4.4 }
     );
   }
   const g = new THREE.Group();
@@ -2378,7 +2378,7 @@ export function makeEagleRay() {
     update(t) {
       const beat = t * 2.3;
       for (const w of wings) {
-        w.pivot.rotation.z = w.sign * (0.22 + Math.sin(beat + (w.sign > 0 ? 0.05 : 0)) * 0.5);
+        w.pivot.rotation.z = w.sign * (0.18 + Math.sin(beat + (w.sign > 0 ? 0.05 : 0)) * 0.4);
         w.pivot.rotation.x = Math.sin(beat + 1.5) * 0.06;
         w.pivot.rotation.y = w.sign * Math.sin(beat * 0.5) * 0.06;
       }
