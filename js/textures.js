@@ -177,10 +177,10 @@ function bakeSand(size) {
 
     // 밝기: 물결 마루 + 미세 모래알
     const shade = 0.80
-      + rip * 0.075
+      + rip * 0.05
       + rip2 * 0.03
-      + (grain - 0.5) * 0.16
-      + (shell - 0.5) * 0.16;
+      + (grain - 0.5) * 0.18
+      + (shell - 0.5) * 0.18;
 
     const r = clamp01(shade * 0.97 + 0.02);
     const g = clamp01(shade * 0.96 + 0.02);
@@ -203,10 +203,10 @@ function bakeRock(size) {
     const fine = noise2(u * 200, v * 200, 200, 5);
     // 능선 패턴으로 균열선
     const ridge = 1 - Math.abs(fbm(u * 1.4, v * 1.4, 5, 3, 133) * 2 - 1);
-    const crack = smooth(0.90, 0.995, ridge + fine * 0.03);
+    const crack = smooth(0.93, 0.998, ridge + fine * 0.03);
 
     let shade = 0.46 + (strata - 0.5) * 0.34 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.10;
-    shade *= 1 - crack * 0.55;
+    shade *= 1 - crack * 0.34;
     // 이끼·규조가 붙은 듯한 녹회색
     const moss = smooth(0.55, 0.9, fbm(u, v, 5, 3, 201)) * 0.28;
     o[0] = clamp01(shade * 0.94 - moss * 0.14) * 255;
