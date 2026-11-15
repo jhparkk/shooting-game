@@ -162,12 +162,12 @@ function bakeSand(size) {
       + (grain - 0.5) * 0.16
       + (shell - 0.5) * 0.14;
 
-    const r = clamp01(shade * 0.96 + 0.06);
-    const g = clamp01(shade * 0.93 + 0.04);
-    const b = clamp01(shade * 0.80);
+    const r = clamp01(shade * 0.99 + 0.03);
+    const g = clamp01(shade * 0.96 + 0.02);
+    const b = clamp01(shade * 0.88 + 0.02);
     o[0] = (r * 255) | 0;
     o[1] = (g * 255) | 0;
-    o[2] = (b * 235) | 0;
+    o[2] = (b * 255) | 0;
     o[3] = clamp01(0.52 + rip * 0.3 + (grain - 0.5) * 0.3) * 255;
   });
 }

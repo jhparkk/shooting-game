@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117e';
-import { getTextures } from './textures.js?v=20261117e';
+} from './models.js?v=20261117f';
+import { getTextures } from './textures.js?v=20261117f';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -494,7 +494,7 @@ export class World {
           detail = mix( detail, cBasalt, deepK );
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
-          detail *= mix( vec3( 1.0 ), vec3( 1.30, 1.22, 0.98 ), sandW );
+          detail *= mix( vec3( 1.0 ), vec3( 1.18, 1.14, 1.06 ), sandW );
           diffuseColor.rgb *= detail;
           `
         ).replace(
