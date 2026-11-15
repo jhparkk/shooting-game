@@ -157,8 +157,8 @@ function bakeSand(size) {
 
     // 밝기: 물결 마루 + 미세 모래알
     const shade = 0.80
-      + rip * 0.10
-      + rip2 * 0.04
+      + rip * 0.075
+      + rip2 * 0.03
       + (grain - 0.5) * 0.16
       + (shell - 0.5) * 0.16;
 
