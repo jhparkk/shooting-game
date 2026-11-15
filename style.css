@@ -328,8 +328,8 @@ body { touch-action: none; }
 }
 .reticle.locked .reticle-tick { background: rgba(255, 190, 160, 0.9); }
 
-/* 웨이브 배너 */
-.wave-banner {
+/* 알림 배너 (잠수 시작 · 크라켄 출현) */
+.notice-banner {
   position: absolute;
   left: 0;
   right: 0;
@@ -345,7 +345,7 @@ body { touch-action: none; }
   transition: opacity 400ms ease, transform 400ms ease;
   pointer-events: none;
 }
-.wave-banner.show { opacity: 1; transform: translateY(0); }
+.notice-banner.show { opacity: 1; transform: translateY(0); }
 
 .toast {
   position: absolute;

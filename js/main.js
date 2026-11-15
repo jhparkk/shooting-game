@@ -3,13 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261115g';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115g';
+import { Sound } from './audio.js?v=20261116a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
-} from './models.js?v=20261115g';
-import { FX } from './fx.js?v=20261115g';
+  makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
+  makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
+} from './models.js?v=20261116a';
+import { FX } from './fx.js?v=20261116a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -25,12 +27,13 @@ const BASE_MAX_HULL = 100;       // 기본 최대 내구력
 const SUB_R = 1.7;               // 잠수정 충돌 반경
 const REGEN_DELAY = 3;           // 마지막 피격 후 회복 시작까지 (초)
 const REGEN_RATE = 5.5;          // 초당 회복량
-const REGEN_FADE_FROM = 58;      // 이 수심부터 회복이 약해진다
-const REGEN_FADE_TO = 70;        // 이 수심부터는 회복 없이 수압만 작용
-const PRESSURE_START = 70;       // 수압이 내구력을 깎기 시작하는 수심(m)
-const PRESSURE_FULL = 100;       // 수압 감소가 최대가 되는 수심(m)
-const PRESSURE_RATE_MIN = 0.6;   // 70m 에서 초당 감소량
-const PRESSURE_RATE_MAX = 1.8;   // 100m 이상에서 초당 감소량
+const REGEN_FADE_FROM = 450;     // 이 수심까지는 정상 회복
+const REGEN_FADE_TO = 950;       // 이 수심부터는 회복이 거의 멈춘다
+const REGEN_FLOOR = 0.16;        // 심연에서 남는 회복 비율
+const PRESSURE_START = 460;      // 수압이 내구력을 깎기 시작하는 수심(m)
+const PRESSURE_FULL = 1300;      // 수압 감소가 최대가 되는 수심(m)
+const PRESSURE_RATE_MIN = 0.45;  // 460m 에서 초당 감소량
+const PRESSURE_RATE_MAX = 2.5;   // 1,300m 에서 초당 감소량
 const DMG_CONTACT = 14;          // 적 생물 접촉
 const DMG_SPIKE = 18;            // 복어·아귀 폭발
 const DMG_ORB = 12;              // 크라켄 구체
@@ -67,7 +70,7 @@ const el = {
   bossFill: $('boss-bar-fill'),
   bossHp: $('boss-bar-hp'),
   reticle: $('reticle'),
-  banner: $('wave-banner'),
+  banner: $('notice-banner'),
   toast: $('toast'),
   flash: $('flash'),
   startScreen: $('screen-start'),
@@ -76,12 +79,12 @@ const el = {
   startBest: $('start-best'),
   overScore: $('over-score'),
   overBest: $('over-best'),
-  overWave: $('over-wave'),
+  overZone: $('over-zone'),
   overDepth: $('over-depth'),
   newRecord: $('new-record'),
   pauseScore: $('pause-score'),
   pauseDepth: $('pause-depth'),
-  pauseWave: $('pause-wave'),
+  pauseZone: $('pause-zone'),
   loading: $('loading'),
   compass: $('hud-compass'),
   ribbon: $('compass-ribbon'),
@@ -96,9 +99,6 @@ const G = {
   state: 'menu',
   score: 0,
   best: 0,
-  wave: 1,
-  kills: 0,
-  waveGoal: 0,
   depth: 0,
   maxDepth: 0,
   hull: BASE_MAX_HULL,
@@ -116,7 +116,8 @@ const G = {
   spawnTimer: 1.6,
   pingTimer: 9,
   bubbleTimer: 0.2,
-  pendingWave: 0,
+  krakenCd: 30,
+  krakenSeen: false,
   shake: 0,
   elapsed: 0,
   flashTimer: 0,
@@ -148,9 +149,9 @@ const P = {
   yaw: 0,
   pitch: 0,
   roll: 0,
-  speed: 30,
-  backSpeed: 17,
-  lift: 16,
+  speed: 32,
+  backSpeed: 18,
+  lift: 24,
   turnRate: 1.7,
   bob: 0,
   bobPhase: 0,
@@ -471,11 +472,11 @@ function pressureRateAt(depth) {
   return PRESSURE_RATE_MIN + (PRESSURE_RATE_MAX - PRESSURE_RATE_MIN) * t;
 }
 
-/** 수심별 자동 회복 배율 — 깊은 곳으로 갈수록 회복이 멈춘다 */
+/** 수심별 자동 회복 배율 — 450m 까지는 정상, 심연으로 갈수록 줄어든다 */
 function regenScaleAt(depth) {
   if (depth <= REGEN_FADE_FROM) return 1;
-  if (depth >= REGEN_FADE_TO) return 0;
-  return 1 - (depth - REGEN_FADE_FROM) / (REGEN_FADE_TO - REGEN_FADE_FROM);
+  const t = clamp((depth - REGEN_FADE_FROM) / (REGEN_FADE_TO - REGEN_FADE_FROM), 0, 1);
+  return 1 - (1 - REGEN_FLOOR) * (t * t * (3 - 2 * t));
 }
 
 /** 매 프레임: 수압 감소 + 3초 후 자동 회복 */
@@ -602,8 +603,6 @@ function resetGame() {
   fx.clear();
 
   G.score = 0;
-  G.wave = 1;
-  G.kills = 0;
   G.depth = 0;
   G.maxDepth = 0;
   G.hull = BASE_MAX_HULL;
@@ -619,7 +618,8 @@ function resetGame() {
   G.invuln = 1.6;
   G.fireTimer = 0;
   G.spawnTimer = 1.4;
-  G.pendingWave = 0;
+  G.krakenCd = 24;
+  G.krakenSeen = false;
   G.shake = 0;
   G.elapsed = 0;
   G.zoneIndex = 0;
@@ -651,7 +651,7 @@ function resetGame() {
   durShownWidth = -1;
   durShownCls = '';
   refreshHud();
-  startWave(1);
+  seedAmbientLife();
 }
 
 function startGame() {
@@ -687,7 +687,7 @@ function gameOver() {
   }
   setText(el.overScore, G.score.toLocaleString('ko-KR'));
   setText(el.overBest, G.best.toLocaleString('ko-KR'));
-  setText(el.overWave, G.wave);
+  if (el.overZone) setText(el.overZone, ZONES[zoneIndexForDepth(G.maxDepth)].name);
   setText(el.overDepth, `${Math.floor(G.maxDepth)} m`);
   el.newRecord.classList.toggle('hidden', !isRecord);
 
@@ -704,7 +704,7 @@ function togglePause(on) {
     G.state = 'paused';
     setText(el.pauseScore, G.score.toLocaleString('ko-KR'));
     setText(el.pauseDepth, `${Math.floor(G.depth)} m`);
-    setText(el.pauseWave, G.wave);
+    if (el.pauseZone) setText(el.pauseZone, ZONES[zoneIndexForDepth(G.depth)].name);
     el.pauseScreen.classList.remove('hidden');
     input.fire = false;
     btnFiring = false;
@@ -726,48 +726,50 @@ function toggleMute() {
   if (!m) sound.resume();
 }
 
-/* ---------------- 웨이브 ---------------- */
-function startWave(n) {
-  G.wave = n;
-  G.kills = 0;
-  G.spawnTimer = 1.0;
+/* ---------------- 자연 생태계 (오픈 바다) ---------------- */
+/** 수심대별 목표 개체수와 등장 간격 — 파도(웨이브) 없이 주변에서 저절로 순환한다 */
+function ecoAt(depth) {
+  if (depth < 150) return { cap: 6, min: 1.8, max: 3.4 };
+  if (depth < 550) return { cap: 8, min: 1.5, max: 2.8 };
+  if (depth < 1000) return { cap: 9, min: 1.3, max: 2.5 };
+  return { cap: 7, min: 1.9, max: 3.4 };
+}
 
-  if (n % 3 === 0) {
-    G.waveGoal = Infinity;
-    spawnBoss(n);
-    banner(`웨이브 ${n} · 크라켄 출현`, 2600);
-    sound.bossWarn();
-  } else {
-    G.waveGoal = 5 + n * 2;
-    banner(`웨이브 ${n} · ${ZONES[zoneIndexForDepth(G.depth)].name}`, 2000);
+function seedAmbientLife() {
+  G.spawnTimer = 2.2;
+  G.krakenCd = 24;
+}
+
+/* 수적 생물 — 깊은 심해(700m+)에서만 드물게 조우하는 전설 */
+const KRAKEN_DEPTH = 700;
+
+function maybeSpawnKraken(dt) {
+  if (G.state !== 'playing' || G.boss) return;
+  if (G.depth < KRAKEN_DEPTH) {
+    if (G.krakenCd < 8) G.krakenCd = 8;
+    return;
   }
-  refreshHud();
+  G.krakenCd -= dt;
+  if (G.krakenCd > 0) return;
+  if (Math.random() < dt * 0.06) {
+    spawnKraken();
+    G.krakenCd = 170;
+  }
 }
 
-function waveCleared() {
-  const bonus = 180 + G.wave * 60;
-  G.score += bonus;
-  G.waveGoal = Infinity;
-  toast(`웨이브 보너스 +${bonus}`);
-  if (G.boss) removeBoss();
-  G.pendingWave = 2.2;
-  sound.waveClear();
-  refreshHud();
-}
-
-/* ---------------- 보스 ---------------- */
-function spawnBoss(wave) {
+function spawnKraken() {
   const b = makeKraken();
-  const hp = 28 + Math.floor(wave / 3) * 12;
+  const hp = 40 + Math.round(Math.max(0, G.depth - 600) / 100) * 6;
   computeForward(forward);
-  b.group.position.copy(P.pos).addScaledVector(forward, 72);
+  b.group.position.copy(P.pos).addScaledVector(forward, 76);
   b.group.position.y = clamp(
     b.group.position.y,
-    terrainHeight(b.group.position.x, b.group.position.z) + 16,
+    terrainHeight(b.group.position.x, b.group.position.z) + 18,
     SURFACE_Y - 16
   );
   b.group.rotation.order = 'YXZ';
-  b.group.scale.setScalar(1.45 + Math.min(0.5, wave * 0.02));
+  const scale = 1.65 + Math.min(0.5, Math.max(0, G.depth - 600) / 1600);
+  b.group.scale.setScalar(scale);
   scene.add(b.group);
   G.boss = {
     obj: b.group,
@@ -775,6 +777,7 @@ function spawnBoss(wave) {
     tentacles: b.tentacles,
     hp,
     maxHp: hp,
+    scale,
     phase: Math.random() * 6.28,
     angle: Math.random() * 6.28,
     fire: 2.2,
@@ -784,6 +787,19 @@ function spawnBoss(wave) {
   el.bossBar.classList.remove('hidden');
   el.bossBar.setAttribute('aria-hidden', 'false');
   updateBossBar();
+  banner('심해의 전설 · 크라켄 출현', 2900);
+  sound.bossWarn();
+  G.shake = 0.8;
+  G.krakenSeen = true;
+}
+
+function krakenDefeated() {
+  G.score += 2600;
+  toast('크라켄 격퇴 +2600');
+  if (G.boss) removeBoss();
+  G.krakenCd = 170;
+  sound.waveClear();
+  refreshHud();
 }
 
 function updateBossBar() {
@@ -816,22 +832,29 @@ const ENEMY_STATS = {
 /** 수심에 따라 그 깊이에 사는 생물이 나온다 */
 function pickEnemyType(depth) {
   const roll = Math.random();
-  if (depth < 38) {
-    if (roll < 0.30) return 'puffer';
-    if (roll < 0.56) return 'lion';
-    if (roll < 0.80) return 'shark';
-    return 'jelly';
+  if (depth < 150) {
+    if (roll < 0.28) return 'puffer';
+    if (roll < 0.54) return 'lion';
+    if (roll < 0.76) return 'shark';
+    if (roll < 0.9) return 'jelly';
+    return 'hammer';
   }
-  if (depth < 72) {
-    if (roll < 0.30) return 'shark';
-    if (roll < 0.52) return 'hammer';
-    if (roll < 0.70) return 'lion';
-    if (roll < 0.86) return 'jelly';
-    return 'puffer';
+  if (depth < 550) {
+    if (roll < 0.26) return 'shark';
+    if (roll < 0.48) return 'hammer';
+    if (roll < 0.64) return 'angler';
+    if (roll < 0.84) return 'jelly';
+    return 'lion';
   }
-  if (roll < 0.36) return 'angler';
-  if (roll < 0.58) return 'hammer';
-  if (roll < 0.80) return 'jelly';
+  if (depth < 1000) {
+    if (roll < 0.4) return 'angler';
+    if (roll < 0.64) return 'jelly';
+    if (roll < 0.84) return 'hammer';
+    return 'shark';
+  }
+  if (roll < 0.5) return 'angler';
+  if (roll < 0.8) return 'jelly';
+  if (roll < 0.93) return 'hammer';
   return 'shark';
 }
 
@@ -923,18 +946,20 @@ function killEnemy(e) {
   sound.explode(big ? 'small' : 'tiny');
 
   G.score += e.score;
-  G.kills++;
   scene.remove(e.obj);
   const idx = enemies.indexOf(e);
   if (idx >= 0) enemies.splice(idx, 1);
 
-  if (Math.random() < 0.16) dropItem(p.x, p.y, p.z);
+  // 깊은 심해일수록 선체 보강·수리 키트가 더 자주 나온다
+  const dropChance = 0.16 + Math.min(0.16, G.depth / 7000);
+  if (Math.random() < dropChance) dropItem(p.x, p.y, p.z);
   refreshHud();
 }
 
 function dropItem(x, y, z, forced) {
   // 선체 보강 · 긴급 수리도 꾸준히 나오도록 가중치를 둔다
-  const t = forced || ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)];
+  const pool = G.depth > 450 ? DEEP_ITEM_POOL : ITEM_POOL;
+  const t = forced || pool[Math.floor(Math.random() * pool.length)];
   const mesh = new THREE.Mesh(itemGeos[t], itemMats[t]);
   const halo = spriteGlow(itemHalo[t], 3.0, 0.78);
   mesh.add(halo);
@@ -969,6 +994,12 @@ const ITEM_POOL = [
   'multi', 'rapid', 'shield', 'bomb',
   'hull', 'repair', 'repair',
   'multi', 'rapid', 'hull', 'repair',
+];
+
+/* 깊은 심해(450m+) — 수압을 버틸 수 있게 선체 보강·수리 비중을 높인다 */
+const DEEP_ITEM_POOL = [
+  'hull', 'repair', 'hull', 'repair', 'hull',
+  'bomb', 'multi', 'rapid', 'shield', 'repair',
 ];
 
 /* ---------------- 아이템 ---------------- */
@@ -1081,16 +1112,13 @@ function damageBoss(dmg) {
     fx.ring(pos, 0xffc27a, 34, 0.9);
     sound.explode('big');
     G.shake = 1.4;
-    G.score += 2200 + G.wave * 120;
     for (let i = 0; i < 3; i++) {
       dropItem(pos.x + rand(-3, 3), pos.y + rand(-1, 2), pos.z, ['multi', 'hull', 'repair'][i]);
     }
     setTimeout(() => {
       if (G.state !== 'playing') return;
-      removeBoss();
-      G.kills = Infinity;
-      waveCleared();
-    }, 700);
+      krakenDefeated();
+    }, 900);
   }
 }
 
@@ -1104,8 +1132,8 @@ function updateSubTransform(dt) {
 }
 
 /* ---------------- 탐조등 — 깊고 어두운 심해일수록 강해진다 ---------------- */
-const HEADLIGHT_FROM = 40;   // 이 수심부터 불빛이 강해지기 시작
-const HEADLIGHT_TO = 90;     // 이 수심에서 최대
+const HEADLIGHT_FROM = 150;  // 이 수심부터 불빛이 강해지기 시작
+const HEADLIGHT_TO = 900;    // 이 수심에서 최대
 
 function updateHeadlight(dt, instant) {
   if (!player || !player.spot) return;
@@ -1114,22 +1142,22 @@ function updateHeadlight(dt, instant) {
   const k = instant ? 1 : damp(2.6, dt);
   const spot = player.spot;
 
-  const targetIntensity = 17 + deep * 200;
+  const targetIntensity = 17 + deep * 300;
   spot.intensity += (targetIntensity - spot.intensity) * k;
-  spot.angle = 0.42 + deep * 0.24;
-  spot.distance = 74 + deep * 118;
+  spot.angle = 0.42 + deep * 0.26;
+  spot.distance = 74 + deep * 210;
   spot.penumbra = 0.72 - deep * 0.2;
 
   // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
   if (player.frontLight) {
-    player.frontLight.intensity += (deep * 36 - player.frontLight.intensity) * k;
-    player.frontLight.distance = 18 + deep * 26;
+    player.frontLight.intensity += (deep * 46 - player.frontLight.intensity) * k;
+    player.frontLight.distance = 18 + deep * 34;
   }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
   const beam = player.beam;
   if (beam) {
-    beam.material.opacity += ((0.03 + deep * 0.19) - beam.material.opacity) * k;
+    beam.material.opacity += ((0.03 + deep * 0.22) - beam.material.opacity) * k;
     const widen = 1 + deep * 0.5;
     const stretch = 1 + deep * 1.15;
     beam.scale.set(widen, widen, stretch);
@@ -1160,9 +1188,11 @@ function updatePlayer(dt) {
   // 추진
   computeHorizontal(horizontal);
   const thrust = input.move >= 0 ? input.move * P.speed : input.move * P.backSpeed;
+  // 깊은 심해일수록 상승·하강이 빠르다 (1,000m 이상을 답답하지 않게 오가도록)
+  const liftSpeed = P.lift + Math.min(64, Math.max(0, G.depth) * 0.075);
   const desired = tmpVec2.set(
     horizontal.x * thrust,
-    input.lift * P.lift,
+    input.lift * liftSpeed,
     horizontal.z * thrust
   );
   const accel = 3.2;
@@ -1420,16 +1450,16 @@ function updateBoss(dt) {
 
   if (b.hit > 0) {
     b.hit -= dt;
-    o.scale.setScalar(1.45 * (1 + b.hit * 0.4));
+    o.scale.setScalar(b.scale * (1 + b.hit * 0.4));
   } else {
-    o.scale.setScalar(1.45 + Math.min(0.5, G.wave * 0.02));
+    o.scale.setScalar(b.scale);
   }
 
   // 발사
   b.fire -= dt;
   if (b.fire <= 0 && dist < 90) {
-    b.fire = Math.max(0.9, 2.0 - G.wave * 0.03);
-    const count = G.wave >= 9 ? 3 : 2;
+    b.fire = 1.6;
+    const count = b.hp < b.maxHp * 0.5 ? 3 : 2;
     for (let i = 0; i < count; i++) {
       const orb = orbs.find((x) => !x.active);
       if (!orb) break;
@@ -1440,7 +1470,7 @@ function updateBoss(dt) {
       orb.life = 7;
       orb.mesh.visible = true;
       orb.mesh.position.copy(o.position).addScaledVector(dir, 5);
-      orb.vel.copy(dir.normalize()).multiplyScalar(20 + G.wave * 0.5);
+      orb.vel.copy(dir.normalize()).multiplyScalar(24);
     }
     sound.shoot();
   }
@@ -1449,10 +1479,10 @@ function updateBoss(dt) {
 }
 
 /* ---------------- 보스 몸통 접촉 — 관통 금지 ---------------- */
-const BOSS_CONTACT_R = 8.4;
 function resolveBossContact() {
   const b = G.boss;
   if (!b) return;
+  const BOSS_CONTACT_R = 8.4 * (b.scale / 1.45);
   const o = b.obj.position;
   let dx = P.pos.x - o.x;
   let dy = P.pos.y - o.y;
@@ -1710,6 +1740,7 @@ function updateIdle(dt) {
     }
   }
   world.update(dt, P.pos);
+  updatePreviews();
   fx.update(dt, camera);
 }
 
@@ -1743,15 +1774,18 @@ function updateGame(dt) {
     sound.sonar();
   }
 
-  // 스폰
-  if (!G.boss && G.waveGoal !== Infinity) {
-    G.spawnTimer -= dt;
-    if (G.spawnTimer <= 0 && enemies.length < 12) {
-      const base = Math.max(0.55, 1.7 - G.wave * 0.08);
-      G.spawnTimer = base * rand(0.7, 1.3);
+  // 자연 생태계 — 수심대에 맞는 개체수가 주변을 떠돈다
+  const eco = ecoAt(G.depth);
+  G.spawnTimer -= dt;
+  if (G.spawnTimer <= 0) {
+    if (enemies.length < eco.cap) {
       spawnEnemy();
+      G.spawnTimer = rand(eco.min, eco.max);
+    } else {
+      G.spawnTimer = 1.2;
     }
   }
+  maybeSpawnKraken(dt);
 
   updateEnemies(dt);
   updateBoss(dt);
@@ -1765,14 +1799,8 @@ function updateGame(dt) {
   updateTorpedoes(dt);
   updateOrbs(dt);
   updateItems(dt, t);
+  updatePreviews();
   fx.update(dt, camera);
-
-  if (G.pendingWave > 0) {
-    G.pendingWave -= dt;
-    if (G.pendingWave <= 0) startWave(G.wave + 1);
-  } else if (!G.boss && G.kills >= G.waveGoal) {
-    waveCleared();
-  }
 
   if (G.flashTimer > 0) {
     G.flashTimer -= dt;
@@ -1808,6 +1836,43 @@ function onResize() {
   renderer.setPixelRatio(pixelRatio);
 }
 
+/* ---------------- 검증용: 생물 모델 미리보기 ---------------- */
+const PREVIEW_MAKERS = {
+  humpback: makeHumpbackWhale, blue: makeBlueWhale, orca: makeOrca, sperm: makeSpermWhale,
+  manta: makeMantaRay, eagle: makeEagleRay, stingray: makeStingray, turtle: makeTurtle,
+  kraken: makeKraken,
+};
+const previews = [];
+
+function clearPreviews() {
+  for (const p of previews) scene.remove(p.group);
+  previews.length = 0;
+}
+
+function previewCreature(kind, opts) {
+  const o = opts || {};
+  clearPreviews();
+  const make = PREVIEW_MAKERS[kind];
+  if (!make) return null;
+  const m = make();
+  computeForward(forward);
+  const dist = o.dist || 34;
+  const pos = P.pos.clone().addScaledVector(forward, dist);
+  m.group.position.copy(pos);
+  m.group.rotation.order = 'YXZ';
+  m.group.rotation.set(o.pitch || 0, P.yaw + (o.turn === undefined ? Math.PI * 0.72 : o.turn), 0);
+  m.group.scale.setScalar(o.scale || 1);
+  scene.add(m.group);
+  previews.push({ kind, group: m.group, model: m });
+  return { kind, pos: [+pos.x.toFixed(1), +pos.y.toFixed(1), +pos.z.toFixed(1)], scale: o.scale || 1 };
+}
+
+function updatePreviews() {
+  for (const p of previews) {
+    if (p.model && p.model.update) p.model.update(ANIM.time.value);
+  }
+}
+
 function bindButtons() {
   $('btn-start').addEventListener('click', startGame);
   $('btn-again').addEventListener('click', startGame);
@@ -1819,9 +1884,6 @@ function bindButtons() {
     setText(el.startBest, G.best.toLocaleString('ko-KR'));
     resetGame();
     G.state = 'menu';
-    G.waveGoal = 0;
-    G.kills = 0;
-    G.pendingWave = 0;
     if (G.boss) removeBoss();
     for (const e of enemies) scene.remove(e.obj);
     enemies.length = 0;
@@ -1869,7 +1931,8 @@ function boot() {
   if (new URLSearchParams(location.search).has('debug')) {
     window.__abyss = {
       G, P, enemies, items, orbs, world, renderer, camera, scene, player, torpedoes,
-      startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy, useBomb,
+      startGame, spawnKraken, maybeSpawnKraken, damageBoss, removeBoss, spawnEnemy, useBomb,
+      ecoAt, previewCreature, clearPreviews,
       dropItem, collectItem, hurtPlayer, updateHeadlight, resolveCreatureContacts,
       pressureRateAt, regenScaleAt,
       hull: () => ({
@@ -1908,22 +1971,36 @@ function boot() {
         // 요청한 수심까지 내려갈 수 있는 가까운 해구를 찾아 이동한다 (검증용)
         const targetY = SURFACE_Y - m / DEPTH_SCALE;
         let best = null;
-        for (let r = 0; r <= 480 && !best; r += 24) {
-          for (let a = 0; a < 16; a++) {
-            const ang = (a / 16) * Math.PI * 2;
+        for (let r = 0; r <= 1800 && !best; r += 40) {
+          for (let a = 0; a < 24; a++) {
+            const ang = (a / 24) * Math.PI * 2;
             const x = P.pos.x + Math.cos(ang) * r;
             const z = P.pos.z + Math.sin(ang) * r;
             if (terrainHeight(x, z) + 5 < targetY) { best = { x, z }; break; }
           }
         }
-        if (!best) return G.depth;
+        if (!best) return { depth: G.depth, found: false };
         P.pos.set(best.x, targetY, best.z);
         P.vel.set(0, 0, 0);
         G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
+        G.maxDepth = Math.max(G.maxDepth, G.depth);
         updateSubTransform(0);
         snapCamera();
-        return G.depth;
+        return {
+          depth: +G.depth.toFixed(1), found: true,
+          at: [+best.x.toFixed(0), +best.z.toFixed(0)],
+          terrainDepth: +(((SURFACE_Y - terrainHeight(best.x, best.z)) * DEPTH_SCALE)).toFixed(1),
+        };
       },
+      depthInfo: () => ({
+        depth: +G.depth.toFixed(1),
+        zone: ZONES[zoneIndexForDepth(G.depth)].name,
+        zoneIndex: zoneIndexForDepth(G.depth),
+        pressure: +pressureRateAt(G.depth).toFixed(2),
+        regenScale: +regenScaleAt(G.depth).toFixed(2),
+        terrainY: +terrainHeight(P.pos.x, P.pos.z).toFixed(1),
+        y: +P.pos.y.toFixed(1),
+      }),
       terrain: (x, z) => terrainHeight(x, z),
       setInput: (o) => {
         if (o.fire !== undefined) btnFiring = !!o.fire;
@@ -1931,6 +2008,13 @@ function boot() {
         if (o.move !== undefined) joy.move = o.move;
         if (o.turn !== undefined) joy.turn = o.turn;
       },
+      previewCreature, clearPreviews,
+      previews: () => previews.map((p) => p.kind),
+      creatureModels: () => ({
+        humpback: makeHumpbackWhale, blue: makeBlueWhale, orca: makeOrca,
+        sperm: makeSpermWhale, manta: makeMantaRay, eagle: makeEagleRay,
+        stingray: makeStingray, turtle: makeTurtle,
+      }),
     };
   }
   loop();

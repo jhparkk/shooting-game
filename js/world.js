@@ -7,23 +7,28 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  makeWhale, makeManta, makeTurtle, makeFishSchool, glowTexture,
+  makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
+  makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
+  makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261115g';
+} from './models.js?v=20261116a';
 
 export const SURFACE_Y = 34;
-export const FLOOR_Y = -50;   // 해구 바닥 (수심 약 113m)
-export const BANK_Y = 21;     // 산호 언덕 봉우리 (수심 약 18m)
-export const SHELF_Y = 9;     // 산호 지대 평지 (수심 약 34m)
+export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
+export const BANK_Y = 21;        // 산호 언덕 봉우리 (수심 약 18m)
+export const SHELF_Y = 9;        // 산호 지대 평지 (수심 약 34m)
+export const CANYON_FLOOR = -215; // 중층 해저 협곡 바닥 (수심 약 336m)
+export const TRENCH_FLOOR = -470; // 심해 해구 대지 (수심 약 680m)
+export const ABYSS_FLOOR = -950;  // 초심해 심연 바닥 (수심 약 1,330m)
 
 /** 수심(m) 환산 계수 — 월드 1단위 = 1.35m */
 export const DEPTH_SCALE = 1.35;
 
-/* 수심 구간별 물빛 — 얕은 산호 언덕 → 해저 협곡 → 심해 해구 */
+/* 수심 구간별 물빛 — 표층 산호대 → 중층 협곡 → 심해 해구 → 초심해 심연 */
 export const ZONES = [
   {
-    name: '산호 언덕',
+    name: '표층 산호대',
     fog: 0x39c6bb, density: 0.0042,
     skyTop: 0xbdf9ef, skyMid: 0x35b2b6, skyBottom: 0x0a5f74,
     hemiSky: 0xd9fffb, hemiGround: 0x2f8f86, hemi: 0.95,
@@ -32,8 +37,8 @@ export const ZONES = [
     coral: [0xff8a72, 0xffbe5c, 0xef86e0, 0xffa8cf, 0xfff07a, 0x86efd8],
   },
   {
-    name: '해저 협곡',
-    fog: 0x1e93c8, density: 0.0064,
+    name: '중층 해저 협곡',
+    fog: 0x1e93c8, density: 0.0058,
     skyTop: 0x9fe6ff, skyMid: 0x1c7fb8, skyBottom: 0x063f6e,
     hemiSky: 0xd2f6ff, hemiGround: 0x1a708c, hemi: 0.8,
     ambient: 0x8fe0f5, ambientI: 0.44,
@@ -42,31 +47,60 @@ export const ZONES = [
   },
   {
     name: '심해 해구',
-    fog: 0x0a2a72, density: 0.0105,
+    fog: 0x0a2a72, density: 0.0085,
     skyTop: 0x2f6bc0, skyMid: 0x0d2f6e, skyBottom: 0x020a20,
     hemiSky: 0x6fa8ff, hemiGround: 0x081a3a, hemi: 0.5,
     ambient: 0x3f6cc0, ambientI: 0.32,
     sun: 0xd8e8ff, sunI: 0.55,
     coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
   },
+  {
+    name: '초심해 심연',
+    fog: 0x040a1e, density: 0.0125,
+    skyTop: 0x0b1f4a, skyMid: 0x030a20, skyBottom: 0x000206,
+    hemiSky: 0x2a4c92, hemiGround: 0x02040c, hemi: 0.32,
+    ambient: 0x1a2f66, ambientI: 0.2,
+    sun: 0x9db8e8, sunI: 0.18,
+    coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
+  },
 ];
 
 /* 물빛이 바뀌는 수심(m) 경계 */
-export const ZONE_DEPTHS = [38, 72];
+export const ZONE_DEPTHS = [150, 550, 1000];
 /** 물빛 그라디언트가 완료되는 수심 */
-const DEPTH_GRADIENT_END = 95;
+const DEPTH_GRADIENT_END = 1200;
 
-/* 대형 관상 생물의 충돌체 설정
+/* 대형 관상 생물의 충돌체 설정 — 종마다 몸 비율이 달라 따로 둔다
    radius: 가장 긴 축 길이 대비 구체 반지름
    n: 가장 긴 축 방향 구체 개수, m: 두 번째 축 방향 구체 개수(있으면 그리드) */
 const CREATURE_COLLIDER = {
-  whale: { radius: 0.16, n: 4 },
-  manta: { radius: 0.13, n: 3, m: 2 },   // 납작하고 넓은 가오리는 앞뒤 두 줄로 덮는다
+  humpback: { radius: 0.15, n: 5 },
+  blue: { radius: 0.14, n: 6 },
+  orca: { radius: 0.15, n: 5 },
+  sperm: { radius: 0.15, n: 5 },
+  manta: { radius: 0.12, n: 3, m: 2 },    // 납작하고 넓은 가오리는 앞뒤 두 줄로 덮는다
+  eagle: { radius: 0.12, n: 3, m: 2 },
+  stingray: { radius: 0.2, n: 2, m: 2 },
   turtle: { radius: 0.4, n: 2 },
 };
 
+/* 관상용 생물 종 — 모델 생성기 */
+const CREATURE_KINDS = {
+  humpback: { make: makeHumpbackWhale },
+  blue: { make: makeBlueWhale },
+  orca: { make: makeOrca },
+  sperm: { make: makeSpermWhale },
+  manta: { make: makeMantaRay },
+  eagle: { make: makeEagleRay },
+  stingray: { make: makeStingray },
+  turtle: { make: makeTurtle },
+};
+
 export function zoneIndexForDepth(depth) {
-  return depth < ZONE_DEPTHS[0] ? 0 : depth < ZONE_DEPTHS[1] ? 1 : 2;
+  if (depth < ZONE_DEPTHS[0]) return 0;
+  if (depth < ZONE_DEPTHS[1]) return 1;
+  if (depth < ZONE_DEPTHS[2]) return 2;
+  return 3;
 }
 
 /* ---------------- 청크 스트리밍 설정 ---------------- */
@@ -125,11 +159,35 @@ function trenchStrength(x, z) {
   return Math.min(1, v1 * 0.95 + v2 * 0.8);
 }
 
+/** 대륙 규모의 심해 분지 — 아주 먼 거리를 지나도 같은 풍경이 반복되지 않게 */
+function basinField(x, z) {
+  return (
+    Math.sin(x * 0.0024 + 1.3) * Math.cos(z * 0.0021 - 0.7) +
+    0.62 * Math.sin((x + z) * 0.0017 + 2.1) +
+    0.34 * Math.cos((x - z) * 0.0031 + 0.5) +
+    0.16 * Math.sin(x * 0.0093 - z * 0.0071 + 0.9)
+  );
+}
+
+/** 시작 지점(산호 언덕)은 얕은 대지로 남긴다 — 바깥으로 나가야 심해가 열린다 */
+function startGuard(x, z) {
+  const d = Math.hypot(x + 20, z - 60);
+  return smoothstep(240, 620, d);
+}
+
+/** 시작 지점에서 헤엄쳐 나가면 만나는 대표 심연 — 반드시 1,300m 깊이까지 내려간다 */
+function abyssCore(x, z) {
+  const d = Math.hypot((x - 120) * 0.95, z + 760);
+  return smoothstep(700, 235, d);
+}
+
 /**
  * 해저 높이 (월드 y) — 모든 (x, z) 에서 연속. 경계 없음.
- *  · 산호 언덕 봉우리 y≈21 → 수심 약 18m
- *  · 산호 지대 평지   y≈-5~9 → 수심 약 34~53m
- *  · 해저 협곡 바닥   y≈-50   → 수심 약 113m
+ *  · 산호 언덕 봉우리 y≈21        → 수심 약 18m
+ *  · 산호 지대 평지   y≈-5~9     → 수심 약 34~53m
+ *  · 해저 협곡 바닥   y≈-215      → 수심 약 336m
+ *  · 심해 해구 대지   y≈-470      → 수심 약 680m
+ *  · 초심해 심연      y≈-950      → 수심 약 1,330m
  * 수심(m) = (SURFACE_Y - y) * DEPTH_SCALE
  */
 export function getTerrainHeight(x, z) {
@@ -139,11 +197,33 @@ export function getTerrainHeight(x, z) {
   let h = shelf + hill * (BANK_Y - shelf);
   h += terrainNoise(x * 2.7, z * 2.7) * 0.9;
 
+  // 1) 중층 해저 협곡 — 얕은 산호대를 가로지르는 깊은 골짜기
   const v = trenchStrength(x, z);
-  const deep = FLOOR_Y +
-    5 * Math.sin(x * 0.05) * Math.cos(z * 0.047) +
-    2.5 * Math.sin((x + z) * 0.03);
-  h = h * (1 - v) + deep * v;
+  if (v > 0.0015) {
+    const deep = CANYON_FLOOR + 9 * Math.sin(x * 0.05) * Math.cos(z * 0.047)
+      + 5 * Math.sin((x + z) * 0.03);
+    h = h * (1 - v) + deep * v;
+  }
+
+  // 2) 심해 해구 대지 → 3) 초심해 심연 (대륙 규모의 완만한 함몰)
+  const guard = startGuard(x, z);
+  if (guard > 0.0015) {
+    const b = basinField(x, z);
+    const t1 = smoothstep(0.12, 1.0, b) * guard;
+    const t2 = Math.max(smoothstep(1.0, 1.72, b), abyssCore(x, z)) * guard;
+    if (t1 > 0.0015) {
+      const f1 = TRENCH_FLOOR
+        + 14 * Math.sin(x * 0.018 + 1.2) * Math.cos(z * 0.016)
+        + 7 * Math.sin(x * 0.0062 - z * 0.0081 + 0.4);
+      h = h * (1 - t1) + f1 * t1;
+    }
+    if (t2 > 0.0015) {
+      const f2 = ABYSS_FLOOR
+        + 12 * Math.sin(x * 0.021 - 0.7) * Math.cos(z * 0.018 + 1.1)
+        + 6 * Math.sin((x + z) * 0.0105);
+      h = h * (1 - t2) + f2 * t2;
+    }
+  }
   return h;
 }
 
@@ -377,7 +457,7 @@ export class World {
     geo.rotateX(-Math.PI / 2);
     this.farMat = new THREE.MeshBasicMaterial({ color: this.zone.fog, fog: true, depthWrite: true });
     this.farFloor = new THREE.Mesh(geo, this.farMat);
-    this.farFloor.position.y = FLOOR_Y - 26;
+    this.farFloor.position.y = ABYSS_FLOOR - 40;
     this.farFloor.frustumCulled = false;
     this.farFloor.renderOrder = -5;
     this.scene.add(this.farFloor);
@@ -460,8 +540,9 @@ export class World {
           Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
           Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
         const kk = clamp01((n + 1.15) / 2.3);
-        const dk = clamp01((SURFACE_Y - y) / 90);
-        fc.setHSL(0.38 + dk * 0.22 - kk * 0.04, 0.52 - dk * 0.18, 0.3 - dk * 0.17 + kk * 0.05);
+        const dkRaw = clamp01((SURFACE_Y - y) / 1000);
+        const dk = Math.pow(dkRaw, 0.75);
+        fc.setHSL(0.38 + dk * 0.3 - kk * 0.04, 0.52 - dk * 0.34, 0.3 - dk * 0.24 + kk * 0.05);
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
         vcol[k3 + 2] = fc.b;
@@ -579,7 +660,7 @@ export class World {
         const wx = ox + lx;
         const wz = oz + lz;
         const gy = getTerrainHeight(wx, wz);
-        if (gy < -3) continue;                 // 깊은 골짜기 바닥에는 산호를 심지 않는다
+        if (gy < -34) continue;                // 수심 90m 보다 깊은 곳에는 산호를 심지 않는다
         if (slopeAt(wx, wz) > 0.85) continue;  // 급한 벽에도 심지 않는다
         const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
         const kind = rnd();
@@ -741,7 +822,7 @@ export class World {
     this.bubbleData = [];
     for (let i = 0; i < bubbleCount; i++) {
       bp[i * 3] = (Math.random() - 0.5) * 320;
-      bp[i * 3 + 1] = FLOOR_Y + Math.random() * (SURFACE_Y - FLOOR_Y);
+      bp[i * 3 + 1] = SURFACE_Y - 4 - Math.random() * 260;
       bp[i * 3 + 2] = (Math.random() - 0.5) * 320;
       this.bubbleData.push({ rise: 0.7 + Math.random() * 2.0, sway: Math.random() * 6.28 });
     }
@@ -762,7 +843,7 @@ export class World {
     const sp = new Float32Array(snowCount * 3);
     for (let i = 0; i < snowCount; i++) {
       sp[i * 3] = (Math.random() - 0.5) * 320;
-      sp[i * 3 + 1] = FLOOR_Y + Math.random() * (SURFACE_Y - FLOOR_Y);
+      sp[i * 3 + 1] = SURFACE_Y - 4 - Math.random() * 300;
       sp[i * 3 + 2] = (Math.random() - 0.5) * 320;
     }
     sGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
@@ -785,7 +866,7 @@ export class World {
     const col = new THREE.Color();
     for (let i = 0; i < PLAN_N; i++) {
       plp[i * 3] = (Math.random() - 0.5) * 320;
-      plp[i * 3 + 1] = FLOOR_Y + Math.random() * (SURFACE_Y - FLOOR_Y);
+      plp[i * 3 + 1] = SURFACE_Y - 4 - Math.random() * 300;
       plp[i * 3 + 2] = (Math.random() - 0.5) * 320;
       col.setHSL(0.47 + Math.random() * 0.16, 0.9, 0.68);
       plc[i * 3] = col.r;
@@ -869,7 +950,7 @@ export class World {
     dims.sort((a, b) => b[1] - a[1]);
     const axis = dims[0][0];
     const L = dims[0][1];
-    const cfg = CREATURE_COLLIDER[kind] || CREATURE_COLLIDER.whale;
+    const cfg = CREATURE_COLLIDER[kind] || CREATURE_COLLIDER.humpback;
     const r = Math.max(0.6, L * cfg.radius);
     const half = Math.max(0, L / 2 - r * 0.9);
     const list = [];
@@ -901,30 +982,36 @@ export class World {
     return list;
   }
 
+  /** 종별 모델 · 고유 수심대(band, 단위 m) · 유영 반경 */
   _buildCreatures() {
     const rnd = mulberry(3131);
     const plan = [
-      { kind: 'whale', radius: 112, y: 22, scale: 1.6, angular: 0.035 },
-      { kind: 'whale', radius: 140, y: 28, scale: 1.35, angular: -0.026 },
-      { kind: 'manta', radius: 104, y: 16, scale: 1.7, angular: 0.055 },
-      { kind: 'manta', radius: 132, y: 12, scale: 1.4, angular: -0.05 },
-      { kind: 'turtle', radius: 88, y: 12, scale: 1.0, angular: 0.08 },
-      { kind: 'turtle', radius: 108, y: 15, scale: 1.2, angular: -0.07 },
+      { kind: 'humpback', scale: 1.1, band: [10, 190], radius: 132, angular: 0.03, clearance: 12 },
+      { kind: 'blue', scale: 1.05, band: [15, 260], radius: 168, angular: -0.021, clearance: 14 },
+      { kind: 'orca', scale: 1.15, band: [10, 400], radius: 116, angular: 0.043, clearance: 10 },
+      { kind: 'sperm', scale: 1.3, band: [380, 1180], radius: 138, angular: 0.026, clearance: 16 },
+      { kind: 'sperm', scale: 1.1, band: [320, 1100], radius: 178, angular: -0.022, clearance: 18 },
+      { kind: 'manta', scale: 1.15, band: [5, 210], radius: 106, angular: 0.05, clearance: 7 },
+      { kind: 'manta', scale: 1.4, band: [10, 280], radius: 142, angular: -0.04, clearance: 9 },
+      { kind: 'eagle', scale: 1.15, band: [5, 180], radius: 94, angular: 0.06, clearance: 6 },
+      { kind: 'stingray', scale: 1.25, band: [20, 440], radius: 80, angular: 0.048, clearance: 4 },
+      { kind: 'turtle', scale: 1.15, band: [5, 140], radius: 90, angular: 0.07, clearance: 5 },
+      { kind: 'turtle', scale: 1.0, band: [5, 170], radius: 114, angular: -0.06, clearance: 6 },
     ];
     for (const p of plan) {
-      let obj;
-      if (p.kind === 'whale') obj = makeWhale();
-      else if (p.kind === 'manta') obj = makeManta();
-      else obj = makeTurtle();
+      const obj = CREATURE_KINDS[p.kind].make();
       const c = {
         kind: p.kind,
         obj,
         t: rnd() * 6.28,
-        center: new THREE.Vector3((rnd() - 0.5) * 60, p.y, (rnd() - 0.5) * 60),
+        center: new THREE.Vector3((rnd() - 0.5) * 80, 0, (rnd() - 0.5) * 80),
+        radius0: p.radius,
         radius: p.radius,
         angle: rnd() * 6.28,
         angular: p.angular,
-        y: p.y,
+        band: p.band,
+        depth: p.band[0],
+        clearance: p.clearance,
         bobPhase: rnd() * 6.28,
         scale: p.scale,
         seeded: false,
@@ -941,6 +1028,18 @@ export class World {
       c.cullR = reach + 24;
       this.creatures.push(c);
     }
+  }
+
+  /** 플레이어 주변·플레이어 수심대에 맞춰 생물을 다시 자리잡게 한다 */
+  _seedCreature(c, px, pz, playerDepth) {
+    const rnd = c.rnd;
+    const ang = rnd() * Math.PI * 2;
+    const dist = 70 + rnd() * 90;
+    c.center.set(px + Math.cos(ang) * dist, 0, pz + Math.sin(ang) * dist);
+    c.depth = Math.min(c.band[1], Math.max(c.band[0], playerDepth + (rnd() - 0.5) * 90));
+    c.angle = rnd() * Math.PI * 2;
+    c.radius = c.radius0 * (0.85 + rnd() * 0.4);
+    c.seeded = true;
   }
 
   /* ---------------- 구역 ---------------- */
@@ -962,20 +1061,15 @@ export class World {
     // 청크 스트리밍
     this._streamChunks(playerPos);
 
-    // 수심에 따른 물빛 전환 — 얕은 에메랄드에서 깊은 코발트로
+    // 수심에 따른 물빛 전환 — 표층 산호대에서 초심해 심연까지 네 단계
     const depth = Math.max(0, (SURFACE_Y - playerPos.y) * DEPTH_SCALE);
-    const t = clamp01(depth / DEPTH_GRADIENT_END);
-    this.depthT = t;
+    const tNorm = clamp01(depth / DEPTH_GRADIENT_END);
+    this.depthT = tNorm;
     this.zoneIndex = zoneIndexForDepth(depth);
-    let a = 0;
-    let b = 1;
-    let u;
-    const split = 0.55;
-    if (t < split) {
-      a = 0; b = 1; u = t / split;
-    } else {
-      a = 1; b = 2; u = (t - split) / (1 - split);
-    }
+    const t = tNorm * (ZONES.length - 1);
+    const a = Math.min(ZONES.length - 2, Math.floor(t));
+    const b = a + 1;
+    let u = clamp01(t - a);
     u = u * u * (3 - 2 * u);
     const c0 = this.zoneCols[a];
     const c1 = this.zoneCols[b];
@@ -1023,7 +1117,7 @@ export class World {
       const dx = ba[i * 3] - playerPos.x;
       const dz = ba[i * 3 + 2] - playerPos.z;
       if (ba[i * 3 + 1] > SURFACE_Y - 1 || dx * dx + dz * dz > 260 * 260) {
-        ba[i * 3 + 1] = Math.max(playerPos.y - 40, FLOOR_Y) + Math.random() * 30;
+        ba[i * 3 + 1] = playerPos.y - 60 - Math.random() * 50;
         ba[i * 3] = playerPos.x + (Math.random() - 0.5) * 300;
         ba[i * 3 + 2] = playerPos.z + (Math.random() - 0.5) * 300;
       }
@@ -1036,7 +1130,7 @@ export class World {
     for (let i = 0; i < sa.length; i += 3) {
       sa[i + 1] -= dt * 0.25;
       sa[i] += Math.sin(this.time * 0.4 + i) * dt * 0.2;
-      if (sa[i + 1] < FLOOR_Y) sa[i + 1] = SURFACE_Y;
+      if (sa[i + 1] < playerPos.y - 170) sa[i + 1] = playerPos.y + 110;
       const dx = sa[i] - playerPos.x;
       const dz = sa[i + 2] - playerPos.z;
       if (dx * dx + dz * dz > 240 * 240) {
@@ -1092,56 +1186,36 @@ export class World {
       s.mesh.instanceMatrix.needsUpdate = true;
     }
 
-    // 대형 생물
+    // 대형 생물 — 플레이어의 수심대에 맞는 종이 주변에 머문다
     for (const c of this.creatures) {
       c.t += dt;
       c.angle += c.angular * dt;
-      const far = Math.hypot(
-        c.center.x + Math.cos(c.angle) * c.radius - playerPos.x,
-        c.center.z + Math.sin(c.angle) * c.radius - playerPos.z
-      ) > 300;
-      if (far) {
-        const ang = c.rnd() * Math.PI * 2;
-        const dist = 120 + c.rnd() * 120;
-        c.center.set(playerPos.x + Math.cos(ang) * dist, c.y, playerPos.z + Math.sin(ang) * dist);
-        c.seeded = true;
-      }
+      const far = Math.hypot(c.center.x - playerPos.x, c.center.z - playerPos.z) > 300 + c.radius;
+      const want = Math.min(c.band[1], Math.max(c.band[0], depth));
+      const drift = Math.abs(c.depth - want) > 240;
+      if (far || drift) this._seedCreature(c, playerPos.x, playerPos.z, depth);
+
       const g = c.obj.group;
       const R = c.radius;
       const cx = c.center.x + Math.cos(c.angle) * R;
       const cz = c.center.z + Math.sin(c.angle) * R;
-      const ground = getTerrainHeight(cx, cz) + 7;
-      const cy = Math.max(
-        c.center.y + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4,
-        ground
-      );
-      const vx = -Math.sin(c.angle) * Math.sign(c.angular);
-      const vz = Math.cos(c.angle) * Math.sign(c.angular);
+      const ground = getTerrainHeight(cx, cz) + c.clearance;
+      let cy = SURFACE_Y - c.depth / DEPTH_SCALE + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
+      if (cy < ground) cy = ground;
+      if (cy > SURFACE_Y - 4) cy = SURFACE_Y - 4;
+      const dir = c.angular >= 0 ? 1 : -1;
+      const vx = -Math.sin(c.angle) * dir;
+      const vz = Math.cos(c.angle) * dir;
       g.position.set(cx, cy, cz);
       g.rotation.y = Math.atan2(-vx, -vz);
       g.rotation.z = Math.sin(c.t * 0.5) * 0.08;
-
-      if (c.kind === 'whale') {
-        c.obj.fluke.rotation.x = Math.sin(c.t * 0.85 + c.bobPhase) * 0.45;
-        c.obj.fluke.rotation.z = Math.sin(c.t * 0.4) * 0.08;
-        c.obj.fins.forEach((f, fi) => {
-          f.rotation.y = (fi === 0 ? 1 : -1) * (0.5 + Math.sin(c.t * 0.7 + c.bobPhase) * 0.12);
-        });
-      } else if (c.kind === 'manta') {
-        const flap = Math.sin(c.t * 1.7 + c.bobPhase) * 0.6;
-        c.obj.wingL.rotation.z = flap;
-        c.obj.wingR.rotation.z = -flap;
-        c.obj.tail.rotation.z = Math.sin(c.t * 1.2) * 0.14;
-      } else {
-        c.obj.flippers.forEach((f) => {
-          f.rotation.z = f.userData.base + Math.sin(c.t * 1.5 + f.userData.phase) * 0.45;
-        });
-      }
+      g.rotation.x = Math.sin(c.t * 0.33 + c.bobPhase) * 0.05;
+      if (c.obj.update) c.obj.update(c.t);
     }
 
     // 하늘 돔·먼 바닥은 플레이어를 따라간다
-    this.sky.position.set(playerPos.x, 0, playerPos.z);
-    this.farFloor.position.set(playerPos.x, FLOOR_Y - 26, playerPos.z);
+    this.sky.position.set(playerPos.x, playerPos.y, playerPos.z);
+    this.farFloor.position.set(playerPos.x, ABYSS_FLOOR - 40, playerPos.z);
   }
 
   reset() {
