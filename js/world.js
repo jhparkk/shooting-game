@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180k';
-import { getTextures } from './textures.js?v=202611180k';
+} from './models.js?v=202611180l';
+import { getTextures } from './textures.js?v=202611180l';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
