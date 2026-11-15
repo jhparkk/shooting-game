@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611180b';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180b';
+import { Sound } from './audio.js?v=202611180c';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180c';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611180b';
-import { FX } from './fx.js?v=202611180b';
+} from './models.js?v=202611180c';
+import { FX } from './fx.js?v=202611180c';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2203,25 +2203,30 @@ async function runCamSelfTest() {
     R.drag = {
       yaw: +CAM.yaw.toFixed(4), pitch: +CAM.pitch.toFixed(4),
       dYaw: +(CAM.yaw - y0).toFixed(4), dPitch: +(CAM.pitch - p0).toFixed(4),
-      pass: Math.abs(CAM.yaw - y0) > 0.3 && CAM.pitch > p0 + 0.02,
+      pass: Math.abs(CAM.yaw - y0) > 0.3 && CAM.pitch < p0 - 0.02,
     };
 
     /* 2) 두 손가락 핀치 → 3D 줌인·줌아웃 (최소·최대 거리 클램프) */
+    // (a) 벌리면 줌인 — 최소 거리까지
     CAM.dist = 15;
-    fireTouch('touchstart', [touch(2, 900, 500), touch(3, 1000, 500)], [touch(3, 1000, 500)]);
-    for (let i = 1; i <= 6; i++) {
-      const a = touch(2, 900 - i * 40, 500);
-      const b = touch(3, 1000 + i * 40, 500);
+    fireTouch('touchstart', [touch(2, 700, 500), touch(3, 1000, 500)], [touch(3, 1000, 500)]);
+    for (let i = 1; i <= 8; i++) {
+      const a = touch(2, 700 - i * 100, 500);
+      const b = touch(3, 1000 + i * 100, 500);
       fireTouch('touchmove', [a, b], [b]);
     }
     const nearDist = CAM.dist;
-    for (let i = 1; i <= 12; i++) {
-      const a = touch(2, 660 + i * 40, 500);
-      const b = touch(3, 1240 - i * 40, 500);
+    fireTouch('touchend', [], [touch(2, 700, 500), touch(3, 1000, 500)]);
+    // (b) 오므리면 줌아웃 — 최대 거리까지
+    CAM.dist = 15;
+    fireTouch('touchstart', [touch(4, 600, 500), touch(5, 900, 500)], [touch(5, 900, 500)]);
+    for (let i = 1; i <= 8; i++) {
+      const a = touch(4, 600 + i * 20, 500);
+      const b = touch(5, 900 - i * 20, 500);
       fireTouch('touchmove', [a, b], [b]);
     }
     const farDist = CAM.dist;
-    fireTouch('touchend', [], [touch(2, 1140, 500), touch(3, 760, 500)]);
+    fireTouch('touchend', [], [touch(4, 760, 500), touch(5, 740, 500)]);
     R.pinch = {
       near: +nearDist.toFixed(2), far: +farDist.toFixed(2),
       min: CAM.minDist, max: CAM.maxDist,
@@ -2247,15 +2252,17 @@ async function runCamSelfTest() {
     }));
     const joySnap = { move: +joy.move.toFixed(2), turn: +joy.turn.toFixed(2) };
     const yawBefore = CAM.yaw;
+    const pitchBefore = CAM.pitch;
     fireTouch('touchstart', [touch(6, 1500, 380)], [touch(6, 1500, 380)]);
     for (let i = 1; i <= 8; i++) {
-      const t = touch(6, 1500, 380 + i * 14);
+      const t = touch(6, 1500 - i * 20, 380 + i * 6);
       fireTouch('touchmove', [t], [t]);
     }
-    fireTouch('touchend', [], [touch(6, 1500, 492)]);
+    fireTouch('touchend', [], [touch(6, 1340, 428)]);
     R.multiTouch = {
-      joy: joySnap, dYaw: +(CAM.yaw - yawBefore).toFixed(4),
-      pass: Math.abs(joySnap.move) > 0.1 && Math.abs(CAM.yaw - yawBefore) > 0.1,
+      joy: joySnap,
+      dYaw: +(CAM.yaw - yawBefore).toFixed(4), dPitch: +(CAM.pitch - pitchBefore).toFixed(4),
+      pass: Math.abs(joySnap.move) > 0.1 && Math.abs(CAM.yaw - yawBefore) > 0.1 && CAM.pitch < pitchBefore - 0.01,
     };
     base.dispatchEvent(new PointerEvent('pointerup', {
       pointerId: 91, pointerType: 'touch', bubbles: true, clientX: 150, clientY: 780,
