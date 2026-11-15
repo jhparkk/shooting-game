@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611180a';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180a';
+import { Sound } from './audio.js?v=202611180b';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180b';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611180a';
-import { FX } from './fx.js?v=202611180a';
+} from './models.js?v=202611180b';
+import { FX } from './fx.js?v=202611180b';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -422,60 +422,109 @@ function bindInput() {
   holdButton(el.upBtn, () => { joy.lift = 1; }, () => { if (joy.lift > 0) joy.lift = 0; });
   holdButton(el.downBtn, () => { joy.lift = -1; }, () => { if (joy.lift < 0) joy.lift = 0; });
 
-  /* --- 시점 회전(드래그) · 3D 줌(핀치·휠) — 멀티터치 분리 --- */
-  const lookPointers = new Map();   // pointerId -> {x, y}
+  /* --- 시점 회전(드래그) · 3D 줌(핀치·휠) — 멀티터치 분리 ---
+     터치는 touch 이벤트(identifier)로, 마우스·펜은 pointer 이벤트로 처리한다.
+     두 경로를 섞지 않으므로 같은 손가락이 두 번 반영되지 않는다. */
+  const lookPointers = new Map();   // 마우스·펜: pointerId -> {x, y}
+  const touchPts = new Map();       // 터치: identifier -> {x, y}
   let pinch = null;                 // { d0, base }
   let tap = null;                   // 마우스 클릭(발사) 판정
 
-  function startPinch() {
-    const ids = [...lookPointers.keys()];
-    if (ids.length < 2) return;
-    const a = lookPointers.get(ids[0]);
-    const b = lookPointers.get(ids[1]);
-    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, base: CAM.dist };
+  function startPinch(d0) {
+    pinch = { d0: d0 || 1, base: CAM.dist };
     tap = null;
   }
 
+  /* ---------------- 터치: 한 손가락 회전 / 두 손가락 줌 ---------------- */
+  const touchList = (e) => Array.from(e.touches || []);
+
+  function onTouchStart(e) {
+    if (e.cancelable !== false) e.preventDefault();
+    const ts = touchList(e);
+    touchPts.clear();
+    for (const t of ts) touchPts.set(t.identifier, { x: t.clientX, y: t.clientY });
+    if (ts.length === 1) {
+      pinch = null;
+    } else if (ts.length >= 2) {
+      const a = ts[0];
+      const b = ts[1];
+      startPinch(Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+    }
+  }
+
+  function onTouchMove(e) {
+    if (e.cancelable !== false) e.preventDefault();
+    const ts = touchList(e);
+    if (ts.length >= 2) {
+      const a = ts[0];
+      const b = ts[1];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+      if (!pinch) startPinch(d);
+      // 손을 벌리면 줌인(가까이), 오므리면 줌아웃
+      applyPinch(pinch.d0, d, pinch.base);
+      for (const t of ts) touchPts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      return;
+    }
+    if (ts.length === 1) {
+      pinch = null;
+      const t = ts[0];
+      const p = touchPts.get(t.identifier);
+      if (!p) {
+        touchPts.set(t.identifier, { x: t.clientX, y: t.clientY });
+        return;
+      }
+      applyLook(t.clientX - p.x, t.clientY - p.y);
+      p.x = t.clientX;
+      p.y = t.clientY;
+    }
+  }
+
+  function onTouchEnd(e) {
+    const ts = touchList(e);
+    for (const id of [...touchPts.keys()]) {
+      let still = false;
+      for (const t of ts) if (t.identifier === id) still = true;
+      if (!still) touchPts.delete(id);
+    }
+    if (ts.length < 2) pinch = null;
+    if (ts.length === 1) {
+      touchPts.set(ts[0].identifier, { x: ts[0].clientX, y: ts[0].clientY });
+    }
+  }
+
+  canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onTouchEnd);
+  canvas.addEventListener('touchcancel', onTouchEnd);
+
+  /* ---------------- 마우스 · 펜 ---------------- */
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;
     if (e.pointerType === 'mouse' && e.button > 0) return;
     lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (lookPointers.size === 1) {
-      pinch = null;
-      tap = e.pointerType === 'mouse'
-        ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }
-        : null;
-    } else if (lookPointers.size === 2) {
-      startPinch();
-    }
-    if (e.pointerType !== 'mouse') e.preventDefault();
+    pinch = null;
+    tap = e.pointerType === 'mouse'
+      ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }
+      : null;
   });
 
   window.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
     const p = lookPointers.get(e.pointerId);
     if (!p) return;
     const dx = e.clientX - p.x;
     const dy = e.clientY - p.y;
     p.x = e.clientX;
     p.y = e.clientY;
-
-    if (pinch && lookPointers.size >= 2) {
-      const ids = [...lookPointers.keys()];
-      const a = lookPointers.get(ids[0]);
-      const b = lookPointers.get(ids[1]);
-      const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-      // 손을 벌리면 줌인(가까이), 오므리면 줌아웃
-      applyPinch(pinch.d0, d, pinch.base);
-      return;
-    }
-
     if (tap && tap.id === e.pointerId) tap.moved += Math.abs(dx) + Math.abs(dy);
     applyLook(dx, dy);
   }, { passive: false });
 
   function endLook(e) {
+    if (e.pointerType === 'touch') return;
     if (!lookPointers.has(e.pointerId)) return;
     lookPointers.delete(e.pointerId);
-    if (pinch && lookPointers.size < 2) pinch = null;
+    pinch = null;
     // PC: 드래그 없이 짧게 클릭하면 한 발 발사
     if (tap && tap.id === e.pointerId) {
       const quick = performance.now() - tap.t < 420 && tap.moved < 8;
@@ -2120,6 +2169,110 @@ function bindButtons() {
   });
 }
 
+/* ---------------- 검증용: 시점·줌 자체 테스트 (?camtest) ----------------
+   실제 손가락 대신 합성 Touch/Pointer 이벤트를 게임 화면에 던져
+   "이벤트 → 핸들러 → 카메라 상태" 경로가 살아 있는지 확인한다.
+   (js/zoom-guard.js 의 ?zoomtest 와 같은 방식, 평소에는 돌지 않는다) */
+async function runCamSelfTest() {
+  const R = (window.__camTest = {});
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const base = el.joystick.querySelector('.joy-base');
+  const touch = (id, x, y) => new Touch({ identifier: id, target: canvas, clientX: x, clientY: y });
+  const fireTouch = (type, touches, changed) => {
+    const ev = new TouchEvent(type, {
+      touches, targetTouches: touches, changedTouches: changed || touches,
+      bubbles: true, cancelable: true,
+    });
+    canvas.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+
+  try {
+    if (G.state !== 'playing') startGame();
+    await wait(400);
+
+    /* 1) 한 손가락 드래그 → 시점 회전 (yaw·pitch) */
+    const y0 = CAM.yaw;
+    const p0 = CAM.pitch;
+    fireTouch('touchstart', [touch(1, 1200, 420)], [touch(1, 1200, 420)]);
+    for (let i = 1; i <= 8; i++) {
+      const t = touch(1, 1200 - i * 22, 420 + i * 9);
+      fireTouch('touchmove', [t], [t]);
+    }
+    fireTouch('touchend', [], [touch(1, 1024, 492)]);
+    R.drag = {
+      yaw: +CAM.yaw.toFixed(4), pitch: +CAM.pitch.toFixed(4),
+      dYaw: +(CAM.yaw - y0).toFixed(4), dPitch: +(CAM.pitch - p0).toFixed(4),
+      pass: Math.abs(CAM.yaw - y0) > 0.3 && CAM.pitch > p0 + 0.02,
+    };
+
+    /* 2) 두 손가락 핀치 → 3D 줌인·줌아웃 (최소·최대 거리 클램프) */
+    CAM.dist = 15;
+    fireTouch('touchstart', [touch(2, 900, 500), touch(3, 1000, 500)], [touch(3, 1000, 500)]);
+    for (let i = 1; i <= 6; i++) {
+      const a = touch(2, 900 - i * 40, 500);
+      const b = touch(3, 1000 + i * 40, 500);
+      fireTouch('touchmove', [a, b], [b]);
+    }
+    const nearDist = CAM.dist;
+    for (let i = 1; i <= 12; i++) {
+      const a = touch(2, 660 + i * 40, 500);
+      const b = touch(3, 1240 - i * 40, 500);
+      fireTouch('touchmove', [a, b], [b]);
+    }
+    const farDist = CAM.dist;
+    fireTouch('touchend', [], [touch(2, 1140, 500), touch(3, 760, 500)]);
+    R.pinch = {
+      near: +nearDist.toFixed(2), far: +farDist.toFixed(2),
+      min: CAM.minDist, max: CAM.maxDist,
+      pass: nearDist <= CAM.minDist + 0.01 && farDist >= CAM.maxDist - 0.01,
+    };
+
+    /* 3) 마우스 휠 줌 */
+    CAM.dist = 15;
+    canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, bubbles: true, cancelable: true }));
+    const wheelIn = CAM.dist;
+    canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 900, bubbles: true, cancelable: true }));
+    const wheelOut = CAM.dist;
+    R.wheel = { in: +wheelIn.toFixed(2), out: +wheelOut.toFixed(2), pass: wheelIn < 14 && wheelOut > wheelIn };
+
+    /* 4) 조이스틱(왼손) + 시점(오른손) 동시 — 멀티터치 분리 */
+    CAM.dist = 15;
+    resetCameraView();
+    base.dispatchEvent(new PointerEvent('pointerdown', {
+      pointerId: 91, pointerType: 'touch', bubbles: true, cancelable: true, clientX: 150, clientY: 820,
+    }));
+    base.dispatchEvent(new PointerEvent('pointermove', {
+      pointerId: 91, pointerType: 'touch', bubbles: true, clientX: 150, clientY: 780,
+    }));
+    const joySnap = { move: +joy.move.toFixed(2), turn: +joy.turn.toFixed(2) };
+    const yawBefore = CAM.yaw;
+    fireTouch('touchstart', [touch(6, 1500, 380)], [touch(6, 1500, 380)]);
+    for (let i = 1; i <= 8; i++) {
+      const t = touch(6, 1500, 380 + i * 14);
+      fireTouch('touchmove', [t], [t]);
+    }
+    fireTouch('touchend', [], [touch(6, 1500, 492)]);
+    R.multiTouch = {
+      joy: joySnap, dYaw: +(CAM.yaw - yawBefore).toFixed(4),
+      pass: Math.abs(joySnap.move) > 0.1 && Math.abs(CAM.yaw - yawBefore) > 0.1,
+    };
+    base.dispatchEvent(new PointerEvent('pointerup', {
+      pointerId: 91, pointerType: 'touch', bubbles: true, clientX: 150, clientY: 780,
+    }));
+
+    /* 5) 시점 초기화 버튼과 같은 경로 */
+    resetCameraView();
+    R.reset = { yaw: +CAM.yaw.toFixed(3), pitch: +CAM.pitch.toFixed(3), dist: CAM.dist };
+    R.pass = !!(R.drag.pass && R.pinch.pass && R.wheel.pass && R.multiTouch.pass);
+    R.errors = window.__errors || [];
+  } catch (err) {
+    R.fail = String(err && err.message ? err.message : err);
+    R.pass = false;
+  }
+  return R;
+}
+
 function boot() {
   try {
     initThree();
@@ -2177,6 +2330,8 @@ function boot() {
         snapCamera();
       },
       CAM, aim, applyLook, applyPinch, applyZoom, resetCameraView, snapCamera,
+      camTest: () => window.__camTest,
+      joyInput: () => ({ move: joy.move, turn: joy.turn, lift: joy.lift }),
       texInfo: () => {
         const t = world.tex || {};
         return { keys: Object.keys(t), ms: t.ms };
@@ -2250,6 +2405,9 @@ function boot() {
     };
   }
   loop();
+  if (new URLSearchParams(location.search).has('camtest')) {
+    runCamSelfTest();
+  }
 }
 
 boot();
