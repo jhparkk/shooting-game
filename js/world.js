@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180h';
-import { getTextures } from './textures.js?v=202611180h';
+} from './models.js?v=202611180i';
+import { getTextures } from './textures.js?v=202611180i';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -495,21 +495,22 @@ export class World {
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
           detail *= mix( vec3( 1.0 ), vec3( 1.10, 1.08, 1.04 ), sandW );
-          diffuseColor.rgb *= detail;
-          `
-        ).replace(
-          'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
-          `
-          // 수중 빛무늬 — 얕은 곳에서 또렷하고 심해로 갈수록 사라진다
+
+          // 수중 빛무늬 — 표면색을 밝히고(곱셈) 약간의 빛을 더한다(덧셈)
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
           vec2 cuv = vWPosV.xz * 0.13;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
           float cb = texture2D( uCaustics, cuv * 2.71 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
-          float cw = ca + cb * 0.55;
-          float caustic = cw * cFade * ( 0.20 + 0.80 * upK ) * uCausticI * 0.34;
+          float caustic = ( ca + cb * 0.55 ) * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
+          detail *= 1.0 + caustic * 0.95;
+          diffuseColor.rgb *= detail;
+          `
+        ).replace(
+          'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
+          `
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.10;
           `
         );
     };
