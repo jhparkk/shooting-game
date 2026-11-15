@@ -12,7 +12,7 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116f';
+} from './models.js?v=20261116g';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -989,8 +989,8 @@ export class World {
       { kind: 'humpback', scale: 1.1, band: [10, 190], radius: 132, angular: 0.03, clearance: 12 },
       { kind: 'blue', scale: 1.05, band: [15, 260], radius: 168, angular: -0.021, clearance: 14 },
       { kind: 'orca', scale: 1.15, band: [10, 400], radius: 116, angular: 0.043, clearance: 10 },
-      { kind: 'sperm', scale: 1.3, band: [380, 1180], radius: 138, angular: 0.026, clearance: 16 },
-      { kind: 'sperm', scale: 1.1, band: [320, 1100], radius: 178, angular: -0.022, clearance: 18 },
+      { kind: 'sperm', scale: 1.3, band: [380, 1260], radius: 138, angular: 0.026, clearance: 16 },
+      { kind: 'sperm', scale: 1.1, band: [320, 1220], radius: 178, angular: -0.022, clearance: 18 },
       { kind: 'manta', scale: 1.15, band: [5, 210], radius: 106, angular: 0.05, clearance: 7 },
       { kind: 'manta', scale: 1.4, band: [10, 280], radius: 142, angular: -0.04, clearance: 9 },
       { kind: 'eagle', scale: 1.15, band: [5, 180], radius: 94, angular: 0.06, clearance: 6 },
@@ -1193,14 +1193,19 @@ export class World {
       const far = Math.hypot(c.center.x - playerPos.x, c.center.z - playerPos.z) > 300 + c.radius;
       const want = Math.min(c.band[1], Math.max(c.band[0], depth));
       const drift = Math.abs(c.depth - want) > 240;
-      if (far || drift) this._seedCreature(c, playerPos.x, playerPos.z, depth);
+      if (!c.seeded || far || drift) this._seedCreature(c, playerPos.x, playerPos.z, depth);
 
       const g = c.obj.group;
       const R = c.radius;
       const cx = c.center.x + Math.cos(c.angle) * R;
       const cz = c.center.z + Math.sin(c.angle) * R;
       const ground = getTerrainHeight(cx, cz) + c.clearance;
-      let cy = SURFACE_Y - c.depth / DEPTH_SCALE + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
+      const wantY = SURFACE_Y - c.depth / DEPTH_SCALE;
+      // 바다가 충분히 깊지 않은 곳에서는 그 종이 머물 수 없다 — 숨긴다
+      const hide = wantY < ground - 3;
+      if (g.visible === hide) g.visible = !hide;
+      if (hide) continue;
+      let cy = wantY + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
       if (cy < ground) cy = ground;
       if (cy > SURFACE_Y - 4) cy = SURFACE_Y - 4;
       const dir = c.angular >= 0 ? 1 : -1;
@@ -1234,6 +1239,7 @@ export class World {
       const list = c.colliders;
       if (!list || !list.length) continue;
       const g = c.obj.group;
+      if (!g.visible) continue;
       const dx = pos.x - g.position.x;
       const dy = pos.y - g.position.y;
       const dz = pos.z - g.position.z;
