@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a';
-import { getTextures } from './textures.js?v=20261117a';
+} from './models.js?v=20261117b';
+import { getTextures } from './textures.js?v=20261117b';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -490,7 +490,9 @@ export class World {
           float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
           vec3 detail = mix( cRock, cSand, sandK );
           detail = mix( detail, cBasalt, deepK );
-          detail *= 1.14;
+          detail *= 1.18;
+          // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
+          detail *= mix( vec3( 1.0 ), vec3( 1.30, 1.22, 0.98 ), sandK );
           diffuseColor.rgb *= detail;
           `
         ).replace(
@@ -499,12 +501,12 @@ export class World {
           // 수중 빛무늬 — 얕은 곳에서 또렷하고 심해로 갈수록 사라진다
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.035;
+          vec2 cuv = vWPosV.xz * 0.05;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
           float cb = texture2D( uCaustics, cuv * 1.47 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
-          float caustic = ca * cb * 2.2 * cFade * ( 0.30 + 0.70 * upK ) * uCausticI;
+          float caustic = ca * cb * 1.7 * cFade * ( 0.25 + 0.75 * upK ) * uCausticI;
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.62, 0.95, 1.0 ) * caustic * 0.55;
+            + vec3( 0.60, 0.94, 1.0 ) * caustic * 0.42;
           `
         );
     };
@@ -1214,7 +1216,7 @@ export class World {
     // 실시간 수중 빛무늬 시간·세기
     if (this.terrainUniforms) {
       this.terrainUniforms.uTime.value = this.time;
-      this.terrainUniforms.uCausticI.value = mix(z0.sunI, z1.sunI, u) * 1.5;
+      this.terrainUniforms.uCausticI.value = mix(z0.sunI, z1.sunI, u) * 0.75;
     }
 
     // 기포 — 수면까지 올라간 뒤 플레이어 주변에서 다시 시작
