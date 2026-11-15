@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611190c';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190c';
+import { Sound } from './audio.js?v=202611190d';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190d';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611190c';
-import { FX } from './fx.js?v=202611190c';
+} from './models.js?v=202611190d';
+import { FX } from './fx.js?v=202611190d';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

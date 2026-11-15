@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611190c';
-import { getTextures } from './textures.js?v=202611190c';
+} from './models.js?v=202611190d';
+import { getTextures } from './textures.js?v=202611190d';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1064,7 +1064,11 @@ export class World {
   /* ---------------- 극심해 열수구 불빛 (2,000m+ 분위기) ---------------- */
   _buildVents() {
     const glow = glowTexture();
-    this.ventMat = new THREE.MeshLambertMaterial({ color: 0x241d18 });
+    this.ventMat = new THREE.MeshLambertMaterial({
+      color: 0x241d18,
+      emissive: 0x2a0f06,   // 완전 검은 실루엣이 되지 않게 열기를 살짝 머금게
+      emissiveIntensity: 0.85,
+    });
     this.vents = [];
     for (let i = 0; i < 16; i++) {
       const group = new THREE.Group();
