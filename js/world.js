@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116f';
-import { getTextures } from './textures.js?v=20261116f';
+} from './models.js?v=20261116g';
+import { getTextures } from './textures.js?v=20261116g';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
