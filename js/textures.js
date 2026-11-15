@@ -139,8 +139,27 @@ function bakePair(size, fn) {
   }
   ctxA.putImageData(imgA, 0, 0);
   ctxB.putImageData(imgB, 0, 0);
+  // 평균 밝기를 0.80 근처로 정규화 — 깊은 바다의 어두운 현무암 텍스처가
+  // 지형을 "까맣게" 만들지 않도록, 대비는 남기고 밝기만 맞춘다.
+  normalize(imgA, A, 0.80, 2.2);
+  ctxA.putImageData(imgA, 0, 0);
   return [cvA, cvB];
 }
+
+/** 캔버스 픽셀의 평균 밝기를 target 에 맞춘다 (완전히 평탄해지지 않게 k 상한) */
+function normalize(img, data, target, maxK) {
+  let sum = 0;
+  const n = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) sum += data[i];
+  const mean = sum / n / 255;
+  if (mean < 0.02) return;
+  const k = Math.min(maxK, Math.max(0.55, 0.55 / mean));
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const v = target + (data[i + c] / 255 - mean) * k;
+      data[i + c] = v < 0 ? 0 : v > 1 ? 255 : (v * 255) | 0;
+    }
+  }
 
 /* =========================================================
    모래 — 잔물결 + 조개 부스러기
