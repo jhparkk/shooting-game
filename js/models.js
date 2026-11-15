@@ -1702,17 +1702,19 @@ function spermGeometry() {
   const parts = [body];
 
   // 각진 사각 머리
-  const head = roundedBox(3.5, 3.7, 5.6, 1.0, 7);
-  head.translate(0, 0.28, -4.6);
+  const head = roundedBox(3.2, 3.4, 5.8, 1.25, 8);
+  head.translate(0, 0.24, -4.3);
   parts.push(paint(head, SKIN));
   // 머리 앞면의 살짝 좁아지는 주둥이
-  const snout = roundedBox(2.7, 2.6, 0.9, 0.55, 5);
-  snout.translate(0, 0.12, -7.5);
+  const snout = roundedBox(2.6, 2.4, 0.9, 0.6, 5);
+  snout.translate(0, 0.08, -7.2);
   parts.push(paint(snout, 0x565046));
+  // 머리와 몸통을 잇는 매끄러운 어깨
+  ellipsePatch(parts, SKIN, [0, 0.12, -1.9], [1.66, 1.84, 1.7]);
 
   // 아래턱 — 가늘고 긴 턱 + 이빨
   const jaw = roundedBox(1.05, 0.55, 4.4, 0.22, 5);
-  jaw.translate(0, -1.5, -5.0);
+  jaw.translate(0, -1.45, -4.9);
   parts.push(paint(jaw, 0x3d3830));
   for (let i = 0; i < 9; i++) {
     const z = -6.4 + i * 0.44;
