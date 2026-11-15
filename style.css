@@ -107,6 +107,83 @@ body { touch-action: none; }
 #flash.on { opacity: 1; transition: opacity 40ms linear; }
 
 /* ================= HUD ================= */
+.compass {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 3px 10px 3px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 220, 235, 0.16);
+  background: linear-gradient(180deg, rgba(4, 32, 46, 0.5), rgba(4, 24, 36, 0.3));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.compass-window {
+  position: relative;
+  width: 118px;
+  height: 15px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+}
+.compass-ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1080px;
+  height: 100%;
+  will-change: transform;
+}
+.compass-ribbon span {
+  position: absolute;
+  top: 0;
+  line-height: 15px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(150, 230, 238, 0.42);
+  transform: translateX(-50%);
+}
+.compass-ribbon span.card {
+  font-size: 10.5px;
+  color: rgba(233, 253, 255, 0.86);
+}
+.compass-ribbon span.n {
+  color: var(--amber);
+  font-weight: 800;
+}
+.compass-ribbon i {
+  position: absolute;
+  top: 6px;
+  width: 1px;
+  height: 3px;
+  background: rgba(150, 230, 238, 0.26);
+  transform: translateX(-50%);
+}
+.compass-marker {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  bottom: 1px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.5);
+}
+.compass-read {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(160, 230, 238, 0.72);
+}
+.compass-read b {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #eafeff;
+}
+
 .hud {
   position: absolute;
   inset: 0;

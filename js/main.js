@@ -4,10 +4,10 @@
    ========================================================= */
 import * as THREE from 'three';
 import { Sound } from './audio.js';
-import { World, ZONES, SURFACE_Y, ARENA, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
-  makeAnglerfish, makeJellyfish, makeKraken, spriteGlow,
+  makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
 } from './models.js';
 import { FX } from './fx.js';
 
@@ -62,6 +62,10 @@ const el = {
   pauseDepth: $('pause-depth'),
   pauseWave: $('pause-wave'),
   loading: $('loading'),
+  compass: $('hud-compass'),
+  ribbon: $('compass-ribbon'),
+  heading: $('hud-heading'),
+  bearing: $('hud-bearing'),
 };
 
 const sound = new Sound();
@@ -193,6 +197,7 @@ function initThree() {
   bindTouchGuards();
   bindInput();
   bindButtons();
+  buildCompass();
   window.addEventListener('resize', onResize);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && G.state === 'playing') togglePause(true);
@@ -432,6 +437,45 @@ function updatePowerups() {
   }
 }
 
+/* ---------------- 나침반 (무한 바다의 방위) ---------------- */
+const COMPASS_WINDOW = 118;
+const COMPASS_CYCLE = 360;
+const HEADING_NAMES = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
+
+function buildCompass() {
+  if (!el.ribbon) return;
+  const cards = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  let html = '';
+  for (let cyc = 0; cyc < 3; cyc++) {
+    const base = cyc * COMPASS_CYCLE;
+    for (let d = 0; d < 360; d += 15) {
+      if (d % 45 === 0) {
+        const i = d / 45;
+        const cls = i === 0 ? 'card n' : (i % 2 === 0 ? 'card' : 'sub');
+        html += `<span class="${cls}" style="left:${base + d}px">${cards[i]}</span>`;
+      } else {
+        html += `<i style="left:${base + d}px"></i>`;
+      }
+    }
+  }
+  el.ribbon.innerHTML = html;
+}
+
+let compassBearing = -1;
+function updateCompass() {
+  if (!el.ribbon) return;
+  // forward = (-sin(yaw), 0, -cos(yaw)) → yaw 0 이 북(-Z), 시계방향이 동(+X)
+  let deg = (-P.yaw * 180) / Math.PI;
+  deg = ((deg % 360) + 360) % 360;
+  if (Math.abs(deg - compassBearing) > 0.2) {
+    compassBearing = deg;
+    const x = COMPASS_WINDOW / 2 - (deg + COMPASS_CYCLE);
+    el.ribbon.style.transform = `translateX(${x.toFixed(1)}px)`;
+    if (el.bearing) setText(el.bearing, `${Math.round(deg)}°`);
+    if (el.heading) setText(el.heading, HEADING_NAMES[Math.round(deg / 45) % 8]);
+  }
+}
+
 function refreshHud() {
   setText(el.score, G.score.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
@@ -449,6 +493,7 @@ function refreshHud() {
     el.shield.classList.add('hidden');
   }
   updatePowerups();
+  updateCompass();
 }
 
 /* ---------------- 게임 시작/종료 ---------------- */
@@ -935,22 +980,7 @@ function updateSubTransform(dt) {
 }
 
 function clampToWorld(pos, vel) {
-  const r = Math.hypot(pos.x, pos.z);
-  const maxR = ARENA - 12;
-  if (r > maxR) {
-    const k = maxR / r;
-    pos.x *= k;
-    pos.z *= k;
-    if (vel) {
-      const nx = pos.x / maxR;
-      const nz = pos.z / maxR;
-      const dot = vel.x * nx + vel.z * nz;
-      if (dot > 0) {
-        vel.x -= nx * dot;
-        vel.z -= nz * dot;
-      }
-    }
-  }
+  // 무한 바다 — 수평 경계는 없고 해저·수면만 막는다
   const ground = terrainHeight(pos.x, pos.z) + 4.5;
   if (pos.y < ground) {
     pos.y = ground;
@@ -1059,7 +1089,6 @@ function updateEnemies(dt) {
       o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.7;
       o.rotation.z = Math.sin(e.phase * 2) * 0.3;
-      if (e.parts.tail) e.parts.tail.rotation.y = Math.sin(e.phase * 3.4) * 0.5;
     } else if (e.type === 'jelly') {
       o.position.addScaledVector(tmpVec, e.speed * dt);
       o.position.x += Math.sin(e.phase) * dt * 2.2;
@@ -1083,15 +1112,20 @@ function updateEnemies(dt) {
       o.position.x += Math.sin(e.phase * 1.3) * dt * 1.8;
       o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
       o.rotation.z = Math.sin(e.phase * 1.1) * 0.14;
-      if (e.parts.fins) e.parts.fins.rotation.z = Math.sin(e.phase * 2.2) * 0.2;
     } else {
       // 심해 아귀 — 유인 돌기를 흔들며 다가온다
       o.position.addScaledVector(tmpVec, e.speed * dt);
       o.position.y += Math.sin(e.phase * 0.9) * 0.8 * dt;
       o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.3;
-      if (e.parts.jaw) e.parts.jaw.rotation.x = 0.08 + Math.abs(Math.sin(e.phase * 1.4)) * 0.5;
-      if (e.parts.lure) e.parts.lure.position.z = -1.6 + Math.sin(e.phase * 1.8) * 0.25;
+    }
+
+    // 유영(몸통 S자 + 꼬리 흔들기) — 해양 생물 모델 공통
+    if (e.parts && e.parts.bend) swim(e.parts, ANIM.time.value);
+
+    if (e.type === 'angler') {
+      if (e.parts.jaw) e.parts.jaw.rotation.x = 0.06 + Math.abs(Math.sin(e.phase * 1.4)) * 0.46;
+      if (e.parts.lure) e.parts.lure.position.z = -1.50 + Math.sin(e.phase * 1.8) * 0.18;
       if (e.parts.glow && e.parts.lure) e.parts.glow.position.copy(e.parts.lure.position);
     }
 
@@ -1373,6 +1407,7 @@ let frames = 0;
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
+  ANIM.time.value += dt;
 
   frames++;
   acc += dt;
@@ -1579,6 +1614,12 @@ function boot() {
     window.__abyss = {
       G, P, enemies, world, renderer, camera, torpedoes,
       startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy, useBomb,
+      chunks: () => world.chunkStats(),
+      setPos: (x, z, dy) => {
+        P.pos.set(x, terrainHeight(x, z) + (dy === undefined ? 7 : dy), z);
+        P.vel.set(0, 0, 0);
+        snapCamera();
+      },
       setInput: (o) => {
         if (o.fire !== undefined) btnFiring = !!o.fire;
         if (o.lift !== undefined) joy.lift = o.lift;

@@ -1,9 +1,15 @@
 /* =========================================================
    ABYSS DIVER — 절차적 3D 모델 빌더
-   외부 모델 파일 없이 Three.js 기본 도형을 조합해 만든다.
+   · 회전체(lathe) 몸통으로 만든 매끄러운 유선형 어류
+   · 등·배지느러미 / 가슴지느러미 / 배지느러미 / 갈라진 꼬리지느러미
+   · 눈(흰자+검은자), 등·배 투톤 피부, 줄무늬·반점
+   · 정점 셰이더 기반 유영(tail-wagging) 애니메이션
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/** 모든 어류가 함께 쓰는 시간 유니폼 (게임 루프에서 증가) */
+export const ANIM = { time: { value: 0 } };
 
 /* ---------------- 공용 텍스처/머티리얼 ---------------- */
 let _glowTex = null;
@@ -53,6 +59,23 @@ export function paint(geo, color) {
   return geo;
 }
 
+export function mulberry(a) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const mix = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+
 const MET = {
   hull: new THREE.MeshPhongMaterial({ color: 0xffc172, shininess: 78, specular: 0x6b8fa8 }),
   hullDark: new THREE.MeshPhongMaterial({ color: 0xe89a45, shininess: 46, specular: 0x334455 }),
@@ -86,6 +109,256 @@ function placed(geo, p, r, s, color) {
   );
   g.applyMatrix4(m);
   return paint(g, color);
+}
+
+/* =========================================================
+   어류 공용 빌더
+   ========================================================= */
+
+/** 이동/회전/크기를 지오메트리에 구워 넣는다 */
+function xf(geo, p, r, s) {
+  const q = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0)
+  );
+  const m = new THREE.Matrix4().compose(
+    new THREE.Vector3(p ? p[0] : 0, p ? p[1] : 0, p ? p[2] : 0),
+    q,
+    new THREE.Vector3(s ? s[0] : 1, s ? s[1] : 1, s ? s[2] : 1)
+  );
+  geo.applyMatrix4(m);
+  return geo;
+}
+
+/**
+ * 몸통 — z 축(머리 -z → 꼬리 +z)을 따라 늘어선 매끄러운 회전체.
+ * profile: [[z, 반지름], ...]   sx: 옆으로 납작한 정도, sy: 세로 배율
+ */
+function bodyGeometry(profile, opts) {
+  const o = opts || {};
+  const radial = o.radial || 20;
+  const pts = profile
+    .map(([z, r]) => new THREE.Vector2(Math.max(0.0015, r), z))
+    .sort((a, b) => a.y - b.y);
+  const geo = new THREE.LatheGeometry(pts, radial);
+  geo.rotateX(Math.PI / 2);            // 회전축을 +Z 로
+  geo.scale(o.sx === undefined ? 1 : o.sx, o.sy === undefined ? 1 : o.sy, 1);
+  return geo;
+}
+
+/** 프로파일에서 특정 z 위치의 몸통 반지름 */
+function radiusAt(profile, z) {
+  for (let i = 0; i < profile.length - 1; i++) {
+    const a = profile[i];
+    const b = profile[i + 1];
+    const lo = Math.min(a[0], b[0]);
+    const hi = Math.max(a[0], b[0]);
+    if (z >= lo && z <= hi) {
+      const t = (z - a[0]) / (b[0] - a[0] || 1);
+      return mix(a[1], b[1], t);
+    }
+  }
+  return profile[profile.length - 1][1];
+}
+
+/**
+ * 등·배 투톤 피부 + 줄무늬/반점 (정점 색)
+ * opt: { back, belly, halfHeight, blend, stripe:{color,freq,phase,width,mix},
+ *        spot:{color,size,mix}, bellyGlow }
+ */
+function paintSkin(geo, opt) {
+  const pos = geo.attributes.position;
+  const n = pos.count;
+  const arr = new Float32Array(n * 3);
+  const back = new THREE.Color(opt.back);
+  const belly = new THREE.Color(opt.belly);
+  const c = new THREE.Color();
+  const other = new THREE.Color();
+  const hh = opt.halfHeight || 0.5;
+  const lo = opt.blend ? opt.blend[0] : -0.28;
+  const hi = opt.blend ? opt.blend[1] : 0.26;
+  const wave = opt.wave === undefined ? 0.12 : opt.wave;
+  const st = opt.stripe;
+  const sp = opt.spot;
+  for (let i = 0; i < n; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    // 등·배 경계를 물결지게 해 단조로운 가로선을 없앤다
+    const yy = y + Math.sin(z * 1.9 + x * 2.2) * wave * hh;
+    const t = smoothstep(lo, hi, yy / hh);
+    c.copy(belly).lerp(back, t);
+    // 배 쪽에 살짝 밝은 반사
+    if (opt.bellyGlow !== false) {
+      c.offsetHSL(0, 0, (1 - t) * 0.045);
+    }
+    if (st) {
+      const ph = (z - (st.phase || 0)) * st.freq + Math.sin(x * 3.1) * (st.wobble === undefined ? 0.5 : st.wobble);
+      const s = Math.sin(ph);
+      const soft = st.soft === undefined ? 0.15 : st.soft;
+      const kw = smoothstep(soft, soft + 0.4, s);
+      c.lerp(other.set(st.color), kw * (st.mix === undefined ? 0.92 : st.mix));
+      if (st.dark !== undefined) {
+        const kd = smoothstep(soft, soft + 0.4, -s);
+        c.lerp(other.set(st.dark), kd * (st.darkMix === undefined ? 0.45 : st.darkMix));
+      }
+    }
+    if (sp) {
+      const h = Math.sin(x * 21.7 + y * 13.3 + z * 17.9) * 43758.5453;
+      const f = h - Math.floor(h);
+      if (f > (sp.threshold === undefined ? 0.82 : sp.threshold)) {
+        other.set(sp.color);
+        c.lerp(other, (sp.mix === undefined ? 0.8 : sp.mix) * (0.3 + 0.7 * t));
+      }
+    }
+    arr[i * 3] = c.r;
+    arr[i * 3 + 1] = c.g;
+    arr[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+
+/**
+ * 얇은 판(지느러미) — xy 평면 도형을 두께만큼 밀어낸다.
+ * points: [[x, y], ...]  smooth: 스플라인으로 부드럽게 잇는다
+ */
+function plate(points, thickness, opts) {
+  const o = opts || {};
+  const t = thickness === undefined ? 0.05 : thickness;
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0][0], points[0][1]);
+  if (o.smooth) {
+    shape.splineThru(points.slice(1).map(([a, b]) => new THREE.Vector2(a, b)));
+  } else {
+    for (let i = 1; i < points.length; i++) shape.lineTo(points[i][0], points[i][1]);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: t,
+    bevelEnabled: true,
+    bevelThickness: t * 0.45,
+    bevelSize: t * 0.7,
+    bevelSegments: 2,
+    steps: 1,
+    curveSegments: o.curveSegments || 8,
+  });
+  geo.translate(0, 0, -t * 0.7);
+  return geo;
+}
+
+/** 세로 지느러미(등·꼬리) — (뒤로, 위로) 좌표계 → 몸통의 z-y 평면 */
+function vfin(points, thickness, color, opt) {
+  const g = plate(points, thickness, opt);
+  g.rotateY(-Math.PI / 2);              // +x → +z(뒤), +y → +y
+  return paint(g, color);
+}
+
+/** 가로 지느러미(가슴·배) — (옆으로, 앞뒤) 좌표계 → 몸통의 x-z 평면 */
+function hfin(points, thickness, color, opt) {
+  const g = plate(points, thickness, opt);
+  g.rotateX(-Math.PI / 2);              // +y → -z(앞)
+  return paint(g, color);
+}
+
+/** 순수 원뿔(이빨·가시) — 부드러운 6각 */
+function spikeGeo(r, h, seg) {
+  const g = new THREE.ConeGeometry(r, h, seg || 6, 1, false);
+  return g;
+}
+
+/** 눈 — 흰자 + 검은자(작은 반사점 포함) */
+function eyeParts(parts, x, y, z, size, outward) {
+  const white = new THREE.SphereGeometry(size, 10, 8);
+  white.scale(1, 1, 0.85);
+  parts.push(xf(paint(white, 0xf8fdff), [x, y, z]));
+  const pupil = new THREE.SphereGeometry(size * 0.56, 8, 6);
+  pupil.scale(1, 1, 0.75);
+  const ox = (outward === undefined ? (x >= 0 ? 1 : -1) : outward) * size * 0.52;
+  parts.push(xf(paint(pupil, 0x0b1014), [x + ox, y + size * 0.05, z - size * 0.34]));
+  const glint = new THREE.SphereGeometry(size * 0.2, 6, 5);
+  parts.push(xf(paint(glint, 0xffffff), [x + ox * 1.25, y + size * 0.34, z - size * 0.5]));
+  return parts;
+}
+
+/** 병합 후 꼬리 쪽으로 갈수록 커지는 굽힘 계수(aBend)를 심는다 */
+function bendify(geo, z0, z1) {
+  const p = geo.attributes.position;
+  const arr = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) {
+    arr[i] = clamp01((p.getZ(i) - z0) / (z1 - z0));
+  }
+  geo.setAttribute('aBend', new THREE.BufferAttribute(arr, 1));
+  return geo;
+}
+
+/** 조각들을 하나의 지오메트리로 (굽힘 계수 포함) */
+function assemble(parts, z0, z1) {
+  // 인덱스가 있는 조각과 없는 조각을 섞으면 병합이 실패한다 — 모두 비인덱스로 통일
+  const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+  const merged = mergeGeometries(flat, false);
+  merged.computeBoundingSphere();
+  bendify(merged, z0, z1);
+  return merged;
+}
+
+/** 유영 셰이더 재질 — 몸통이 좌우로 S 자로 흔들린다 */
+function swimMaterial(params, bend) {
+  const mat = new THREE.MeshPhongMaterial(params);
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = ANIM.time;
+    shader.uniforms.uBendAmp = { value: bend.amp };
+    shader.uniforms.uBendFreq = { value: bend.freq };
+    shader.uniforms.uBendSpeed = { value: bend.speed };
+    shader.vertexShader =
+      'uniform float uTime;\nuniform float uBendAmp;\nuniform float uBendFreq;\nuniform float uBendSpeed;\nattribute float aBend;\n' +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          float bt = aBend;
+          float seed = modelMatrix[3].x * 0.11 + modelMatrix[3].z * 0.07;
+          #ifdef USE_INSTANCING
+            seed = instanceMatrix[3].x * 0.11 + instanceMatrix[3].z * 0.07;
+          #endif
+          float ph = uTime * uBendSpeed + seed - bt * uBendFreq;
+          float k = bt * bt;
+          transformed.x += sin(ph) * uBendAmp * k;
+          transformed.y += cos(ph * 0.7) * uBendAmp * 0.16 * k;
+        }`
+      );
+  };
+  mat.customProgramCacheKey = () => 'swimBend';
+  return mat;
+}
+
+/** 같은 위상으로 꼬리 그룹을 흔든다 (셰이더 굽힘과 이어지게) */
+function tailSwing(m, t) {
+  const b = m.bend;
+  if (!b || !m.tail) return;
+  const seed = m.group.position.x * 0.11 + m.group.position.z * 0.07;
+  const ph = t * b.speed + seed - m.tailT * b.freq;
+  const k = m.tailT * m.tailT;
+  m.tail.position.x = Math.sin(ph) * b.amp * k;
+  m.tail.position.y = Math.cos(ph * 0.7) * b.amp * 0.16 * k;
+  m.tail.rotation.y = Math.sin(ph) * b.wag;
+}
+
+/**
+ * 어류 모델의 유영 갱신 — 모든 어류에 공통.
+ * t 는 ANIM.time.value 와 같은 값이어야 몸통 굽힘과 꼬리가 맞는다.
+ */
+export function swim(m, t) {
+  if (!m) return;
+  tailSwing(m, t);
+  if (m.fins) {
+    for (let i = 0; i < m.fins.length; i++) {
+      const f = m.fins[i];
+      f.obj.rotation[f.axis] = f.base + Math.sin(t * f.speed + f.phase) * f.amp;
+    }
+  }
+  if (m.jaw) {
+    m.jaw.rotation.x = m.jawBase + Math.sin(t * 1.3) * 0.06;
+  }
 }
 
 /* =========================================================
@@ -208,157 +481,265 @@ export function makeSubmarine() {
 }
 
 /* =========================================================
-   백상아리 — 살아 있는 상어
+   백상아리 — 유선형 몸통 · 회청색 등 / 흰 배
    ========================================================= */
+const SHARK_BEND = { amp: 0.15, freq: 3.3, speed: 3.4, wag: 0.40 };
+
 let _sharkGeo = null;
+let _sharkTailGeo = null;
+let _sharkMat = null;
+
 function sharkGeometry() {
   if (_sharkGeo) return _sharkGeo;
-  const BACK = 0x5d6c76;
-  const BELLY = 0xf1f6f5;
-  const FIN = 0x4c5860;
+  const BACK = 0x60727c;
+  const BELLY = 0xf4f9f8;
+  const FIN = 0x4e5d66;
+  const DARK = 0x3c4a52;
+  const TOOTH = 0xfbfdf6;
 
-  const body = new THREE.SphereGeometry(1, 16, 12);
-  body.scale(0.68, 0.62, 1.95);
-  const belly = new THREE.SphereGeometry(1, 14, 10);
-  belly.scale(0.6, 0.44, 1.76);
-  const snout = new THREE.ConeGeometry(0.52, 1.05, 10);
-  snout.rotateX(-Math.PI / 2);
-  const dorsal = new THREE.ConeGeometry(0.5, 1.2, 4);
-  const dorsal2 = new THREE.ConeGeometry(0.2, 0.42, 4);
-  const pec = new THREE.ConeGeometry(0.42, 1.15, 4);
-  pec.rotateZ(Math.PI / 2);
-  const pelvic = new THREE.ConeGeometry(0.1, 0.3, 4);
-  const tooth = new THREE.ConeGeometry(0.06, 0.2, 4);
-  const eye = new THREE.SphereGeometry(0.075, 6, 5);
-  const gill = new THREE.BoxGeometry(0.03, 0.3, 0.06);
-
-  const parts = [
-    placed(body, [0, 0, 0], [0, 0, 0], [1, 1, 1], BACK),
-    placed(belly, [0, -0.22, 0.05], [0, 0, 0], [1, 1, 1], BELLY),
-    placed(snout, [0, -0.02, -2.05], [0, 0, 0], [1, 1, 1], BACK),
+  const profile = [
+    [-2.15, 0.025], [-1.96, 0.13], [-1.72, 0.25], [-1.42, 0.37], [-1.05, 0.47],
+    [-0.60, 0.55], [-0.10, 0.585], [0.40, 0.55], [0.90, 0.45], [1.30, 0.33],
+    [1.65, 0.22], [1.90, 0.155], [2.02, 0.135],
   ];
-  // 등지느러미 (얇은 삼각 날)
-  parts.push(placed(dorsal, [0, 0.5, 0.1], [0.22, 0, 0], [0.16, 1, 1.55], FIN));
-  parts.push(placed(dorsal2, [0, 0.34, 1.5], [0.2, 0, 0], [0.14, 1, 1.2], FIN));
-  // 가슴지느러미
-  parts.push(placed(pec, [-0.62, -0.16, -0.34], [0, 0.25, 0.35], [1, 1, 0.9], FIN));
-  parts.push(placed(pec, [0.62, -0.16, -0.34], [0, -0.25, -0.35], [1, 1, 0.9], FIN));
-  // 배지느러미
-  parts.push(placed(pelvic, [-0.4, -0.4, 1.5], [0.4, 0, 0.5], [1, 1, 1], FIN));
-  parts.push(placed(pelvic, [0.4, -0.4, 1.5], [0.4, 0, -0.5], [1, 1, 1], FIN));
-  // 눈
-  parts.push(placed(eye, [-0.44, 0.16, -1.72], [0, 0, 0], [1, 1, 1], 0x10161a));
-  parts.push(placed(eye, [0.44, 0.16, -1.72], [0, 0, 0], [1, 1, 1], 0x10161a));
-  // 입 라인 + 이빨
-  parts.push(placed(new THREE.BoxGeometry(0.62, 0.05, 0.5), [0, -0.28, -1.85], [0.05, 0, 0], [1, 1, 1], 0x3a2226));
-  for (let i = 0; i < 7; i++) {
-    parts.push(placed(tooth, [-0.24 + i * 0.08, -0.24, -2.02], [Math.PI, 0, 0], [1, 1, 1], 0xf7fbf4));
-  }
-  // 아가미
-  for (let i = 0; i < 4; i++) {
-    parts.push(placed(gill, [-0.6, 0, -0.85 + i * 0.16], [0, 0, 0.2], [1, 1, 1], 0x3f4a52));
-    parts.push(placed(gill, [0.6, 0, -0.85 + i * 0.16], [0, 0, -0.2], [1, 1, 1], 0x3f4a52));
+  const body = bodyGeometry(profile, { radial: 22, sx: 0.74, sy: 0.99 });
+  paintSkin(body, { back: BACK, belly: BELLY, halfHeight: 0.585, blend: [-0.46, 0.16], wave: 0.2 });
+
+  const parts = [body];
+
+  // 등지느러미 (큰 삼각형, 뒤로 젖혀진 끝)
+  parts.push(xf(vfin([
+    [-0.34, 0.50], [-0.06, 0.86], [0.18, 1.20], [0.30, 1.28],
+    [0.36, 1.02], [0.55, 0.66], [0.70, 0.50],
+  ], 0.07, FIN), [0, 0.02, 0.02], [0, 0, 0], [1, 1, 0.92]));
+
+  // 제2등지느러미
+  parts.push(xf(vfin([
+    [-0.16, 0.28], [-0.02, 0.46], [0.10, 0.48], [0.16, 0.30],
+  ], 0.05, FIN), [0, 0.0, 1.32], [0, 0, 0], [1, 1, 1]));
+
+  // 뒷지느러미
+  parts.push(xf(vfin([
+    [-0.14, -0.26], [0.0, -0.42], [0.12, -0.44], [0.14, -0.26],
+  ], 0.05, FIN), [0, 0, 1.40], [0, 0, 0], [1, 1, 1]));
+
+  // 가슴지느러미 (좌우 · 뒤로 살짝 젖힘)
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.46], [0.52, 0.18], [0.96, -0.12], [1.22, -0.34],
+      [0.82, -0.46], [0.30, -0.40], [0, -0.16],
+    ].map(([x, y]) => [x * s, y]), 0.055, FIN),
+      [0.09 * s, -0.13, -0.55], [0, 0, -0.20 * s], [1, 1, 1]));
   }
 
-  _sharkGeo = mergeGeometries(parts, false);
+  // 배지느러미
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.16], [0.24, 0.02], [0.30, -0.14], [0.14, -0.16], [0, -0.06],
+    ].map(([x, y]) => [x * s, y]), 0.045, FIN),
+      [0.09 * s, -0.36, 1.16], [0, 0, 0], [1, 1, 1]));
+  }
+
+  // 눈 (흰자 + 검은자)
+  const reye = radiusAt(profile, -1.62) * 0.74;
+  for (const s of [-1, 1]) {
+    eyeParts(parts, reye * 0.86 * s, 0.17, -1.62, 0.098, s);
+  }
+
+  // 아가미 (얇은 홈)
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const z = -0.92 + i * 0.15;
+      const rr = radiusAt(profile, z) * 0.74;
+      const g = new THREE.BoxGeometry(0.022, 0.28, 0.045);
+      parts.push(xf(paint(g, DARK), [rr * 0.94 * s, -0.02, z], [0, 0, 0.16 * s], [1, 1, 1]));
+    }
+  }
+
+  // 입 — 아래턱 라인 + 작은 이빨 (몸통 표면에 붙인다)
+  const mz = -1.80;
+  const mr = radiusAt(profile, mz);
+  const mouthGeo = new THREE.SphereGeometry(1, 14, 8);
+  mouthGeo.scale(mr * 0.95, 0.05, 0.40);
+  parts.push(xf(paint(mouthGeo, 0x2a1e20), [0, -mr * 0.84, mz], [0.14, 0, 0], [1, 1, 1]));
+  for (let i = 0; i < 5; i++) {
+    const t = (i / 4 - 0.5) * 2;
+    const tooth = spikeGeo(0.021, 0.085, 5);
+    parts.push(xf(paint(tooth, TOOTH),
+      [t * mr * 0.55, -mr * 0.84, mz - 0.06], [Math.PI - 0.15, 0, 0], [1, 1, 1]));
+  }
+
+  _sharkGeo = assemble(parts, -0.9, 2.02);
   return _sharkGeo;
 }
 
-let _sharkTailGeo = null;
 function sharkTailGeometry() {
   if (_sharkTailGeo) return _sharkTailGeo;
-  const FIN = 0x4c5860;
-  const upper = new THREE.ConeGeometry(0.42, 1.35, 4);
-  const lower = new THREE.ConeGeometry(0.28, 0.8, 4);
-  _sharkTailGeo = mergeGeometries([
-    placed(upper, [0, 0.55, 0.32], [0, 0, 0.5], [0.12, 1, 1.4], FIN),
-    placed(lower, [0, -0.35, 0.3], [0, 0, -0.35], [0.12, 1, 1.3], FIN),
-  ], false);
+  const FIN = 0x4e5d66;
+  // 초승달 꼬리 — 위아래 갈라진 날
+  const g = vfin([
+    [0.00, 0.10], [0.20, 0.40], [0.46, 0.80], [0.62, 1.02],
+    [0.40, 0.42], [0.26, 0.04], [0.34, -0.34], [0.42, -0.66],
+    [0.24, -0.44], [0.06, -0.12],
+  ], 0.075, FIN, { smooth: true, curveSegments: 10 });
+  // 굽힘은 꼬리 그룹 회전으로 표현하므로 계수를 0 으로 둔다
+  bendify(g, 0, 1);
+  const ab = g.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  _sharkTailGeo = g;
   return _sharkTailGeo;
 }
 
-let _sharkMat = null;
 export function makeShark() {
   if (!_sharkMat) {
-    _sharkMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 22, specular: 0x2a4453 });
+    _sharkMat = swimMaterial(
+      { vertexColors: true, shininess: 26, specular: 0x33454f },
+      SHARK_BEND
+    );
   }
   const g = new THREE.Group();
-  const body = new THREE.Mesh(sharkGeometry(), _sharkMat);
-  g.add(body);
+  g.add(new THREE.Mesh(sharkGeometry(), _sharkMat));
   const tail = new THREE.Group();
-  tail.position.set(0, 0, 1.95);
+  tail.position.set(0, 0, 2.00);
   tail.add(new THREE.Mesh(sharkTailGeometry(), _sharkMat));
   g.add(tail);
-  return { group: g, tail, body };
+  return {
+    group: g, tail, body: g.children[0],
+    bend: SHARK_BEND, tailT: 0.93, fins: [],
+  };
 }
 
 /* =========================================================
-   귀상어(해머헤드)
+   귀상어(해머헤드) — 넓은 머리 날개
    ========================================================= */
+const HAMMER_BEND = { amp: 0.16, freq: 3.1, speed: 3.0, wag: 0.44 };
+
 let _hammerGeo = null;
+let _hammerTailGeo = null;
+let _hammerMat = null;
+
+function cephalofoil(span, opts) {
+  const o = opts || {};
+  const pts = [
+    [-1.0, 0.015], [-0.92, 0.10], [-0.68, 0.17], [-0.30, 0.205], [0.05, 0.21],
+    [0.42, 0.20], [0.74, 0.145], [0.94, 0.06],
+  ].map(([t, r]) => new THREE.Vector2(Math.max(0.01, r), t * span));
+  const geo = new THREE.LatheGeometry(pts, 16);
+  geo.rotateZ(-Math.PI / 2);                    // 축을 X(좌우) 로
+  geo.scale(o.sx === undefined ? 1 : o.sx, 0.55, 1.7);  // 납작 + 앞뒤로 넓게
+  return geo;
+}
+
 function hammerGeometry() {
   if (_hammerGeo) return _hammerGeo;
-  const BACK = 0x6f7669;
-  const BELLY = 0xeef3ea;
-  const FIN = 0x565c50;
+  const BACK = 0x6f776a;
+  const BELLY = 0xeef4ec;
+  const FIN = 0x565e52;
+  const DARK = 0x3f463c;
+  const TOOTH = 0xfbfdf6;
 
-  const body = new THREE.SphereGeometry(1, 16, 12);
-  body.scale(0.62, 0.56, 1.95);
-  const belly = new THREE.SphereGeometry(1, 14, 10);
-  belly.scale(0.54, 0.38, 1.74);
-  const head = new THREE.SphereGeometry(1, 14, 10);
-  head.scale(1.3, 0.2, 0.46);
-  const dorsal = new THREE.ConeGeometry(0.62, 1.6, 4);
-  const dorsal2 = new THREE.ConeGeometry(0.24, 0.5, 4);
-  const pec = new THREE.ConeGeometry(0.46, 1.25, 4);
-  pec.rotateZ(Math.PI / 2);
-  const eye = new THREE.SphereGeometry(0.1, 6, 5);
-  const mouth = new THREE.BoxGeometry(0.5, 0.06, 0.42);
-
-  const parts = [
-    placed(body, [0, 0, 0], [0, 0, 0], [1, 1, 1], BACK),
-    placed(belly, [0, -0.2, 0.05], [0, 0, 0], [1, 1, 1], BELLY),
-    placed(head, [0, 0.02, -1.95], [0, 0, 0], [1, 1, 1], BACK),
-    placed(dorsal, [0, 0.62, 0.05], [0.26, 0, 0], [0.15, 1, 1.5], FIN),
-    placed(dorsal2, [0, 0.36, 1.55], [0.22, 0, 0], [0.13, 1, 1.2], FIN),
-    placed(pec, [-0.6, -0.14, -0.3], [0, 0.28, 0.4], [1, 1, 0.95], FIN),
-    placed(pec, [0.6, -0.14, -0.3], [0, -0.28, -0.4], [1, 1, 0.95], FIN),
-    placed(mouth, [0, -0.16, -2.05], [0.04, 0, 0], [1, 1, 1], 0x3a2a2a),
+  const profile = [
+    [-1.92, 0.03], [-1.70, 0.16], [-1.40, 0.30], [-1.05, 0.42], [-0.65, 0.50],
+    [-0.20, 0.535], [0.35, 0.50], [0.85, 0.40], [1.25, 0.29], [1.60, 0.19],
+    [1.85, 0.14], [1.98, 0.13],
   ];
-  // 망치 머리 양 끝의 눈
-  parts.push(placed(eye, [-1.18, 0.04, -2.0], [0, 0, 0], [1, 1, 1], 0x121417));
-  parts.push(placed(eye, [1.18, 0.04, -2.0], [0, 0, 0], [1, 1, 1], 0x121417));
+  const body = bodyGeometry(profile, { radial: 22, sx: 0.76, sy: 0.97 });
+  paintSkin(body, { back: BACK, belly: BELLY, halfHeight: 0.54, blend: [-0.34, 0.3] });
 
-  _hammerGeo = mergeGeometries(parts, false);
+  const parts = [body];
+
+  // 망치 모양 머리
+  const head = cephalofoil(1.05, {});
+  parts.push(xf(paintSkin(head, { back: BACK, belly: BELLY, halfHeight: 0.2, blend: [-0.5, 0.4] }),
+    [0, 0.03, -1.74], [0, 0, 0], [1, 1, 1]));
+
+  // 등지느러미 (길고 뾰족)
+  parts.push(xf(vfin([
+    [-0.36, 0.48], [-0.10, 0.90], [0.10, 1.34], [0.22, 1.46],
+    [0.32, 1.10], [0.54, 0.66], [0.66, 0.48],
+  ], 0.07, FIN), [0, 0.0, 0.0], [0, 0, 0], [1, 1, 0.9]));
+
+  // 제2등지느러미
+  parts.push(xf(vfin([
+    [-0.14, 0.26], [0.0, 0.44], [0.12, 0.46], [0.15, 0.28],
+  ], 0.05, FIN), [0, 0.0, 1.28], [0, 0, 0], [1, 1, 1]));
+
+  // 가슴지느러미
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.34], [0.40, 0.12], [0.78, -0.12], [0.92, -0.30],
+      [0.60, -0.40], [0.22, -0.34], [0, -0.12],
+    ].map(([x, y]) => [x * s, y]), 0.055, FIN),
+      [0.08 * s, -0.20, -0.48], [0, 0, -0.20 * s], [1, 1, 1]));
+  }
+
+  // 배지느러미
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.14], [0.22, 0.02], [0.28, -0.12], [0.12, -0.14], [0, -0.06],
+    ].map(([x, y]) => [x * s, y]), 0.045, FIN),
+      [0.08 * s, -0.33, 1.08], [0, 0, 0], [1, 1, 1]));
+  }
+
+  // 눈 — 망치 끝
+  for (const s of [-1, 1]) {
+    eyeParts(parts, 0.99 * s, 0.03, -1.78, 0.09, s);
+  }
+
+  // 입
+  const mouth = new THREE.BoxGeometry(0.46, 0.05, 0.36);
+  parts.push(xf(paint(mouth, 0x2a2c22), [0, -0.20, -1.90], [0.04, 0, 0], [1, 1, 1]));
+  for (let i = 0; i < 6; i++) {
+    const t = (i / 5 - 0.5) * 2;
+    parts.push(xf(paint(spikeGeo(0.03, 0.13, 5), TOOTH),
+      [t * 0.19, -0.19, -1.92], [Math.PI, 0, 0], [1, 1, 1]));
+  }
+  // 아가미 홈
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const z = -0.72 + i * 0.14;
+      const rr = radiusAt(profile, z) * 0.76;
+      const g = new THREE.BoxGeometry(0.02, 0.26, 0.04);
+      parts.push(xf(paint(g, DARK), [rr * 0.94 * s, -0.02, z], [0, 0, 0.16 * s], [1, 1, 1]));
+    }
+  }
+
+  _hammerGeo = assemble(parts, -0.8, 1.98);
   return _hammerGeo;
 }
 
-let _hammerTailGeo = null;
 function hammerTailGeometry() {
   if (_hammerTailGeo) return _hammerTailGeo;
-  const FIN = 0x565c50;
-  const upper = new THREE.ConeGeometry(0.5, 1.7, 4);
-  const lower = new THREE.ConeGeometry(0.3, 0.9, 4);
-  _hammerTailGeo = mergeGeometries([
-    placed(upper, [0, 0.7, 0.35], [0, 0, 0.55], [0.12, 1, 1.45], FIN),
-    placed(lower, [0, -0.4, 0.3], [0, 0, -0.4], [0.12, 1, 1.35], FIN),
-  ], false);
+  const FIN = 0x565e52;
+  const g = vfin([
+    [0.00, 0.10], [0.24, 0.52], [0.44, 0.96], [0.56, 1.16],
+    [0.36, 0.46], [0.24, 0.02], [0.30, -0.36], [0.36, -0.62],
+    [0.20, -0.40], [0.05, -0.10],
+  ], 0.07, FIN, { smooth: true, curveSegments: 10 });
+  bendify(g, 0, 1);
+  const ab = g.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  _hammerTailGeo = g;
   return _hammerTailGeo;
 }
 
-let _hammerMat = null;
 export function makeHammerhead() {
   if (!_hammerMat) {
-    _hammerMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 18, specular: 0x2a3a33 });
+    _hammerMat = swimMaterial(
+      { vertexColors: true, shininess: 20, specular: 0x2d3a32 },
+      HAMMER_BEND
+    );
   }
   const g = new THREE.Group();
-  const body = new THREE.Mesh(hammerGeometry(), _hammerMat);
-  g.add(body);
+  g.add(new THREE.Mesh(hammerGeometry(), _hammerMat));
   const tail = new THREE.Group();
-  tail.position.set(0, 0, 1.95);
+  tail.position.set(0, 0, 1.96);
   tail.add(new THREE.Mesh(hammerTailGeometry(), _hammerMat));
   g.add(tail);
-  return { group: g, tail, body };
+  return {
+    group: g, tail, body: g.children[0],
+    bend: HAMMER_BEND, tailT: 0.94, fins: [],
+  };
 }
 
 /* =========================================================
@@ -366,16 +747,16 @@ export function makeHammerhead() {
    ========================================================= */
 let _jellyGeo = null;
 let _jellyTentGeo = null;
+let _jellyGeoCore = null;
+let _jellyBell = null;
+
 function jellyGeometries() {
   if (_jellyGeo) return;
-  const bell = new THREE.SphereGeometry(0.85, 12, 9, 0, Math.PI * 2, 0, Math.PI * 0.62);
-  const rim = new THREE.TorusGeometry(0.8, 0.055, 6, 20);
+  const bell = new THREE.SphereGeometry(0.85, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62);
+  const rim = new THREE.TorusGeometry(0.8, 0.055, 6, 22);
   rim.rotateX(Math.PI / 2);
-  const core = new THREE.SphereGeometry(0.3, 8, 6);
-  _jellyGeo = mergeGeometries([
-    placed(rim, [0, 0, 0], [0, 0, 0], [1, 1, 1], 0xffffff),
-  ], false);
-  _jellyGeoCore = core;
+  _jellyGeo = mergeGeometries([paint(rim, 0xffffff)], false);
+  _jellyGeoCore = new THREE.SphereGeometry(0.3, 8, 6);
   _jellyBell = bell;
 
   const parts = [];
@@ -388,8 +769,6 @@ function jellyGeometries() {
   }
   _jellyTentGeo = mergeGeometries(parts, false);
 }
-let _jellyGeoCore = null;
-let _jellyBell = null;
 
 export function makeJellyfish(color) {
   jellyGeometries();
@@ -429,62 +808,76 @@ export function makeJellyfish(color) {
 }
 
 /* =========================================================
-   독가시 복어 — 부풀어 오르는 가시 복어
+   독가시 복어 — 둥근 몸통 · 짧은 부채 꼬리
    ========================================================= */
+const PUFFER_BEND = { amp: 0.07, freq: 2.4, speed: 2.2, wag: 0.30 };
+
 let _pufferBodyGeo = null;
+let _pufferTailGeo = null;
 let _pufferSpikeGeo = null;
+let _pufferMat = null;
+let _pufferSpikeMat = null;
+
 function pufferGeometries() {
   if (_pufferBodyGeo) return;
-  const BODY = 0xf0cd6a;
-  const BELLY = 0xfff4d2;
+  const BODY = 0xd9aa52;
+  const BELLY = 0xfff5d8;
   const FIN = 0xe0b45c;
+  const SPOT = 0x5a3f22;
+  const MOUTH = 0xc08a58;
 
-  const body = new THREE.SphereGeometry(0.92, 16, 12);
-  body.scale(1, 0.94, 1.12);
-  const belly = new THREE.SphereGeometry(0.86, 14, 10);
-  belly.scale(1, 0.6, 1.08);
-  const dorsal = new THREE.ConeGeometry(0.22, 0.5, 4);
-  const caudal = new THREE.ConeGeometry(0.34, 0.55, 4);
-  caudal.rotateX(Math.PI / 2);
-  const pec = new THREE.ConeGeometry(0.2, 0.45, 4);
-  pec.rotateZ(Math.PI / 2);
-  const eye = new THREE.SphereGeometry(0.14, 8, 6);
-  const pupil = new THREE.SphereGeometry(0.07, 6, 5);
-  const mouth = new THREE.TorusGeometry(0.13, 0.05, 6, 12);
-
-  const parts = [
-    placed(body, [0, 0, 0], [0, 0, 0], [1, 1, 1], BODY),
-    placed(belly, [0, -0.3, 0], [0, 0, 0], [1, 1, 1], BELLY),
-    placed(dorsal, [0, 0.86, 0.12], [0.1, 0, 0], [0.35, 1, 1], FIN),
-    placed(caudal, [0, 0.1, 1.02], [0, 0, 0], [1, 1, 1], FIN),
-    placed(pec, [-0.88, -0.05, -0.1], [0, 0, 0.25], [1, 1, 1], FIN),
-    placed(pec, [0.88, -0.05, -0.1], [0, 0, -0.25], [1, 1, 1], FIN),
-    placed(mouth, [0, -0.12, -0.98], [0, 0, 0], [1, 1, 1], 0xb07a48),
+  const profile = [
+    [-0.96, 0.03], [-0.86, 0.34], [-0.70, 0.58], [-0.50, 0.74], [-0.26, 0.84],
+    [0.00, 0.87], [0.26, 0.83], [0.50, 0.72], [0.70, 0.55], [0.84, 0.34],
+    [0.92, 0.18],
   ];
-  // 눈 (흰자 + 검은 동자)
-  parts.push(placed(eye, [-0.34, 0.28, -0.8], [0, 0, 0], [1, 1, 1], 0xfdf6e2));
-  parts.push(placed(eye, [0.34, 0.28, -0.8], [0, 0, 0], [1, 1, 1], 0xfdf6e2));
-  parts.push(placed(pupil, [-0.36, 0.29, -0.9], [0, 0, 0], [1, 1, 1], 0x14100c));
-  parts.push(placed(pupil, [0.36, 0.29, -0.9], [0, 0, 0], [1, 1, 1], 0x14100c));
+  const body = bodyGeometry(profile, { radial: 22, sx: 0.94, sy: 0.92 });
+  paintSkin(body, {
+    back: BODY, belly: BELLY, halfHeight: 0.80, blend: [-0.42, 0.34],
+    spot: { color: SPOT, threshold: 0.90, mix: 0.5 },
+  });
+  const parts = [body];
 
-  // 등·배의 검은 반점
-  const spot = new THREE.SphereGeometry(0.07, 6, 4);
-  const R = 0.9;
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2;
-    const b = -0.9 + (i % 3) * 0.5;
-    parts.push(placed(spot,
-      [Math.cos(a) * R * 0.8, 0.35 + b * 0.35, Math.sin(a) * R * 0.85],
-      [0, 0, 0], [1, 1, 1], 0x4a3320));
+  // 등지느러미 · 뒷지느러미 (부드러운 부채)
+  parts.push(xf(vfin([
+    [-0.20, 0.70], [-0.06, 0.94], [0.10, 0.96], [0.22, 0.72],
+  ], 0.05, FIN, { smooth: true }), [0, 0.0, 0.16], [0, 0, 0], [1, 1, 1]));
+  parts.push(xf(vfin([
+    [-0.20, -0.70], [-0.06, -0.92], [0.10, -0.94], [0.22, -0.70],
+  ], 0.05, FIN, { smooth: true }), [0, 0.0, 0.20], [0, 0, 0], [1, 1, 1]));
+
+  // 가슴지느러미 (작고 둥글다)
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.16], [0.20, 0.06], [0.26, -0.10], [0.12, -0.16], [0, -0.08],
+    ].map(([x, y]) => [x * s, y]), 0.04, FIN, { smooth: true }),
+      [0.80 * s, -0.06, -0.10], [0, 0.3 * s, -0.25 * s], [1, 1, 1]));
   }
 
-  _pufferBodyGeo = mergeGeometries(parts, false);
+  // 눈 (크고 동그랗다) + 입
+  for (const s of [-1, 1]) {
+    eyeParts(parts, 0.42 * s, 0.21, -0.76, 0.105, s);
+  }
+  const mouth = new THREE.TorusGeometry(0.085, 0.032, 6, 14);
+  parts.push(xf(paint(mouth, MOUTH), [0, -0.14, -0.90], [0, 0, 0], [1, 1, 1]));
 
-  // 가시 — 공 모양으로 고르게 뻗은 삼각침
-  const spikeG = new THREE.ConeGeometry(0.075, 0.5, 4);
+  _pufferBodyGeo = assemble(parts, -0.7, 0.9);
+
+  // 꼬리 — 짧은 부채 (세로)
+  const tail = vfin([
+    [0, 0.26], [0.24, 0.40], [0.38, 0.30], [0.42, 0.02],
+    [0.36, -0.24], [0.20, -0.34], [0, -0.22],
+  ], 0.04, FIN, { smooth: true });
+  bendify(tail, 0, 1);
+  const ab = tail.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  _pufferTailGeo = tail;
+
+  // 가시 — 부드러운 6각 침
+  const spikeG = spikeGeo(0.045, 0.30, 6);
   const spikeParts = [];
   const up = new THREE.Vector3(0, 1, 0);
-  const n = 36;
+  const n = 72;
   for (let i = 0; i < n; i++) {
     const phi = Math.acos(1 - (2 * (i + 0.5)) / n);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
@@ -494,175 +887,313 @@ function pufferGeometries() {
       Math.sin(phi) * Math.sin(theta)
     );
     const geo = spikeG.clone();
-    const q = new THREE.Quaternion().setFromUnitVectors(up, d);
+    const q = new THREE.Quaternion().setFromUnitVectors(up, d.normalize());
     const m = new THREE.Matrix4().compose(
-      d.clone().multiplyScalar(0.88),
+      d.clone().multiplyScalar(0.80),
       q,
       new THREE.Vector3(1, 1, 1)
     );
     geo.applyMatrix4(m);
-    spikeParts.push(paint(geo, 0xdca24a));
+    spikeParts.push(paint(geo, 0xd9a252));
   }
   _pufferSpikeGeo = mergeGeometries(spikeParts, false);
+
+  if (!_pufferMat) {
+    _pufferMat = swimMaterial(
+      { vertexColors: true, shininess: 34, specular: 0x6b5a30 },
+      PUFFER_BEND
+    );
+    _pufferSpikeMat = new THREE.MeshPhongMaterial({
+      vertexColors: true, shininess: 70, specular: 0x8a7340,
+    });
+  }
 }
 
-let _pufferMat = null;
-let _pufferSpikeMat = null;
 export function makePuffer() {
   pufferGeometries();
-  if (!_pufferMat) {
-    _pufferMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 34, specular: 0x6b5a30 });
-    _pufferSpikeMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x8a7340 });
-  }
   const g = new THREE.Group();
   const body = new THREE.Mesh(_pufferBodyGeo, _pufferMat);
   const spikes = new THREE.Mesh(_pufferSpikeGeo, _pufferSpikeMat);
-  g.add(body, spikes);
-  return { group: g, body, spikes, tail: null };
+  const tail = new THREE.Group();
+  tail.position.set(0, 0, 0.90);
+  tail.add(new THREE.Mesh(_pufferTailGeo, _pufferMat));
+  g.add(body, spikes, tail);
+  return {
+    group: g, body, spikes, tail,
+    bend: PUFFER_BEND, tailT: 0.95, fins: [],
+  };
 }
 
 /* =========================================================
-   쏠배감펭(lionfish) — 긴 독가시 지느러미를 편 채 떠다니는 물고기
+   쏠배감펭(lionfish) — 세로로 넓적한 몸 · 줄무늬 · 부채 지느러미
    ========================================================= */
+const LION_BEND = { amp: 0.11, freq: 2.9, speed: 2.6, wag: 0.34 };
+
 let _lionGeo = null;
-let _lionFinGeo = null;
-function lionGeometries() {
-  if (_lionGeo) return;
-  const BODY = 0xd2542f;
-  const STRIPE = 0xfff1e2;
-  const FIN = 0xe8794a;
-
-  const body = new THREE.SphereGeometry(1, 16, 12);
-  body.scale(0.5, 0.66, 1.2);
-  const head = new THREE.SphereGeometry(1, 14, 10);
-  head.scale(0.46, 0.5, 0.56);
-  const eye = new THREE.SphereGeometry(0.1, 8, 6);
-  const mouth = new THREE.BoxGeometry(0.24, 0.09, 0.16);
-
-  const parts = [
-    placed(body, [0, 0, 0], [0, 0, 0], [1, 1, 1], BODY),
-    placed(head, [0, 0.04, -1.0], [0, 0, 0], [1, 1, 1], BODY),
-    placed(eye, [-0.22, 0.2, -1.28], [0, 0, 0], [1, 1, 1], 0x1b1310),
-    placed(eye, [0.22, 0.2, -1.28], [0, 0, 0], [1, 1, 1], 0x1b1310),
-    placed(mouth, [0, -0.18, -1.34], [0.1, 0, 0], [1, 1, 1], 0x8a3a2a),
-  ];
-  // 흰 세로 줄무늬
-  for (let i = 0; i < 4; i++) {
-    parts.push(placed(new THREE.BoxGeometry(0.66, 0.94 - i * 0.09, 0.1),
-      [0, 0.02, -0.42 + i * 0.36], [0, 0, 0], [1, 1, 1], STRIPE));
-  }
-  _lionGeo = mergeGeometries(parts, false);
-
-  const finParts = [];
-  const ray = new THREE.ConeGeometry(0.042, 1.7, 4);
-  // 등지느러미 — 위로 부채꼴
-  for (let i = 0; i < 9; i++) {
-    const t = (i / 8 - 0.5) * 2;
-    finParts.push(placed(ray,
-      [0, 0.5 + Math.abs(t) * 0.05, 0.6 - i * 0.24],
-      [0, 0, t * 0.9], [1, i < 4 ? 1 : 0.72, 1], FIN));
-  }
-  // 큰 가슴지느러미 — 좌우 부채
-  for (let s = -1; s <= 1; s += 2) {
-    for (let i = 0; i < 5; i++) {
-      const t = (i / 4 - 0.5) * 2;
-      finParts.push(placed(ray,
-        [s * 0.34, -0.05, -0.25],
-        [t * 1.1, t * 0.5, s * (1.2 + Math.abs(t) * 0.2)], [1, 0.9, 1], FIN));
-    }
-  }
-  _lionFinGeo = mergeGeometries(finParts, false);
-}
-
+let _lionTailGeo = null;
+let _lionFanL = null;
+let _lionFanR = null;
 let _lionMat = null;
 let _lionFinMat = null;
-export function makeLionfish() {
-  lionGeometries();
+
+function lionGeometries() {
+  if (_lionGeo) return;
+  const BODY = 0xc4482c;
+  const STRIPE = 0xfff0e0;
+  const FIN = 0xe8764d;
+  const DARK = 0x8f2f1e;
+
+  const profile = [
+    [-1.02, 0.03], [-0.92, 0.20], [-0.78, 0.36], [-0.60, 0.50], [-0.36, 0.60],
+    [-0.06, 0.655], [0.24, 0.62], [0.50, 0.50], [0.72, 0.34], [0.88, 0.18],
+    [0.96, 0.10],
+  ];
+  const body = bodyGeometry(profile, { radial: 20, sx: 0.40, sy: 1.02 });
+  paintSkin(body, {
+    back: BODY, belly: 0xa8381f, halfHeight: 0.66,
+    blend: [-0.75, 0.55], wave: 0.3,
+    stripe: {
+      color: 0xfff2e4, freq: 16.0, phase: -0.55, mix: 0.95,
+      dark: 0x7c2413, darkMix: 0.55, soft: 0.2, wobble: 0.45,
+    },
+  });
+
+  const parts = [body];
+
+  // 등지느러미 — 물결치는 막 + 긴 가시 줄
+  parts.push(xf(vfin([
+    [-0.44, 0.48], [-0.24, 0.84], [0.00, 0.97], [0.22, 0.88],
+    [0.44, 0.93], [0.66, 0.80], [0.88, 0.60], [1.00, 0.44],
+    [0.86, 0.40], [0.48, 0.43], [0.10, 0.45], [-0.30, 0.45],
+  ], 0.028, FIN, { smooth: true }), [0, 0, 0], [0, 0, 0], [1, 1, 1]));
+
+  const rayParts = [];
+  for (let i = 0; i < 9; i++) {
+    const t = i / 8;
+    const z = -0.30 + t * 1.10;
+    const h = 0.62 - Math.abs(t - 0.34) * 0.34;
+    const g = spikeGeo(0.022, h, 5);
+    const lean = -0.22 + t * 0.5;
+    rayParts.push(xf(paint(g, 0xf2c6a8), [0, 0.50 + h * 0.42, z], [lean, 0, 0], [1, 1, 1]));
+  }
+  parts.push(mergeGeometries(rayParts, false));
+
+  // 배지느러미 · 뒷지느러미 가시
+  const lowRays = [];
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const h = 0.40 - t * 0.13;
+    const g = spikeGeo(0.02, h, 5);
+    lowRays.push(xf(paint(g, FIN), [0, -0.44 - h * 0.44, 0.0 + t * 0.62],
+      [Math.PI + 0.28 - t * 0.5, 0, 0], [1, 1, 1]));
+  }
+  parts.push(mergeGeometries(lowRays, false));
+
+  // 눈 (몸통 옆면)
+  for (const s of [-1, 1]) {
+    eyeParts(parts, 0.30 * s, 0.20, -0.80, 0.085, s);
+  }
+  // 입
+  const mouth = new THREE.BoxGeometry(0.24, 0.10, 0.16);
+  parts.push(xf(paint(mouth, DARK), [0, -0.16, -0.98], [0.12, 0, 0], [1, 1, 1]));
+
+  _lionGeo = assemble(parts, -0.9, 0.95);
+
+  // 꼬리 — 큰 부채
+  const tail = vfin([
+    [0.00, 0.10], [0.22, 0.46], [0.40, 0.62], [0.52, 0.52],
+    [0.46, 0.10], [0.52, -0.34], [0.40, -0.56], [0.20, -0.42],
+  ], 0.035, FIN, { smooth: true });
+  bendify(tail, 0, 1);
+  const ab = tail.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  _lionTailGeo = tail;
+
+  // 가슴지느러미 부채 (좌우 · 퍼덕임)
+  function fan(sign) {
+    const shape = new THREE.Shape();
+    const n = 24;
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = -0.62 + (i / n) * 1.68;
+      const r = 0.86 + Math.sin(i * 2.6) * 0.018;
+      pts.push([Math.cos(a) * r * 0.92 * sign, Math.sin(a) * r]);
+    }
+    shape.moveTo(0, 0);
+    for (const [x, y] of pts) shape.lineTo(x, y);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.022, bevelEnabled: false, steps: 1, curveSegments: 6,
+    });
+    geo.rotateX(-Math.PI / 2);    // 수평으로 눕힌 부채
+    geo.rotateZ(0.30 * sign);     // 바깥으로 살짝 기울임
+    return paint(geo, 0xef8f66);
+  }
+  _lionFanL = fan(-1);
+  _lionFanR = fan(1);
+
   if (!_lionMat) {
-    _lionMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 40, specular: 0x8a4a30 });
+    _lionMat = swimMaterial(
+      { vertexColors: true, shininess: 44, specular: 0x8a4a30 },
+      LION_BEND
+    );
     _lionFinMat = new THREE.MeshPhongMaterial({
-      vertexColors: true, shininess: 26, specular: 0x5a3320,
-      side: THREE.DoubleSide, transparent: true, opacity: 0.92,
+      vertexColors: true, shininess: 22, specular: 0x5a3320,
+      side: THREE.DoubleSide, transparent: true, opacity: 0.88,
     });
   }
+}
+
+export function makeLionfish() {
+  lionGeometries();
   const g = new THREE.Group();
   const body = new THREE.Mesh(_lionGeo, _lionMat);
-  const fins = new THREE.Mesh(_lionFinGeo, _lionFinMat);
-  g.add(body, fins);
-  return { group: g, body, fins, tail: null };
+  g.add(body);
+
+  const pivotL = new THREE.Group();
+  pivotL.position.set(-0.28, -0.02, -0.22);
+  pivotL.add(new THREE.Mesh(_lionFanL, _lionFinMat));
+  const pivotR = new THREE.Group();
+  pivotR.position.set(0.28, -0.02, -0.22);
+  pivotR.add(new THREE.Mesh(_lionFanR, _lionFinMat));
+  g.add(pivotL, pivotR);
+
+  const tail = new THREE.Group();
+  tail.position.set(0, 0, 0.92);
+  tail.add(new THREE.Mesh(_lionTailGeo, _lionFinMat));
+  g.add(tail);
+
+  return {
+    group: g, body, tail, bend: LION_BEND, tailT: 0.95,
+    fins: [
+      { obj: pivotL, axis: 'z', base: 0.15, amp: 0.30, speed: 2.1, phase: 0.0 },
+      { obj: pivotR, axis: 'z', base: -0.15, amp: -0.30, speed: 2.1, phase: 0.0 },
+    ],
+  };
 }
 
 /* =========================================================
-   심해 아귀 — 유인 돌기를 밝히는 심해 포식자
+   심해 아귀 — 큰 입 · 유인 돌기
    ========================================================= */
-export function makeAnglerfish() {
-  const g = new THREE.Group();
-  const skin = new THREE.MeshPhongMaterial({
-    color: 0x2d3f52, shininess: 26, specular: 0x33506b, emissive: 0x081420, emissiveIntensity: 0.6,
-  });
-  const jawMat = new THREE.MeshPhongMaterial({ color: 0x3a4d60, shininess: 18, specular: 0x2a3a48 });
+const ANGLER_BEND = { amp: 0.08, freq: 2.0, speed: 1.9, wag: 0.26 };
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.95, 14, 11), skin);
-  body.scale.set(0.95, 0.85, 0.8);
-  g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 11), skin);
-  head.scale.set(1.05, 0.9, 0.7);
-  head.position.set(0, 0.05, -0.85);
-  g.add(head);
+let _anglerGeo = null;
+let _anglerJawGeo = null;
+let _anglerTailGeo = null;
+let _anglerMat = null;
+let _anglerJawMat = null;
 
-  // 입 (아래턱이 열린다)
-  const jaw = new THREE.Group();
-  jaw.position.set(0, -0.28, -1.1);
-  const jawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), jawMat);
-  jawMesh.scale.set(0.95, 0.28, 0.6);
-  jawMesh.position.set(0, -0.1, -0.18);
-  jaw.add(jawMesh);
-  g.add(jaw);
+function anglerGeometries() {
+  if (_anglerGeo) return;
+  const SKIN = 0x3a5064;
+  const BELLY = 0x6b8298;
+  const TOOTH = 0xf2f7ea;
 
-  // 이빨
-  const toothG = new THREE.ConeGeometry(0.07, 0.28, 4);
-  for (let i = 0; i < 7; i++) {
-    const t = -0.45 + (i / 6) * 0.9;
-    const tt = new THREE.Mesh(toothG, MET.bone);
-    tt.position.set(t, -0.3, -1.35);
-    tt.rotation.x = Math.PI;
-    g.add(tt);
-    const tb = new THREE.Mesh(toothG, MET.bone);
-    tb.position.set(t, -0.16, -1.28);
-    tb.scale.setScalar(0.8);
-    jaw.add(tb);
+  // 머리가 크게 부푼 몸통
+  const profile = [
+    [-1.30, 0.04], [-1.14, 0.34], [-0.94, 0.60], [-0.66, 0.80], [-0.30, 0.92],
+    [0.06, 0.94], [0.42, 0.84], [0.72, 0.60], [0.94, 0.32], [1.06, 0.14],
+  ];
+  const body = bodyGeometry(profile, { radial: 20, sx: 0.86, sy: 0.86 });
+  paintSkin(body, { back: SKIN, belly: BELLY, halfHeight: 0.9, blend: [-0.5, 0.2] });
+  const parts = [body];
+
+  // 위턱 이빨
+  for (let i = 0; i < 8; i++) {
+    const t = (i / 7 - 0.5) * 2;
+    const g = spikeGeo(0.028, 0.17, 5);
+    parts.push(xf(paint(g, TOOTH), [t * 0.32, -0.32, -1.16 + Math.abs(t) * 0.16],
+      [Math.PI - 0.3, 0, 0], [1, 1, 1]));
+  }
+  // 눈 (작고 밝다)
+  for (const s of [-1, 1]) {
+    eyeParts(parts, 0.44 * s, 0.34, -1.02, 0.075, s);
+  }
+  // 가슴지느러미 (둥근 부채)
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.20], [0.24, 0.16], [0.34, -0.02], [0.26, -0.20], [0.04, -0.16],
+    ].map(([x, y]) => [x * s, y]), 0.04, SKIN, { smooth: true }),
+      [0.70 * s, -0.34, -0.62], [0, 0.2 * s, -0.3 * s], [1, 1, 1]));
   }
 
-  // 눈
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xa9f0ff });
-  const eyeG = new THREE.SphereGeometry(0.11, 8, 6);
-  g.add(mesh(eyeG, eyeMat, -0.34, 0.32, -1.42));
-  g.add(mesh(eyeG, eyeMat, 0.34, 0.32, -1.42));
+  _anglerGeo = assemble(parts, -0.7, 1.05);
 
-  // 꼬리 지느러미
-  const tailG = new THREE.ConeGeometry(0.45, 0.7, 4);
-  tailG.rotateX(Math.PI / 2);
-  const tail = new THREE.Mesh(tailG, skin);
-  tail.position.set(0, 0, 0.95);
-  tail.scale.set(1, 1.3, 1);
+  // 아래턱 (열린다)
+  const jawProfile = [
+    [-0.62, 0.02], [-0.5, 0.22], [-0.28, 0.36], [0.0, 0.40], [0.24, 0.32], [0.42, 0.18],
+  ];
+  const jaw = bodyGeometry(jawProfile, { radial: 16, sx: 0.84, sy: 0.5 });
+  paintSkin(jaw, { back: SKIN, belly: BELLY, halfHeight: 0.34, blend: [-0.4, 0.3] });
+  const jawParts = [jaw];
+  for (let i = 0; i < 7; i++) {
+    const t = (i / 6 - 0.5) * 2;
+    const g = spikeGeo(0.024, 0.15, 5);
+    jawParts.push(xf(paint(g, TOOTH), [t * 0.28, 0.15, -0.58 + Math.abs(t) * 0.14],
+      [0.3, 0, 0], [1, 1, 1]));
+  }
+  _anglerJawGeo = mergeGeometries(jawParts, false);
+  bendify(_anglerJawGeo, -0.7, 1.05);
+
+  // 꼬리 — 둥근 부채
+  const tail = vfin([
+    [0.0, 0.14], [0.24, 0.40], [0.40, 0.46], [0.50, 0.26],
+    [0.48, -0.02], [0.38, -0.30], [0.16, -0.34], [-0.02, -0.14],
+  ], 0.045, SKIN, { smooth: true });
+  bendify(tail, 0, 1);
+  const ab = tail.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  _anglerTailGeo = tail;
+
+  if (!_anglerMat) {
+    _anglerMat = swimMaterial({
+      vertexColors: true, shininess: 30, specular: 0x3a5468,
+      emissive: 0x081420, emissiveIntensity: 0.55,
+    }, ANGLER_BEND);
+    _anglerJawMat = swimMaterial({
+      vertexColors: true, shininess: 20, specular: 0x2a3a48,
+    }, ANGLER_BEND);
+  }
+}
+
+export function makeAnglerfish() {
+  anglerGeometries();
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(_anglerGeo, _anglerMat));
+
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -0.34, -1.14);
+  jaw.add(new THREE.Mesh(_anglerJawGeo, _anglerJawMat));
+  g.add(jaw);
+
+  const tail = new THREE.Group();
+  tail.position.set(0, 0, 1.04);
+  tail.add(new THREE.Mesh(_anglerTailGeo, _anglerJawMat));
   g.add(tail);
 
-  // 유인 돌기
-  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.5, 5), skin);
-  stalk.position.set(0.2, 0.85, -1.0);
-  stalk.rotation.x = -0.5;
+  // 유인 돌기 — 머리에서 앞으로 휘어진 줄기
+  const stalkCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.14, 0.72, -0.78),
+    new THREE.Vector3(0.18, 1.16, -0.86),
+    new THREE.Vector3(0.16, 1.50, -1.16),
+    new THREE.Vector3(0.12, 1.58, -1.44),
+  ]);
+  const stalk = new THREE.Mesh(new THREE.TubeGeometry(stalkCurve, 12, 0.035, 6, false), _anglerMat);
   g.add(stalk);
   const lure = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2, 10, 8),
+    new THREE.SphereGeometry(0.17, 10, 8),
     new THREE.MeshBasicMaterial({ color: 0xc8fff4 })
   );
-  lure.position.set(0.2, 1.55, -1.6);
+  lure.position.set(0.12, 1.58, -1.50);
   g.add(lure);
-  const glow = spriteGlow(0x8ffff0, 3.6, 0.8);
+  const glow = spriteGlow(0x8ffff0, 3.4, 0.8);
   glow.position.copy(lure.position);
   g.add(glow);
 
-  return { group: g, jaw, lure, glow, tail };
+  return {
+    group: g, jaw, lure, glow, tail,
+    jawBase: 0.10, bend: ANGLER_BEND, tailT: 0.95, fins: [],
+  };
 }
 
 /* =========================================================
@@ -790,7 +1321,7 @@ export function makeKraken() {
   beak.position.set(0, -1.05, -2.9);
   g.add(beak);
 
-  // 다리 8가닥 — 앞쪽으로 부채꼴로 뗨친다
+  // 다리 8가닥 — 앞쪽으로 부채꼴로 뻗친다
   const arms = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
@@ -1033,22 +1564,65 @@ export function makeTurtle() {
 }
 
 /* =========================================================
-   물고기 떼 (InstancedMesh)
+   관상 물고기 떼 (InstancedMesh)
    ========================================================= */
+const SCHOOL_BEND = { amp: 0.085, freq: 2.6, speed: 6.5, wag: 0.0 };
+let _schoolGeo = null;
+let _schoolMat = null;
+
 export function makeFishGeometry() {
-  const body = new THREE.SphereGeometry(0.22, 8, 6);
-  body.scale(0.55, 0.85, 2.0);
-  const tail = new THREE.ConeGeometry(0.18, 0.42, 4);
-  tail.rotateX(-Math.PI / 2);
-  tail.translate(0, 0, 0.52);
-  const geo = mergeGeometries([body, tail], false);
-  return geo;
+  if (_schoolGeo) return _schoolGeo;
+  const GRAY_BACK = 0.60;
+  const id = 0xffffff;
+
+  const profile = [
+    [-0.50, 0.02], [-0.40, 0.09], [-0.28, 0.155], [-0.12, 0.195],
+    [0.06, 0.19], [0.22, 0.145], [0.33, 0.09], [0.40, 0.05],
+  ];
+  const body = bodyGeometry(profile, { radial: 12, sx: 0.62, sy: 1.0 });
+  paintSkin(body, { back: 0x9a9a9a, belly: id, halfHeight: 0.2, blend: [-0.36, 0.2] });
+
+  const parts = [body];
+  // 꼬리 — 갈라진 부채
+  const tail = vfin([
+    [0.00, 0.05], [0.13, 0.20], [0.20, 0.24], [0.16, 0.02],
+    [0.21, -0.22], [0.12, -0.19], [0.00, -0.05],
+  ], 0.03, 0xb8b8b8, { smooth: true });
+  parts.push(xf(tail, [0, 0, 0.38], [0, 0, 0], [1, 1, 1]));
+  // 등지느러미
+  const dorsal = vfin([
+    [-0.10, 0.17], [0.02, 0.30], [0.12, 0.31], [0.12, 0.17],
+  ], 0.022, 0xa8a8a8);
+  parts.push(xf(dorsal, [0, 0, 0.0], [0, 0, 0], [1, 1, 1]));
+  // 배지느러미
+  const pelvic = vfin([
+    [-0.04, -0.14], [0.04, -0.22], [0.10, -0.22], [0.08, -0.14],
+  ], 0.018, 0xa8a8a8);
+  parts.push(xf(pelvic, [0, 0, 0.14], [0, 0, 0], [1, 1, 1]));
+  // 눈
+  for (const s of [-1, 1]) {
+    const eye = new THREE.SphereGeometry(0.045, 6, 5);
+    parts.push(xf(paint(eye, 0x101418), [0.095 * s, 0.06, -0.34], [0, 0, 0], [1, 1, 1]));
+  }
+  // 가슴지느러미
+  for (const s of [-1, 1]) {
+    const fin = hfin([
+      [0, 0.06], [0.10, 0.02], [0.13, -0.05], [0.04, -0.05],
+    ].map(([x, y]) => [x * s, y]), 0.014, 0xa8a8a8);
+    parts.push(xf(fin, [0.10 * s, -0.04, -0.18], [0, 0, 0], [1, 1, 1]));
+  }
+  _schoolGeo = assemble(parts, -0.4, 0.55);
+  return _schoolGeo;
 }
 
 export function makeFishSchool(count) {
   const geo = makeFishGeometry();
-  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const inst = new THREE.InstancedMesh(geo, mat, count);
+  if (!_schoolMat) {
+    _schoolMat = swimMaterial({
+      vertexColors: true, shininess: 30, specular: 0x556677,
+    }, SCHOOL_BEND);
+  }
+  const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const palette = [0xffd166, 0xff8f6b, 0x6be0ff, 0xff9ecb, 0xa6ff9e, 0xfff3b0];
   const c = new THREE.Color();
@@ -1065,25 +1639,15 @@ export function makeFishSchool(count) {
    해저 지형 요소들 (월드에서 병합해 사용)
    ========================================================= */
 export function rockGeometry(radius, seed) {
-  const geo = new THREE.IcosahedronGeometry(radius, 0);
+  const geo = new THREE.IcosahedronGeometry(radius, 1);
   const pos = geo.attributes.position;
   const rnd = mulberry(seed);
   for (let i = 0; i < pos.count; i++) {
-    const f = 0.72 + rnd() * 0.55;
-    pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f * 0.8, pos.getZ(i) * f);
+    const f = 0.82 + rnd() * 0.38;
+    pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f * 0.82, pos.getZ(i) * f);
   }
   geo.computeVertexNormals();
   return geo;
-}
-
-export function mulberry(a) {
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /** 가지형 산호 */
@@ -1091,14 +1655,14 @@ export function branchCoralGeometry(color, seed) {
   const rnd = mulberry(seed);
   const parts = [];
   const trunkH = 1.0 + rnd() * 1.1;
-  const trunk = new THREE.CylinderGeometry(0.09, 0.14, trunkH, 5);
+  const trunk = new THREE.CylinderGeometry(0.09, 0.16, trunkH, 5);
   trunk.translate(0, trunkH / 2, 0);
   parts.push(paint(trunk, color));
 
   const branches = 2 + Math.floor(rnd() * 3);
   for (let i = 0; i < branches; i++) {
-    const h = 0.55 + rnd() * 0.7;
-    const b = new THREE.CylinderGeometry(0.05, 0.08, h, 4);
+    const h = 0.6 + rnd() * 0.8;
+    const b = new THREE.CylinderGeometry(0.045, 0.09, h, 5);
     b.translate(0, h / 2, 0);
     const m = new THREE.Matrix4();
     const e = new THREE.Euler((rnd() - 0.5) * 1.0, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.0);
@@ -1113,7 +1677,7 @@ export function branchCoralGeometry(color, seed) {
 /** 부채형/뇌형 산호 */
 export function blobCoralGeometry(color, seed) {
   const rnd = mulberry(seed);
-  const geo = new THREE.SphereGeometry(0.28 + rnd() * 0.24, 8, 6);
+  const geo = new THREE.SphereGeometry(0.30 + rnd() * 0.26, 10, 8);
   geo.scale(1 + rnd() * 0.45, 0.5 + rnd() * 0.4, 1 + rnd() * 0.35);
   geo.translate(0, 0.2, 0);
   return paint(geo, color);
@@ -1126,7 +1690,7 @@ export function tubeCoralGeometry(color, seed) {
   const n = 3;
   for (let i = 0; i < n; i++) {
     const h = 0.6 + rnd() * 1.2;
-    const g = new THREE.CylinderGeometry(0.1, 0.14, h, 6, 1, true);
+    const g = new THREE.CylinderGeometry(0.1, 0.14, h, 7, 1, true);
     g.translate(0, h / 2, 0);
     const m = new THREE.Matrix4();
     m.makeTranslation((i - 1) * 0.22 + (rnd() - 0.5) * 0.1, 0, (rnd() - 0.5) * 0.3);

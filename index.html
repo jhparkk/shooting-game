@@ -62,6 +62,14 @@
       </div>
     </div>
 
+    <div id="compass" class="compass" aria-hidden="true">
+      <div class="compass-window">
+        <div id="compass-ribbon" class="compass-ribbon"></div>
+        <span class="compass-marker"></span>
+      </div>
+      <div class="compass-read"><b id="hud-heading">북</b><span id="hud-bearing">0°</span></div>
+    </div>
+
     <div id="boss-bar" class="boss-bar hidden" aria-hidden="true">
       <div class="boss-bar-head">
         <span class="boss-bar-label">거대 대왕오징어 · 크라켄</span>
@@ -205,6 +213,6 @@
     __showError('promise: ' + (r && r.message ? r.message : String(r)));
   });
 </script>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=20261115"></script>
 </body>
 </html>
