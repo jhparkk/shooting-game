@@ -12,7 +12,7 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116k';
+} from './models.js?v=20261116m';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -78,9 +78,9 @@ const CREATURE_COLLIDER = {
   blue: { radius: 0.14, n: 6 },
   orca: { radius: 0.15, n: 5 },
   sperm: { radius: 0.15, n: 5 },
-  manta: { radius: 0.12, n: 3, m: 2 },    // 납작하고 넓은 가오리는 앞뒤 두 줄로 덮는다
-  eagle: { radius: 0.12, n: 3, m: 2 },
-  stingray: { radius: 0.2, n: 2, m: 2 },
+  manta: { radius: 0.12, n: 3, m: 3 },    // 납작하고 넓은 가오리는 격자로 고르게 덮는다
+  eagle: { radius: 0.12, n: 3, m: 3 },
+  stingray: { radius: 0.2, n: 3, m: 3 },
   turtle: { radius: 0.4, n: 2 },
 };
 
