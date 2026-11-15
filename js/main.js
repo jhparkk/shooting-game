@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611190b';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190b';
+import { Sound } from './audio.js?v=202611190c';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190c';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611190b';
-import { FX } from './fx.js?v=202611190b';
+} from './models.js?v=202611190c';
+import { FX } from './fx.js?v=202611190c';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2387,49 +2387,58 @@ async function runSteerSelfTest() {
     /* 3) 위로 밀면 전진 — 잠수정이 바라보는 쪽으로 나아간다 */
     ev('pointerup', cx, cy);
     await wait(150);
-    // 속도가 잠잠해질 때까지 기다린다 (기기 프레임레이트와 무관하게)
-    for (let i = 0; i < 40 && Math.hypot(P.vel.x, P.vel.z) > 1.5; i++) await wait(250);
-    const p0 = P.pos.clone();
     const yawFwd = P.yaw;
+    const fwdDir = new THREE.Vector3(-Math.sin(yawFwd), 0, -Math.cos(yawFwd));
+    const velAlong = (d) => P.vel.x * d.x + P.vel.z * d.z;
+    // 기기의 프레임레이트와 무관하게, 실제로 전진 속도가 붙을 때까지 기다린다
+    const waitSpeed = async (sign, thr, maxMs) => {
+      const t0 = performance.now();
+      while (performance.now() - t0 < maxMs) {
+        if (sign * velAlong(fwdDir) > thr) break;
+        await wait(200);
+      }
+      return sign * velAlong(fwdDir);
+    };
+
+    const q0 = P.pos.clone();
     e0 = t0();
     ev('pointerdown', cx, cy);
     ev('pointermove', cx, cy - rad * 0.95);
+    const vFwd = await waitSpeed(1, 18, 20000);
     await wait(1500);
     const dtF = Math.max(0.001, t0() - e0);
     const p1 = P.pos.clone();
-    const movedDist = Math.hypot(p1.x - p0.x, p1.z - p0.z);
-    const fwdDir = new THREE.Vector3(-Math.sin(yawFwd), 0, -Math.cos(yawFwd));
+    const movedDist = Math.hypot(p1.x - q0.x, p1.z - q0.z);
     const fwdDot = movedDist > 0.01
-      ? ((p1.x - p0.x) * fwdDir.x + (p1.z - p0.z) * fwdDir.z) / movedDist
+      ? ((p1.x - q0.x) * fwdDir.x + (p1.z - q0.z) * fwdDir.z) / movedDist
       : 0;
     R.forward = {
+      speed: +vFwd.toFixed(1),
       moved: +movedDist.toFixed(2),
       unitsPerSec: +(movedDist / dtF).toFixed(1),
       dot: +fwdDot.toFixed(3),
       camGap: +Math.abs(angDiff(P.yaw, CAM.yaw)).toFixed(3),
-      pass: movedDist / dtF > 12 && fwdDot > 0.85,
+      pass: vFwd > 15 && movedDist / dtF > 10 && fwdDot > 0.85,
     };
 
     /* 4) 아래로 밀면 후진 — 정면 반대쪽으로 물러난다 */
-    ev('pointerup', cx, cy);
-    await wait(150);
-    for (let i = 0; i < 40 && Math.hypot(P.vel.x, P.vel.z) > 1.5; i++) await wait(250);
-    const p2 = P.pos.clone();
-    e0 = t0();
-    ev('pointerdown', cx, cy);
     ev('pointermove', cx, cy + rad * 0.95);
+    const vBack = await waitSpeed(-1, 3, 25000);
+    const q1 = P.pos.clone();
+    e0 = t0();
     await wait(1500);
     const dtB = Math.max(0.001, t0() - e0);
     const p3 = P.pos.clone();
-    const backDist = Math.hypot(p3.x - p2.x, p3.z - p2.z);
+    const backDist = Math.hypot(p3.x - q1.x, p3.z - q1.z);
     const backDot = backDist > 0.01
-      ? ((p3.x - p2.x) * fwdDir.x + (p3.z - p2.z) * fwdDir.z) / backDist
+      ? ((p3.x - q1.x) * fwdDir.x + (p3.z - q1.z) * fwdDir.z) / backDist
       : 0;
     R.backward = {
+      speed: +vBack.toFixed(1),
       moved: +backDist.toFixed(2),
       unitsPerSec: +(backDist / dtB).toFixed(1),
       dot: +backDot.toFixed(3),
-      pass: backDist / dtB > 4 && backDot < -0.5,
+      pass: vBack > 2 && backDist / dtB > 3 && backDot < -0.5,
     };
     ev('pointerup', cx, cy);
 
