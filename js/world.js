@@ -58,9 +58,9 @@ export const ZONES = [
     name: '초심해 심연',
     fog: 0x040a1e, density: 0.0125,
     skyTop: 0x0b1f4a, skyMid: 0x030a20, skyBottom: 0x000206,
-    hemiSky: 0x2a4c92, hemiGround: 0x02040c, hemi: 0.32,
-    ambient: 0x1a2f66, ambientI: 0.2,
-    sun: 0x9db8e8, sunI: 0.18,
+    hemiSky: 0x2a4c92, hemiGround: 0x03060e, hemi: 0.42,
+    ambient: 0x22386f, ambientI: 0.34,
+    sun: 0x9db8e8, sunI: 0.24,
     coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
   },
 ];
@@ -541,8 +541,8 @@ export class World {
           Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
         const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
-        const dk = Math.pow(dkRaw, 0.75);
-        fc.setHSL(0.38 + dk * 0.3 - kk * 0.04, 0.52 - dk * 0.34, 0.3 - dk * 0.24 + kk * 0.05);
+        const dk = Math.pow(dkRaw, 0.7);
+        fc.setHSL(0.38 + dk * 0.2 - kk * 0.04, 0.52 - dk * 0.3, 0.31 - dk * 0.13 + kk * 0.05);
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
         vcol[k3 + 2] = fc.b;

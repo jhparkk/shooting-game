@@ -217,6 +217,7 @@ function initThree() {
     spot: sub.spot,
     beam: sub.beam,
     frontLight: sub.frontLight,
+    under: sub.under,
   };
   P.pos.copy(START_POS);
   updateSubTransform(0);
@@ -1142,22 +1143,27 @@ function updateHeadlight(dt, instant) {
   const k = instant ? 1 : damp(2.6, dt);
   const spot = player.spot;
 
-  const targetIntensity = 17 + deep * 300;
+  const targetIntensity = 17 + deep * 420;
   spot.intensity += (targetIntensity - spot.intensity) * k;
-  spot.angle = 0.42 + deep * 0.26;
-  spot.distance = 74 + deep * 210;
+  spot.angle = 0.42 + deep * 0.24;
+  spot.distance = 74 + deep * 260;
   spot.penumbra = 0.72 - deep * 0.2;
 
   // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
   if (player.frontLight) {
-    player.frontLight.intensity += (deep * 46 - player.frontLight.intensity) * k;
-    player.frontLight.distance = 18 + deep * 34;
+    player.frontLight.intensity += (deep * 70 - player.frontLight.intensity) * k;
+    player.frontLight.distance = 18 + deep * 46;
+  }
+  // 잠수정 주변을 감싸는 옅은 빛무리
+  if (player.under) {
+    player.under.intensity += ((6 + deep * 46) - player.under.intensity) * k;
+    player.under.distance = 16 + deep * 34;
   }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
   const beam = player.beam;
   if (beam) {
-    beam.material.opacity += ((0.03 + deep * 0.22) - beam.material.opacity) * k;
+    beam.material.opacity += ((0.03 + deep * 0.12) - beam.material.opacity) * k;
     const widen = 1 + deep * 0.5;
     const stretch = 1 + deep * 1.15;
     beam.scale.set(widen, widen, stretch);

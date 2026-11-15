@@ -482,7 +482,7 @@ export function makeSubmarine() {
   frontLight.position.set(0, 0.15, -3.1);
   g.add(frontLight);
 
-  return { group: g, propeller: prop, spot, beam, frontLight };
+  return { group: g, propeller: prop, spot, beam, frontLight, under };
 }
 
 /* =========================================================
