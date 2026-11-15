@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611190d';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190d';
+import { Sound } from './audio.js?v=202611190e';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190e';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611190d';
-import { FX } from './fx.js?v=202611190d';
+} from './models.js?v=202611190e';
+import { FX } from './fx.js?v=202611190e';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1411,8 +1411,8 @@ function updatePlayer(dt) {
   // 추진 — 방향은 잠수정이 바라보는 정면
   computeHorizontal(horizontal);
   const thrust = driveIn >= 0 ? driveIn * P.speed : driveIn * P.backSpeed;
-  // 깊은 심해일수록 상승·하강이 빠르다 (2,500m+까지 답답하지 않게 오가도록)
-  const liftSpeed = P.lift + Math.min(96, Math.max(0, G.depth) * 0.05);
+  // 깊은 심해일수록 상승·하강이 빠르다 (2,500m+까지 답답하지 않게 오가도록 — 최대 약 148 m/s)
+  const liftSpeed = P.lift + Math.min(84, Math.max(0, G.depth) * 0.045);
   const desired = tmpVec2.set(
     horizontal.x * thrust,
     input.lift * liftSpeed,
