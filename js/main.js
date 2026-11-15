@@ -3,13 +3,13 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261115f';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115f';
+import { Sound } from './audio.js?v=20261115g';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115g';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
-} from './models.js?v=20261115f';
-import { FX } from './fx.js?v=20261115f';
+} from './models.js?v=20261115g';
+import { FX } from './fx.js?v=20261115g';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -215,7 +215,7 @@ function initThree() {
     prop: sub.propeller,
     spot: sub.spot,
     beam: sub.beam,
-    nose: sub.nose,
+    frontLight: sub.frontLight,
   };
   P.pos.copy(START_POS);
   updateSubTransform(0);
@@ -1121,9 +1121,9 @@ function updateHeadlight(dt, instant) {
   spot.penumbra = 0.72 - deep * 0.2;
 
   // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
-  if (player.nose) {
-    player.nose.intensity += (deep * 36 - player.nose.intensity) * k;
-    player.nose.distance = 18 + deep * 26;
+  if (player.frontLight) {
+    player.frontLight.intensity += (deep * 36 - player.frontLight.intensity) * k;
+    player.frontLight.distance = 18 + deep * 26;
   }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다

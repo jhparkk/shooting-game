@@ -10,7 +10,7 @@ import {
   makeWhale, makeManta, makeTurtle, makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261115f';
+} from './models.js?v=20261115g';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;   // 해구 바닥 (수심 약 113m)
