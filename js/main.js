@@ -3,13 +3,13 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261115d';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115d';
+import { Sound } from './audio.js?v=20261115f';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115f';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
-} from './models.js?v=20261115d';
-import { FX } from './fx.js?v=20261115d';
+} from './models.js?v=20261115f';
+import { FX } from './fx.js?v=20261115f';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -215,6 +215,7 @@ function initThree() {
     prop: sub.propeller,
     spot: sub.spot,
     beam: sub.beam,
+    nose: sub.nose,
   };
   P.pos.copy(START_POS);
   updateSubTransform(0);
@@ -1113,16 +1114,22 @@ function updateHeadlight(dt, instant) {
   const k = instant ? 1 : damp(2.6, dt);
   const spot = player.spot;
 
-  const targetIntensity = 17 + deep * 135;
+  const targetIntensity = 17 + deep * 200;
   spot.intensity += (targetIntensity - spot.intensity) * k;
   spot.angle = 0.42 + deep * 0.24;
-  spot.distance = 74 + deep * 104;
+  spot.distance = 74 + deep * 118;
   spot.penumbra = 0.72 - deep * 0.2;
+
+  // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
+  if (player.nose) {
+    player.nose.intensity += (deep * 36 - player.nose.intensity) * k;
+    player.nose.distance = 18 + deep * 26;
+  }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
   const beam = player.beam;
   if (beam) {
-    beam.material.opacity += ((0.03 + deep * 0.15) - beam.material.opacity) * k;
+    beam.material.opacity += ((0.03 + deep * 0.19) - beam.material.opacity) * k;
     const widen = 1 + deep * 0.5;
     const stretch = 1 + deep * 1.15;
     beam.scale.set(widen, widen, stretch);

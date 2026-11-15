@@ -477,7 +477,12 @@ export function makeSubmarine() {
   under.position.set(0, -0.9, 0.4);
   g.add(under);
 
-  return { group: g, propeller: prop, spot, beam };
+  // 전방 근거리 보조광 — 심해에서 바로 앞 바위·생물이 환하게 비친다
+  const nose = new THREE.PointLight(0xd8f6ff, 0, 30, 1.35);
+  nose.position.set(0, 0.15, -3.1);
+  g.add(nose);
+
+  return { group: g, propeller: prop, spot, beam, nose };
 }
 
 /* =========================================================
