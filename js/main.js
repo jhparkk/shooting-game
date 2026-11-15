@@ -466,11 +466,11 @@ function updateDurabilityHud() {
   }
 }
 
-/** 수심별 수압 감소량 (내구력/초) */
+/** 수심별 수압 감소량 (내구력/초) — 1,000m 언저리는 완만하고 심연으로 갈수록 급해진다 */
 function pressureRateAt(depth) {
   if (depth < PRESSURE_START) return 0;
   const t = clamp((depth - PRESSURE_START) / (PRESSURE_FULL - PRESSURE_START), 0, 1);
-  return PRESSURE_RATE_MIN + (PRESSURE_RATE_MAX - PRESSURE_RATE_MIN) * t;
+  return PRESSURE_RATE_MIN + (PRESSURE_RATE_MAX - PRESSURE_RATE_MIN) * Math.pow(t, 1.8);
 }
 
 /** 수심별 자동 회복 배율 — 450m 까지는 정상, 심연으로 갈수록 줄어든다 */
