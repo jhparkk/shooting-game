@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116i';
-import { getTextures } from './textures.js?v=20261116i';
+} from './models.js?v=20261116j';
+import { getTextures } from './textures.js?v=20261116j';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -734,8 +734,8 @@ export class World {
         const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
-        const hue = 0.10 + dk * 0.45 + (1 - flatness) * 0.14;
-        const sat = 0.07 + flatness * 0.10;
+        const hue = 0.10 + dk * 0.45 + (1 - flatness) * 0.13;
+        const sat = 0.07 + flatness * 0.10 + (1 - flatness) * (0.04 + Math.max(0, Math.sin(wx * 0.041 + wz * 0.017)) * 0.06);
         const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18);
         fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
         vcol[k3] = fc.r;

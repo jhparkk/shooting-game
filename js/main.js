@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116i';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116i';
+import { Sound } from './audio.js?v=20261116j';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116j';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116i';
-import { FX } from './fx.js?v=20261116i';
+} from './models.js?v=20261116j';
+import { FX } from './fx.js?v=20261116j';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1227,7 +1227,7 @@ function softAim(fromPos, dir) {
 
   // 창 가장자리에서는 조금만, 정면에 가까울수록 끝까지 — 부드럽게 끌어당긴다
   const k = Math.min(1, Math.abs(best.dpitch) / AIM_WIN_PITCH);
-  const weight = 1 - k * 0.5;
+  const weight = k < 0.72 ? 1 : 1 - ((k - 0.72) / 0.28) * 0.45;
   const corr = best.dpitch * weight;
   const newPitch = clamp(aimPitch + corr, -1.3, 1.1);
   const cp = Math.cos(newPitch);
