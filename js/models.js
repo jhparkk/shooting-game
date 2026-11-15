@@ -2012,7 +2012,7 @@ function mantaWings() {
 export function makeMantaRay() {
   if (!_mantaMat) {
     _mantaMat = flapMaterial(
-      { vertexColors: true, shininess: 34, specular: 0x6b8496 },
+      { vertexColors: true, shininess: 22, specular: 0x3c4e5e },
       { amp: 0.55, freq: 3.4, speed: 2.0, span: 5.8 }
     );
   }
@@ -2126,7 +2126,7 @@ function eagleWings() {
 export function makeEagleRay() {
   if (!_eagleMat) {
     _eagleMat = flapMaterial(
-      { vertexColors: true, shininess: 46, specular: 0x7f9cb4 },
+      { vertexColors: true, shininess: 24, specular: 0x3a4a58 },
       { amp: 0.42, freq: 3.8, speed: 2.3, span: 4.4 }
     );
   }
