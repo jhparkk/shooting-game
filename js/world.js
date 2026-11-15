@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116m';
-import { getTextures } from './textures.js?v=20261116m';
+} from './models.js?v=20261116n';
+import { getTextures } from './textures.js?v=20261116n';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -567,18 +567,20 @@ export class World {
           // 수중 빛무늬 — 표면색을 밝히고(곱셈) 약간의 빛을 더한다(덧셈)
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.26;
+          vec2 cuv = vWPosV.xz * 0.14;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.012, uTime * 0.008 ) ).r;
-          float cb = texture2D( uCaustics, cuv * 2.71 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
-          float caustic = ( ca + cb * 0.55 ) * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.30;
+          float cb = texture2D( uCaustics, cuv * 2.31 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
+          // 셀 경계의 날카로운 선 대신, 부드러운 빛 덩어리로 나타나게
+          float cshape = smoothstep( 0.12, 0.92, ca * 0.78 + cb * 0.42 );
+          float caustic = cshape * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
+          detail *= 1.0 + caustic * 0.2;
           diffuseColor.rgb *= detail;
           `
         ).replace(
           'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
           `
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.035;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.05;
           `
         );
     };
