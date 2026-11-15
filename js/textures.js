@@ -156,11 +156,11 @@ function bakeSand(size) {
     const shell = fbm(u, v, 24, 2, 71);
 
     // 밝기: 물결 마루 + 미세 모래알
-    const shade = 0.72
-      + rip * 0.12
-      + rip2 * 0.05
+    const shade = 0.78
+      + rip * 0.18
+      + rip2 * 0.06
       + (grain - 0.5) * 0.16
-      + (shell - 0.5) * 0.12;
+      + (shell - 0.5) * 0.14;
 
     const r = clamp01(shade * 0.96 + 0.06);
     const g = clamp01(shade * 0.93 + 0.04);
