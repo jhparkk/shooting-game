@@ -150,7 +150,7 @@ function bakeSand(size) {
     const warp = fbm(u, v, 3, 3, 11);
     const warp2 = fbm(u, v, 6, 2, 47);
     // 물결: u 축으로 흐르고 v 축으로 천천히 흔들린다
-    const rip = Math.sin((v * 7 + u * 1.2 + warp * 2.6 + warp2 * 1.1) * TAU);
+    const rip = Math.sin((v * 7 + u * 1.2 + warp * 1.5 + warp2 * 1.0) * TAU);
     const rip2 = Math.sin((v * 19 + warp2 * 2.2 + warp * 1.4) * TAU);
     const grain = noise2(u * 256, v * 256, 256, 3);
     const shell = fbm(u, v, 24, 2, 71);
@@ -226,9 +226,11 @@ function bakeCaustics(size) {
     const v = y / size;
     for (let x = 0; x < size; x++) {
       const u = x / size;
-      // 두 겹의 셀 경계를 겹쳐 물결처럼 흔든다 — 가는 선만 남긴다
-      const a = worley(u, v, 5, 91);
-      const b = worley(u + 0.31, v + 0.17, 8, 457);
+      // 셀 경계를 휘게 만들어 곧은 선 대신 물결 모양으로
+      const wu = u + (fbm(u, v, 3, 2, 7) - 0.5) * 0.26;
+      const wv = v + (fbm(u, v, 3, 2, 23) - 0.5) * 0.26;
+      const a = worley(wu, wv, 5, 91);
+      const b = worley(wu + 0.31, wv + 0.17, 8, 457);
       const ea = 1 - smooth(0.0, 0.058, a.f2 - a.f1);
       const eb = 1 - smooth(0.0, 0.044, b.f2 - b.f1);
       let c = Math.pow(ea * 0.82 + eb * 0.58, 1.35) * 1.3;

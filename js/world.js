@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180g';
-import { getTextures } from './textures.js?v=202611180g';
+} from './models.js?v=202611180h';
+import { getTextures } from './textures.js?v=202611180h';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1228,12 +1228,15 @@ export class World {
     this.skyUniforms.mid.value.lerp(tc.copy(c0.skyMid).lerp(c1.skyMid, u), k);
     this.skyUniforms.bottom.value.lerp(tc.copy(c0.skyBottom).lerp(c1.skyBottom, u), k);
 
-    // 빛줄기 살랑임 + 플레이어 주변으로 재배치 (수심이 깊으면 사라진다)
+    // 빛줄기 살랑임 + 플레이어 주변으로 재배치 (수심이 깊으면, 지형을 끊지 않는 곳에서만)
     const rayFade = clamp01(1 - depth / 320);
     for (const r of this.rays) {
       const base = r.userData.base === undefined ? 0.26 : r.userData.base;
-      r.material.opacity = (base + Math.sin(this.time * 0.7 + r.userData.phase) * 0.08) * rayFade;
-      r.visible = rayFade > 0.02;
+      // 바닥이 솟아 있는 곳에서는 줄기가 지형을 가로질러 밝은 띠를 만들어 — 거기선 끄다
+      const gy = getTerrainHeight(r.position.x, r.position.z);
+      const clearK = clamp01((r.position.y - 74 - gy) / 60);
+      r.material.opacity = (base + Math.sin(this.time * 0.7 + r.userData.phase) * 0.08) * rayFade * clearK;
+      r.visible = rayFade > 0.02 && clearK > 0.02;
       r.rotation.z = Math.sin(this.time * 0.12 + r.userData.phase) * 0.08;
       const dx = r.position.x - playerPos.x;
       const dz = r.position.z - playerPos.z;
