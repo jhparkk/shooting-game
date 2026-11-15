@@ -150,21 +150,21 @@ function bakeSand(size) {
     const warp = fbm(u, v, 3, 3, 11);
     const warp2 = fbm(u, v, 6, 2, 47);
     // 물결: u 축으로 흐르고 v 축으로 천천히 흔들린다
-    const rip = Math.sin((v * 7 + u * 1.2 + warp * 2.2 + warp2 * 0.5) * TAU);
-    const rip2 = Math.sin((v * 19 + warp2 * 1.4) * TAU);
+    const rip = Math.sin((v * 7 + u * 1.2 + warp * 2.6 + warp2 * 1.1) * TAU);
+    const rip2 = Math.sin((v * 19 + warp2 * 2.2 + warp * 1.4) * TAU);
     const grain = noise2(u * 256, v * 256, 256, 3);
     const shell = fbm(u, v, 24, 2, 71);
 
     // 밝기: 물결 마루 + 미세 모래알
-    const shade = 0.78
-      + rip * 0.18
-      + rip2 * 0.06
+    const shade = 0.80
+      + rip * 0.10
+      + rip2 * 0.04
       + (grain - 0.5) * 0.16
-      + (shell - 0.5) * 0.14;
+      + (shell - 0.5) * 0.16;
 
-    const r = clamp01(shade * 0.99 + 0.03);
+    const r = clamp01(shade * 0.97 + 0.02);
     const g = clamp01(shade * 0.96 + 0.02);
-    const b = clamp01(shade * 0.88 + 0.02);
+    const b = clamp01(shade * 0.92 + 0.02);
     o[0] = (r * 255) | 0;
     o[1] = (g * 255) | 0;
     o[2] = (b * 255) | 0;

@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180d';
-import { getTextures } from './textures.js?v=202611180d';
+} from './models.js?v=202611180e';
+import { getTextures } from './textures.js?v=202611180e';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -494,7 +494,7 @@ export class World {
           detail = mix( detail, cBasalt, deepK );
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
-          detail *= mix( vec3( 1.0 ), vec3( 1.18, 1.14, 1.06 ), sandW );
+          detail *= mix( vec3( 1.0 ), vec3( 1.10, 1.08, 1.04 ), sandW );
           diffuseColor.rgb *= detail;
           `
         ).replace(
@@ -663,8 +663,8 @@ export class World {
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
         const hue = 0.11 + dk * 0.47 - kk * 0.02 + (1 - flatness) * 0.10;
-        const sat = 0.11 + (1 - flatness) * 0.06 - dk * 0.03;
-        const lit = (0.48 - dk * 0.28 + kk * 0.04) * (0.80 + flatness * 0.20);
+        const sat = 0.07 + (1 - flatness) * 0.07 - dk * 0.02;
+        const lit = (0.50 - dk * 0.30 + kk * 0.04) * (0.80 + flatness * 0.20);
         fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
