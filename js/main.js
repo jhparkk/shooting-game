@@ -3,13 +3,13 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261115c';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115c';
+import { Sound } from './audio.js?v=20261115d';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115d';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
-} from './models.js?v=20261115c';
-import { FX } from './fx.js?v=20261115c';
+} from './models.js?v=20261115d';
+import { FX } from './fx.js?v=20261115d';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -20,6 +20,23 @@ const BEST_KEY = 'abyss-diver-best';
 // 산호 언덕 위에서 시작 — 앞쪽으로 해저 협곡이 깊게 떨어진다
 const START_POS = new THREE.Vector3(-20, terrainHeight(-20, 60) + 7, 60);
 
+/* ---------------- 내구력 · 충돌 · 수압 밸런스 ---------------- */
+const BASE_MAX_HULL = 100;       // 기본 최대 내구력
+const SUB_R = 1.7;               // 잠수정 충돌 반경
+const REGEN_DELAY = 3;           // 마지막 피격 후 회복 시작까지 (초)
+const REGEN_RATE = 5.5;          // 초당 회복량
+const REGEN_FADE_FROM = 58;      // 이 수심부터 회복이 약해진다
+const REGEN_FADE_TO = 70;        // 이 수심부터는 회복 없이 수압만 작용
+const PRESSURE_START = 70;       // 수압이 내구력을 깎기 시작하는 수심(m)
+const PRESSURE_FULL = 100;       // 수압 감소가 최대가 되는 수심(m)
+const PRESSURE_RATE_MIN = 0.6;   // 70m 에서 초당 감소량
+const PRESSURE_RATE_MAX = 1.8;   // 100m 이상에서 초당 감소량
+const DMG_CONTACT = 14;          // 적 생물 접촉
+const DMG_SPIKE = 18;            // 복어·아귀 폭발
+const DMG_ORB = 12;              // 크라켄 구체
+const DMG_BOSS = 22;             // 크라켄 몸통 접촉
+const MAX_HULL_CAP = 300;        // 선체 보강 반복 상한
+
 /* ---------------- DOM ---------------- */
 const canvas = $('game');
 const el = {
@@ -28,7 +45,11 @@ const el = {
   best: $('hud-best'),
   depth: $('hud-depth-val'),
   zone: $('hud-zone'),
-  hull: $('hud-hull'),
+  dur: $('dur'),
+  durFill: $('dur-fill'),
+  durVal: $('dur-val'),
+  durMax: $('dur-max'),
+  durFlag: $('dur-flag'),
   shield: $('hud-shield'),
   shieldVal: $('shield-val'),
   powerups: $('powerups'),
@@ -80,8 +101,12 @@ const G = {
   waveGoal: 0,
   depth: 0,
   maxDepth: 0,
-  hull: 5,
-  maxHull: 5,
+  hull: BASE_MAX_HULL,
+  maxHull: BASE_MAX_HULL,
+  sinceHit: 99,
+  pressure: 0,
+  regen: false,
+  bumpCd: 0,
   shield: 0,
   bombs: 1,
   multi: 0,
@@ -189,6 +214,7 @@ function initThree() {
     obj: sub.group,
     prop: sub.propeller,
     spot: sub.spot,
+    beam: sub.beam,
   };
   P.pos.copy(START_POS);
   updateSubTransform(0);
@@ -205,7 +231,7 @@ function initThree() {
 }
 
 /* ---------------- 풀 ---------------- */
-let torpGeo, torpMat, itemGeos, itemMats, orbGeo, orbMat;
+let torpGeo, torpMat, itemGeos, itemMats, itemHalo, orbGeo, orbMat;
 
 function buildPools() {
   torpGeo = new THREE.CapsuleGeometry(0.16, 0.6, 3, 8);
@@ -225,12 +251,20 @@ function buildPools() {
     rapid: new THREE.TetrahedronGeometry(0.66, 0),
     shield: new THREE.IcosahedronGeometry(0.62, 0),
     bomb: new THREE.DodecahedronGeometry(0.62, 0),
+    hull: new THREE.TorusGeometry(0.52, 0.19, 8, 18),          // 선체 보강 모듈
+    repair: new THREE.BoxGeometry(0.82, 0.82, 0.82),           // 긴급 수리 키트
   };
   itemMats = {
     multi: new THREE.MeshBasicMaterial({ color: 0xff8fb4 }),
     rapid: new THREE.MeshBasicMaterial({ color: 0x8fe4ff }),
     shield: new THREE.MeshBasicMaterial({ color: 0xa8b8ff }),
     bomb: new THREE.MeshBasicMaterial({ color: 0xffce6b }),
+    hull: new THREE.MeshBasicMaterial({ color: 0x6dffcf }),
+    repair: new THREE.MeshBasicMaterial({ color: 0xa9ff8c }),
+  };
+  itemHalo = {
+    multi: 0xff8fb4, rapid: 0x8fe4ff, shield: 0xa8b8ff,
+    bomb: 0xffce6b, hull: 0x6dffcf, repair: 0xa9ff8c,
   };
 
   orbGeo = new THREE.SphereGeometry(0.5, 10, 8);
@@ -398,18 +432,76 @@ function setText(node, value) {
   if (node && node.textContent !== String(value)) node.textContent = String(value);
 }
 
-function buildHearts() {
-  el.hull.innerHTML = '';
-  for (let i = 0; i < G.maxHull; i++) {
-    const d = document.createElement('div');
-    d.className = 'heart';
-    el.hull.appendChild(d);
+/* ---------------- 내구력 HUD · 수압 · 자동 회복 ---------------- */
+let durShownWidth = -1;
+let durShownCls = '';
+
+function updateDurabilityHud() {
+  if (!el.durFill) return;
+  const k = clamp(G.hull / G.maxHull, 0, 1);
+  const w = Math.round(k * 1000) / 10;
+  if (w !== durShownWidth) {
+    durShownWidth = w;
+    el.durFill.style.width = w + '%';
+  }
+  setText(el.durVal, Math.ceil(G.hull - 0.001));
+  setText(el.durMax, Math.round(G.maxHull));
+  const cls = k <= 0.3 ? 'danger' : k <= 0.6 ? 'warn' : 'safe';
+  const full = cls + (G.regen ? ' regen' : '');
+  if (full !== durShownCls) {
+    durShownCls = full;
+    el.dur.classList.toggle('safe', cls === 'safe');
+    el.dur.classList.toggle('warn', cls === 'warn');
+    el.dur.classList.toggle('danger', cls === 'danger');
+    el.dur.classList.toggle('regen', !!G.regen);
+    el.dur.setAttribute('aria-valuenow', String(Math.round(G.hull)));
+    el.dur.setAttribute('aria-valuemax', String(Math.round(G.maxHull)));
+  }
+  if (el.durFlag) {
+    const show = G.pressure > 0 && G.state === 'playing';
+    if (el.durFlag.classList.contains('hidden') === show) el.durFlag.classList.toggle('hidden', !show);
   }
 }
 
-function updateHearts() {
-  const kids = el.hull.children;
-  for (let i = 0; i < kids.length; i++) kids[i].classList.toggle('empty', i >= G.hull);
+/** 수심별 수압 감소량 (내구력/초) */
+function pressureRateAt(depth) {
+  if (depth < PRESSURE_START) return 0;
+  const t = clamp((depth - PRESSURE_START) / (PRESSURE_FULL - PRESSURE_START), 0, 1);
+  return PRESSURE_RATE_MIN + (PRESSURE_RATE_MAX - PRESSURE_RATE_MIN) * t;
+}
+
+/** 수심별 자동 회복 배율 — 깊은 곳으로 갈수록 회복이 멈춘다 */
+function regenScaleAt(depth) {
+  if (depth <= REGEN_FADE_FROM) return 1;
+  if (depth >= REGEN_FADE_TO) return 0;
+  return 1 - (depth - REGEN_FADE_FROM) / (REGEN_FADE_TO - REGEN_FADE_FROM);
+}
+
+/** 매 프레임: 수압 감소 + 3초 후 자동 회복 */
+function updateDurability(dt) {
+  if (G.state !== 'playing') return;
+  G.sinceHit += dt;
+  G.pressure = pressureRateAt(G.depth);
+
+  if (G.pressure > 0) {
+    G.hull -= G.pressure * dt;
+    if (G.hull <= 0) {
+      G.hull = 0;
+      refreshHud();
+      gameOver();
+      return;
+    }
+  }
+
+  const scale = regenScaleAt(G.depth);
+  if (scale > 0 && G.sinceHit >= REGEN_DELAY && G.hull < G.maxHull) {
+    G.hull = Math.min(G.maxHull, G.hull + REGEN_RATE * scale * dt);
+    G.regen = true;
+  } else {
+    G.regen = false;
+  }
+
+  if (G.bumpCd > 0) G.bumpCd = Math.max(0, G.bumpCd - dt);
 }
 
 let bannerTimer = 0;
@@ -494,6 +586,7 @@ function refreshHud() {
   }
   updatePowerups();
   updateCompass();
+  updateDurabilityHud();
 }
 
 /* ---------------- 게임 시작/종료 ---------------- */
@@ -512,7 +605,12 @@ function resetGame() {
   G.kills = 0;
   G.depth = 0;
   G.maxDepth = 0;
-  G.hull = G.maxHull;
+  G.hull = BASE_MAX_HULL;
+  G.maxHull = BASE_MAX_HULL;
+  G.sinceHit = 99;
+  G.pressure = 0;
+  G.regen = false;
+  G.bumpCd = 0;
   G.shield = 0;
   G.bombs = 1;
   G.multi = 0;
@@ -546,10 +644,11 @@ function resetGame() {
 
   world.reset();
   updateSubTransform(0);
+  updateHeadlight(0, true);
   snapCamera();
 
-  buildHearts();
-  updateHearts();
+  durShownWidth = -1;
+  durShownCls = '';
   refreshHud();
   startWave(1);
 }
@@ -786,6 +885,9 @@ function spawnEnemy() {
     speed,
     hit: 0,
     dead: false,
+    kb: new THREE.Vector3(),
+    bumpCd: 0,
+    hitCd: 0,
     swirl: rand(1.0, 2.2),
     age: 0,
     swayAmp: rand(1.5, 4),
@@ -830,13 +932,10 @@ function killEnemy(e) {
 }
 
 function dropItem(x, y, z, forced) {
-  const types = ['multi', 'rapid', 'shield', 'bomb'];
-  const t = forced || types[Math.floor(Math.random() * types.length)];
+  // 선체 보강 · 긴급 수리도 꾸준히 나오도록 가중치를 둔다
+  const t = forced || ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)];
   const mesh = new THREE.Mesh(itemGeos[t], itemMats[t]);
-  const halo = spriteGlow(
-    t === 'multi' ? 0xff8fb4 : t === 'rapid' ? 0x8fe4ff : t === 'shield' ? 0xa8b8ff : 0xffce6b,
-    3.0, 0.75
-  );
+  const halo = spriteGlow(itemHalo[t], 3.0, 0.78);
   mesh.add(halo);
   mesh.position.set(x, y, z);
   scene.add(mesh);
@@ -865,9 +964,16 @@ function fire() {
   sound.shoot();
 }
 
+const ITEM_POOL = [
+  'multi', 'rapid', 'shield', 'bomb',
+  'hull', 'repair', 'repair',
+  'multi', 'rapid', 'hull', 'repair',
+];
+
 /* ---------------- 아이템 ---------------- */
 function collectItem(it) {
   sound.pickup();
+  const p = it.obj.position;
   if (it.type === 'multi') {
     G.multi = Math.min(26, G.multi + 13);
     toast('멀티 어뢰 · 3발 동시 발사');
@@ -877,6 +983,20 @@ function collectItem(it) {
   } else if (it.type === 'shield') {
     G.shield = Math.min(4, G.shield + 2);
     toast('수중 실드 · 피해 2회 흡수');
+  } else if (it.type === 'hull') {
+    // 최대 내구력 자체가 늘어난다 (+ 현재 내구력도 회복)
+    G.maxHull = Math.min(MAX_HULL_CAP, G.maxHull + 20);
+    G.hull = Math.min(G.maxHull, G.hull + 25);
+    durShownWidth = -1;
+    durShownCls = '';
+    toast(`선체 보강 · 최대 내구력 +20 (${Math.round(G.maxHull)})`);
+    fx.ring(p.clone(), 0x6dffcf, 14, 0.6);
+    fx.burst(p.x, p.y, p.z, 14, { colors: [0x6dffcf, 0xd8fff4, 0xffffff], speed: 9, size: 1.6, life: 0.6 });
+  } else if (it.type === 'repair') {
+    G.hull = Math.min(G.maxHull, G.hull + 35);
+    toast('긴급 수리 키트 · 내구력 +35');
+    fx.ring(p.clone(), 0xa9ff8c, 12, 0.55);
+    fx.burst(p.x, p.y, p.z, 12, { colors: [0xa9ff8c, 0xe8ffd8, 0xffffff], speed: 8, size: 1.5, life: 0.55 });
   } else {
     G.bombs = Math.min(5, G.bombs + 1);
     toast('음파 폭탄 +1');
@@ -906,6 +1026,9 @@ function useBomb() {
 /* ---------------- 피해 ---------------- */
 function hurtPlayer(amount) {
   if (G.state !== 'playing' || G.invuln > 0) return;
+  // 맞은 순간부터 3초 동안은 자동 회복이 멈춘다
+  G.sinceHit = 0;
+  G.regen = false;
   if (G.shield > 0) {
     G.shield--;
     G.invuln = 0.7;
@@ -921,13 +1044,13 @@ function hurtPlayer(amount) {
   sound.damage();
   el.flash.classList.add('on');
   G.flashTimer = 0.18;
-  refreshHud();
-  updateHearts();
   if (G.hull <= 0) {
     G.hull = 0;
-    updateHearts();
+    refreshHud();
     gameOver();
+    return;
   }
+  refreshHud();
 }
 
 function damageBoss(dmg) {
@@ -959,7 +1082,7 @@ function damageBoss(dmg) {
     G.shake = 1.4;
     G.score += 2200 + G.wave * 120;
     for (let i = 0; i < 3; i++) {
-      dropItem(pos.x + rand(-3, 3), pos.y + rand(-1, 2), pos.z, ['multi', 'rapid', 'shield'][i]);
+      dropItem(pos.x + rand(-3, 3), pos.y + rand(-1, 2), pos.z, ['multi', 'hull', 'repair'][i]);
     }
     setTimeout(() => {
       if (G.state !== 'playing') return;
@@ -977,6 +1100,33 @@ function updateSubTransform(dt) {
   player.obj.position.set(P.pos.x, P.pos.y + bobY, P.pos.z);
   player.obj.rotation.set(P.pitch, P.yaw, P.roll);
   player.prop.rotation.z += dt * (12 + Math.abs(input.move) * 26);
+}
+
+/* ---------------- 탐조등 — 깊고 어두운 심해일수록 강해진다 ---------------- */
+const HEADLIGHT_FROM = 40;   // 이 수심부터 불빛이 강해지기 시작
+const HEADLIGHT_TO = 90;     // 이 수심에서 최대
+
+function updateHeadlight(dt, instant) {
+  if (!player || !player.spot) return;
+  const t = clamp((G.depth - HEADLIGHT_FROM) / (HEADLIGHT_TO - HEADLIGHT_FROM), 0, 1);
+  const deep = t * t * (3 - 2 * t);            // 부드러운 상승
+  const k = instant ? 1 : damp(2.6, dt);
+  const spot = player.spot;
+
+  const targetIntensity = 17 + deep * 135;
+  spot.intensity += (targetIntensity - spot.intensity) * k;
+  spot.angle = 0.42 + deep * 0.24;
+  spot.distance = 74 + deep * 104;
+  spot.penumbra = 0.72 - deep * 0.2;
+
+  // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
+  const beam = player.beam;
+  if (beam) {
+    beam.material.opacity += ((0.03 + deep * 0.15) - beam.material.opacity) * k;
+    const widen = 1 + deep * 0.5;
+    const stretch = 1 + deep * 1.15;
+    beam.scale.set(widen, widen, stretch);
+  }
 }
 
 function clampToWorld(pos, vel) {
@@ -1075,6 +1225,8 @@ function updateEnemies(dt) {
     const o = e.obj;
     e.age += dt;
     e.phase += dt * e.swirl;
+    if (e.bumpCd > 0) e.bumpCd -= dt;
+    if (e.hitCd > 0) e.hitCd -= dt;
 
     tmpVec.copy(pp).sub(o.position);
     const dist = tmpVec.length() || 1;
@@ -1120,6 +1272,14 @@ function updateEnemies(dt) {
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.3;
     }
 
+    // 부딪힘 반동 (밀려난 뒤 서서히 멈춘다)
+    if (e.kb.lengthSq() > 0.0025) {
+      o.position.addScaledVector(e.kb, dt);
+      e.kb.multiplyScalar(Math.max(0, 1 - 3.4 * dt));
+    } else if (e.kb.lengthSq() > 0) {
+      e.kb.set(0, 0, 0);
+    }
+
     // 유영(몸통 S자 + 꼬리 흔들기) — 해양 생물 모델 공통
     if (e.parts && e.parts.bend) swim(e.parts, ANIM.time.value);
 
@@ -1141,24 +1301,59 @@ function updateEnemies(dt) {
       o.scale.setScalar(e.scale0);
     }
 
-    // 접촉
+    // 접촉 — 관통하지 않고 서로 밀려난다
     const dx = o.position.x - pp.x;
     const dy = o.position.y - pp.y;
     const dz = o.position.z - pp.z;
-    const rr = e.r + 2.0;
-    if (dx * dx + dy * dy + dz * dz < rr * rr) {
-      if (e.type === 'puffer' || e.type === 'angler') {
-        // 가시·이빨에 닿으면 크게 터진다
-        fx.burst(o.position.x, o.position.y, o.position.z, 20, {
-          colors: [0xffe08a, 0xffb06b, 0xffffff], speed: 12, size: 2.0, life: 0.7,
-        });
-        fx.flash(o.position, 0xffb066, 9, 0.32);
-        sound.explode('big');
+    const rr = e.r + SUB_R;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < rr * rr) {
+      const d = Math.sqrt(d2) || 0.0001;
+      const nx = dx / d;
+      const ny = dy / d;
+      const nz = dz / d;
+      const overlap = rr - d;
+
+      // 적은 뒤로 크게, 잠수정은 살짝 밀려나며 튕긴다
+      o.position.x += nx * overlap * 0.78;
+      o.position.y += ny * overlap * 0.78;
+      o.position.z += nz * overlap * 0.78;
+      e.kb.x += nx * (5.5 + overlap * 2.4);
+      e.kb.y += ny * (5.5 + overlap * 2.4);
+      e.kb.z += nz * (5.5 + overlap * 2.4);
+
+      pp.x -= nx * overlap * 0.32;
+      pp.y -= ny * overlap * 0.32;
+      pp.z -= nz * overlap * 0.32;
+      const vn = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;
+      if (vn > 0) {
+        P.vel.x -= nx * vn * 1.5;
+        P.vel.y -= ny * vn * 1.5;
+        P.vel.z -= nz * vn * 1.5;
       }
-      hurtPlayer(1);
-      enemies.splice(i, 1);
-      scene.remove(o);
-      continue;
+
+      if (e.bumpCd <= 0) {
+        e.bumpCd = 0.35;
+        G.shake = Math.max(G.shake, 0.3);
+        sound.bump();
+      }
+
+      if (e.hitCd <= 0) {
+        e.hitCd = 0.9;
+        if (e.type === 'puffer' || e.type === 'angler') {
+          // 가시·이빨에 닿으면 크게 터지며 사라진다
+          fx.burst(o.position.x, o.position.y, o.position.z, 20, {
+            colors: [0xffe08a, 0xffb06b, 0xffffff], speed: 12, size: 2.0, life: 0.7,
+          });
+          fx.flash(o.position, 0xffb066, 9, 0.32);
+          sound.explode('big');
+          hurtPlayer(DMG_SPIKE);
+          enemies.splice(i, 1);
+          scene.remove(o);
+          continue;
+        }
+        hurtPlayer(DMG_CONTACT);
+      }
     }
 
     // 너무 멀어지면 정리
@@ -1243,7 +1438,54 @@ function updateBoss(dt) {
     sound.shoot();
   }
 
-  if (dist < 9) hurtPlayer(1);
+  // 몸통·촉수 접촉은 resolveBossContact() 에서 처리한다
+}
+
+/* ---------------- 보스 몸통 접촉 — 관통 금지 ---------------- */
+const BOSS_CONTACT_R = 8.4;
+function resolveBossContact() {
+  const b = G.boss;
+  if (!b) return;
+  const o = b.obj.position;
+  let dx = P.pos.x - o.x;
+  let dy = P.pos.y - o.y;
+  let dz = P.pos.z - o.z;
+  let d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.0001;
+  if (d >= BOSS_CONTACT_R) return;
+  const nx = dx / d;
+  const ny = dy / d;
+  const nz = dz / d;
+  const overlap = BOSS_CONTACT_R - d;
+  P.pos.x += nx * overlap;
+  P.pos.y += ny * overlap;
+  P.pos.z += nz * overlap;
+  const vn = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;
+  if (vn < 0) {
+    P.vel.x -= nx * vn * 1.5;
+    P.vel.y -= ny * vn * 1.5;
+    P.vel.z -= nz * vn * 1.5;
+  }
+  if (G.bumpCd <= 0) {
+    G.bumpCd = 0.5;
+    G.shake = Math.max(G.shake, 0.5);
+    sound.bump();
+  }
+  hurtPlayer(DMG_BOSS);
+}
+
+/* ---------------- 대형 관상 생물 충돌 — 데미지 없이 밀려난다 ---------------- */
+function resolveCreatureContacts() {
+  if (!world || !world.resolveCreatureCollisions) return;
+  const pushed = world.resolveCreatureCollisions(P.pos, SUB_R, P.vel);
+  if (pushed <= 0) return;
+  if (G.bumpCd <= 0) {
+    G.bumpCd = 0.6;
+    G.shake = Math.max(G.shake, 0.34);
+    sound.bump();
+    fx.flash(P.pos, 0xbfefff, 6, 0.22);
+    // 살짝 부딪히는 물결
+    fx.ring(P.pos.clone(), 0xbfefff, 9, 0.4);
+  }
 }
 
 /* ---------------- 어뢰 ---------------- */
@@ -1354,7 +1596,7 @@ function updateOrbs(dt) {
     const dy = o.mesh.position.y - P.pos.y;
     const dz = o.mesh.position.z - P.pos.z;
     if (dx * dx + dy * dy + dz * dz < 9) {
-      hurtPlayer(1);
+      hurtPlayer(DMG_ORB);
       o.active = false;
       o.mesh.visible = false;
       fx.burst(o.mesh.position.x, o.mesh.position.y, o.mesh.position.z, 10, {
@@ -1506,6 +1748,13 @@ function updateGame(dt) {
 
   updateEnemies(dt);
   updateBoss(dt);
+  resolveBossContact();
+  resolveCreatureContacts();
+  clampToWorld(P.pos, P.vel);
+  updateSubTransform(0);
+  updateHeadlight(dt);
+  updateDurability(dt);
+  if (G.state !== 'playing') return;
   updateTorpedoes(dt);
   updateOrbs(dt);
   updateItems(dt, t);
@@ -1598,7 +1847,6 @@ function boot() {
     el.loading.innerHTML = '<p style="padding:24px;text-align:center;line-height:1.6">이 브라우저에서 3D 그래픽(WebGL)을 시작할 수 없습니다.<br />사파리 최신 버전에서 다시 시도해 주세요.</p>';
     return;
   }
-  buildHearts();
   setText(el.startBest, G.best.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
   snapCamera();
@@ -1613,13 +1861,49 @@ function boot() {
   G.pingTimer = 4;
   if (new URLSearchParams(location.search).has('debug')) {
     window.__abyss = {
-      G, P, enemies, world, renderer, camera, torpedoes,
+      G, P, enemies, items, orbs, world, renderer, camera, scene, player, torpedoes,
       startWave, startGame, spawnBoss, damageBoss, removeBoss, spawnEnemy, useBomb,
+      dropItem, collectItem, hurtPlayer, updateHeadlight, resolveCreatureContacts,
+      pressureRateAt, regenScaleAt,
+      hull: () => ({
+        hull: G.hull, maxHull: G.maxHull, sinceHit: G.sinceHit,
+        pressure: G.pressure, regen: G.regen,
+        barWidth: el.durFill ? el.durFill.style.width : null,
+        barClass: el.dur ? el.dur.className : null,
+        flag: el.durFlag ? !el.durFlag.classList.contains('hidden') : null,
+        text: el.durVal ? el.durVal.textContent + '/' + el.durMax.textContent : null,
+      }),
+      light: () => ({
+        intensity: player.spot.intensity, angle: player.spot.angle,
+        distance: player.spot.distance,
+        beamOpacity: player.beam ? player.beam.material.opacity : null,
+        beamScale: player.beam ? player.beam.scale.z : null,
+      }),
+      creatures: () => world.creatures.map((c) => ({
+        kind: c.kind,
+        pos: [+c.obj.group.position.x.toFixed(2), +c.obj.group.position.y.toFixed(2), +c.obj.group.position.z.toFixed(2)],
+        colliders: c.colliders.length,
+        cullR: +c.cullR.toFixed(1),
+        box: c.colliders.map((s) => +s.r.toFixed(2)),
+      })),
       chunks: () => world.chunkStats(),
       setPos: (x, z, dy) => {
         P.pos.set(x, terrainHeight(x, z) + (dy === undefined ? 7 : dy), z);
         P.vel.set(0, 0, 0);
         snapCamera();
+      },
+      setPos3: (x, y, z) => {
+        P.pos.set(x, y, z);
+        P.vel.set(0, 0, 0);
+        snapCamera();
+      },
+      depthTo: (m) => {
+        const y = SURFACE_Y - m / DEPTH_SCALE;
+        P.pos.y = Math.max(terrainHeight(P.pos.x, P.pos.z) + 3, Math.min(SURFACE_Y - 7, y));
+        P.vel.set(0, 0, 0);
+        G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
+        snapCamera();
+        return G.depth;
       },
       setInput: (o) => {
         if (o.fire !== undefined) btnFiring = !!o.fire;

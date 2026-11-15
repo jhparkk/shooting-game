@@ -177,6 +177,13 @@ export class Sound {
     this._osc('sawtooth', 190, 48, 0.42, 0.16);
   }
 
+  /** 큰 생물과 부딪혔을 때의 둔탁한 충격음 */
+  bump() {
+    if (!this.ac) return;
+    this._noiseBurst(0.22, 0.2, 'lowpass', 460, 110, 1.3);
+    this._osc('sine', 128, 52, 0.26, 0.11);
+  }
+
   bomb() {
     if (!this.ac) return;
     this._osc('sine', 1500, 180, 1.0, 0.22);

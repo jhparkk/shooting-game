@@ -10,7 +10,7 @@ import {
   makeWhale, makeManta, makeTurtle, makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261115c';
+} from './models.js?v=20261115d';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;   // 해구 바닥 (수심 약 113m)
@@ -55,6 +55,15 @@ export const ZONES = [
 export const ZONE_DEPTHS = [38, 72];
 /** 물빛 그라디언트가 완료되는 수심 */
 const DEPTH_GRADIENT_END = 95;
+
+/* 대형 관상 생물의 충돌체 설정
+   radius: 가장 긴 축 길이 대비 구체 반지름
+   n: 가장 긴 축 방향 구체 개수, m: 두 번째 축 방향 구체 개수(있으면 그리드) */
+const CREATURE_COLLIDER = {
+  whale: { radius: 0.16, n: 4 },
+  manta: { radius: 0.13, n: 3, m: 2 },   // 납작하고 넓은 가오리는 앞뒤 두 줄로 덮는다
+  turtle: { radius: 0.4, n: 2 },
+};
 
 export function zoneIndexForDepth(depth) {
   return depth < ZONE_DEPTHS[0] ? 0 : depth < ZONE_DEPTHS[1] ? 1 : 2;
@@ -847,6 +856,51 @@ export class World {
   }
 
   /* ---------------- 대형 관상 생물 ---------------- */
+  /**
+   * 대형 생물용 충돌 구체 목록 — 몸통을 축 따라 여러 구로 덮는다.
+   * (긴 몸통을 구분해 밀어내기 위함. radiusFactor 는 가장 긴 축 길이 대비 반지름)
+   */
+  _creatureColliders(group, kind) {
+    const box = new THREE.Box3().setFromObject(group);
+    if (!isFinite(box.min.x) || !isFinite(box.max.x)) return [];
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const dims = [['x', size.x], ['y', size.y], ['z', size.z]];
+    dims.sort((a, b) => b[1] - a[1]);
+    const axis = dims[0][0];
+    const L = dims[0][1];
+    const cfg = CREATURE_COLLIDER[kind] || CREATURE_COLLIDER.whale;
+    const r = Math.max(0.6, L * cfg.radius);
+    const half = Math.max(0, L / 2 - r * 0.9);
+    const list = [];
+
+    if (cfg.m) {
+      // 두 축에 걸친 구체 그리드 (넓고 납작한 생물)
+      const axis2 = dims[1][0];
+      const L2 = dims[1][1];
+      const half2 = Math.max(0, L2 / 2 - r * 0.9);
+      for (let j = 0; j < cfg.m; j++) {
+        const t2 = cfg.m === 1 ? 0 : (j / (cfg.m - 1)) * 2 - 1;
+        for (let i = 0; i < cfg.n; i++) {
+          const t = cfg.n === 1 ? 0 : (i / (cfg.n - 1)) * 2 - 1;
+          const s = { x: center.x, y: center.y, z: center.z, r };
+          s[axis] = center[axis] + t * half;
+          s[axis2] = center[axis2] + t2 * half2;
+          list.push(s);
+        }
+      }
+      return list;
+    }
+
+    for (let i = 0; i < cfg.n; i++) {
+      const t = cfg.n === 1 ? 0 : (i / (cfg.n - 1)) * 2 - 1;
+      const s = { x: center.x, y: center.y, z: center.z, r };
+      s[axis] = center[axis] + t * half;
+      list.push(s);
+    }
+    return list;
+  }
+
   _buildCreatures() {
     const rnd = mulberry(3131);
     const plan = [
@@ -879,6 +933,12 @@ export class World {
       obj.group.scale.setScalar(p.scale);
       obj.group.rotation.order = 'YXZ';
       this.scene.add(obj.group);
+      c.colliders = this._creatureColliders(obj.group, p.kind);
+      let reach = 0;
+      for (const s of c.colliders) {
+        reach = Math.max(reach, Math.hypot(s.x, s.y, s.z) + s.r);
+      }
+      c.cullR = reach + 24;
       this.creatures.push(c);
     }
   }
@@ -1087,5 +1147,78 @@ export class World {
   reset() {
     this.time = 0;
     this.setZone(0);
+  }
+
+  /**
+   * 대형 관상 생물(고래·만타가오리·거북)과의 충돌 — 플레이어를 밖으로 밀어낸다.
+   * 데미지는 없고, 불러준 쪽(main.js)이 충격음·카메라 흔들림을 처리한다.
+   * @returns {number} 이번 호출에서 밀려난 거리 합 (0 이면 충돌 없음)
+   */
+  resolveCreatureCollisions(pos, radius, vel) {
+    let pushed = 0;
+    for (const c of this.creatures) {
+      const list = c.colliders;
+      if (!list || !list.length) continue;
+      const g = c.obj.group;
+      const dx = pos.x - g.position.x;
+      const dy = pos.y - g.position.y;
+      const dz = pos.z - g.position.z;
+      const cull = c.cullR || 80;
+      if (dx * dx + dy * dy + dz * dz > cull * cull) continue;
+
+      const cos = Math.cos(g.rotation.y);
+      const sin = Math.sin(g.rotation.y);
+      // 월드 → 생물 로컬 (y축 회전만 고려)
+      let lx = dx * cos - dz * sin;
+      let ly = dy;
+      let lz = dx * sin + dz * cos;
+      let lastX = pos.x;
+      let lastY = pos.y;
+      let lastZ = pos.z;
+
+      // 구체들이 서로 겹치므로 여러 번 반복해 완전히 밖으로 내보낸다
+      for (let pass = 0; pass < 3; pass++) {
+        let movedThisPass = false;
+        for (const s of list) {
+          const ox = lx - s.x;
+          const oy = ly - s.y;
+          const oz = lz - s.z;
+          const rr = s.r + radius;
+          const d2 = ox * ox + oy * oy + oz * oz;
+          if (d2 >= rr * rr) continue;
+          const d = Math.sqrt(d2) || 0.0001;
+          const nx = ox / d;
+          const ny = oy / d;
+          const nz = oz / d;
+          const overlap = rr - d;
+
+          // 로컬 법선 → 월드
+          const wx = nx * cos + nz * sin;
+          const wz = -nx * sin + nz * cos;
+          pos.x += wx * overlap;
+          pos.y += ny * overlap;
+          pos.z += wz * overlap;
+
+          if (vel) {
+            const vn = vel.x * wx + vel.y * ny + vel.z * wz;
+            if (vn < 0) {
+              vel.x -= wx * vn * 1.7;
+              vel.y -= ny * vn * 1.7;
+              vel.z -= wz * vn * 1.7;
+            }
+          }
+
+          // 같은 생물의 다음 구체도 갱신된 위치로 판정
+          lx += nx * overlap;
+          ly += ny * overlap;
+          lz += nz * overlap;
+          pushed += overlap;
+          movedThisPass = true;
+        }
+        if (!movedThisPass) break;
+      }
+
+    }
+    return pushed;
   }
 }

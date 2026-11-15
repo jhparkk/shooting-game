@@ -40,7 +40,16 @@
           <span class="stat-sub">최고 <b id="hud-best">0</b></span>
         </div>
         <div class="hull-wrap">
-          <div id="hud-hull" class="hearts" aria-label="잠수정 내구도"></div>
+          <div id="dur" class="dur safe" role="progressbar" aria-label="잠수정 내구력" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+            <div class="dur-head">
+              <span class="dur-label">내구력</span>
+              <span class="dur-read"><b id="dur-val">100</b><i>/</i><span id="dur-max">100</span></span>
+            </div>
+            <div class="dur-track">
+              <div id="dur-fill" class="dur-fill"></div>
+            </div>
+          </div>
+          <div id="dur-flag" class="dur-flag hidden" aria-live="polite">⚠ 심해 수압</div>
           <div id="hud-shield" class="shield hidden"><span aria-hidden="true">🛡</span><b id="shield-val">0</b></div>
         </div>
         <div id="powerups" class="powerups"></div>
@@ -139,10 +148,11 @@
         <li><b>📱 조이스틱</b><span>왼쪽 드래그로 전진·회전, ▲▼로 상승·하강</span></li>
         <li><b>🔥 발사</b><span>오른쪽 FIRE 를 누르고 있으면 연사</span></li>
         <li><b>🌊 탐험</b><span>산호 언덕에서 협곡·해구 깊은 곳까지 내려가세요</span></li>
+        <li><b>🛡 내구력</b><span>큰 생물과 부딪히면 밀려나고, 3초 쉬면 내구력이 회복됩니다</span></li>
         <li><b>🖥 PC</b><span>WASD 이동 · Q/E 고도 · Space/클릭 발사</span></li>
         <li><b>〰 음파</b><span>폭탄 버튼 또는 B 로 주변 정리</span></li>
       </ul>
-      <div class="start-foot">3인칭 자유 유영 · 웨이브 3마다 크라켄</div>
+      <div class="start-foot">3인칭 자유 유영 · 웨이브 3마다 크라켄 · 70m 아래는 수압 주의</div>
     </div>
   </div>
 
@@ -213,6 +223,6 @@
     __showError('promise: ' + (r && r.message ? r.message : String(r)));
   });
 </script>
-<script type="module" src="js/main.js?v=20261115c"></script>
+<script type="module" src="js/main.js?v=20261115d"></script>
 </body>
 </html>
