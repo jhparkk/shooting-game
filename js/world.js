@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611180n';
-import { getTextures } from './textures.js?v=202611180n';
+} from './models.js?v=202611190a';
+import { getTextures } from './textures.js?v=202611190a';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -25,11 +25,12 @@ export const SHELF_Y = 9;        // 산호 지대 평지 (수심 약 34m)
 export const CANYON_FLOOR = -215; // 중층 해저 협곡 바닥 (수심 약 336m)
 export const TRENCH_FLOOR = -470; // 심해 해구 대지 (수심 약 680m)
 export const ABYSS_FLOOR = -950;  // 초심해 심연 바닥 (수심 약 1,330m)
+export const HADAL_FLOOR = -1985; // 극심해 해구 바닥 (수심 약 2,730m · 마리아나 해구급)
 
 /** 수심(m) 환산 계수 — 월드 1단위 = 1.35m */
 export const DEPTH_SCALE = 1.35;
 
-/* 수심 구간별 물빛 — 표층 산호대 → 중층 협곡 → 심해 해구 → 초심해 심연 */
+/* 수심 구간별 물빛 — 표층 산호대 → 중층 협곡 → 심해 해구 → 초심해 심연 → 극심해 해구 */
 export const ZONES = [
   {
     name: '표층 산호대',
@@ -67,12 +68,35 @@ export const ZONES = [
     sun: 0x9db8e8, sunI: 0.24,
     coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
   },
+  {
+    name: '극심해 해구',
+    fog: 0x01030b, density: 0.0092,
+    skyTop: 0x03102b, skyMid: 0x010413, skyBottom: 0x000103,
+    hemiSky: 0x1a3570, hemiGround: 0x02030a, hemi: 0.42,
+    ambient: 0x1a2a58, ambientI: 0.4,
+    sun: 0x8aa8dd, sunI: 0.16,
+    coral: [0x2e5aa8, 0x4f74c8, 0x6a4fc0, 0x2d9d9d, 0x46628f],
+  },
 ];
 
-/* 물빛이 바뀌는 수심(m) 경계 */
-export const ZONE_DEPTHS = [150, 550, 1000];
-/** 물빛 그라디언트가 완료되는 수심 */
-const DEPTH_GRADIENT_END = 1200;
+/* 물빛이 바뀌는 수심(m) 경계 — 0~150 / 150~550 / 550~1,000 / 1,000~1,800 / 1,800+ */
+export const ZONE_DEPTHS = [150, 550, 1000, 1800];
+/** 구역 경계에서 물빛이 섞이는 폭(m) */
+const ZONE_BLEND = 160;
+
+/** 수심(m) → 어느 두 구역 사이를 얼마나 섞을지 */
+export function zoneBlendAt(depth) {
+  for (let i = 0; i < ZONE_DEPTHS.length; i++) {
+    const b = ZONE_DEPTHS[i];
+    if (depth < b + ZONE_BLEND) {
+      if (depth <= b - ZONE_BLEND) return { a: i, b: i, u: 0 };
+      const t = (depth - (b - ZONE_BLEND)) / (ZONE_BLEND * 2);
+      return { a: i, b: i + 1, u: t * t * (3 - 2 * t) };
+    }
+  }
+  const last = ZONES.length - 1;
+  return { a: last, b: last, u: 0 };
+}
 
 /* 대형 관상 생물의 충돌체 설정 — 종마다 몸 비율이 달라 따로 둔다
    radius: 가장 긴 축 길이 대비 구체 반지름
@@ -101,10 +125,10 @@ const CREATURE_KINDS = {
 };
 
 export function zoneIndexForDepth(depth) {
-  if (depth < ZONE_DEPTHS[0]) return 0;
-  if (depth < ZONE_DEPTHS[1]) return 1;
-  if (depth < ZONE_DEPTHS[2]) return 2;
-  return 3;
+  for (let i = 0; i < ZONE_DEPTHS.length; i++) {
+    if (depth < ZONE_DEPTHS[i]) return i;
+  }
+  return ZONE_DEPTHS.length;
 }
 
 /* ---------------- 청크 스트리밍 설정 ---------------- */
@@ -185,6 +209,12 @@ function abyssCore(x, z) {
   return smoothstep(700, 235, d);
 }
 
+/** 심연 한가운데 있는 극심해 해구(마리아나 해구급) — 2,700m 바닥까지 이어진다 */
+function hadalCore(x, z) {
+  const d = Math.hypot((x - 210) * 0.92, z + 1430);
+  return smoothstep(620, 190, d);
+}
+
 /**
  * 해저 높이 (월드 y) — 모든 (x, z) 에서 연속. 경계 없음.
  *  · 산호 언덕 봉우리 y≈21        → 수심 약 18m
@@ -192,6 +222,7 @@ function abyssCore(x, z) {
  *  · 해저 협곡 바닥   y≈-215      → 수심 약 336m
  *  · 심해 해구 대지   y≈-470      → 수심 약 680m
  *  · 초심해 심연      y≈-950      → 수심 약 1,330m
+ *  · 극심해 해구      y≈-1,985    → 수심 약 2,730m
  * 수심(m) = (SURFACE_Y - y) * DEPTH_SCALE
  */
 export function getTerrainHeight(x, z) {
@@ -209,7 +240,7 @@ export function getTerrainHeight(x, z) {
     h = h * (1 - v) + deep * v;
   }
 
-  // 2) 심해 해구 대지 → 3) 초심해 심연 (대륙 규모의 완만한 함몰)
+  // 2) 심해 해구 대지 → 3) 초심해 심연 → 4) 극심해 해구 (대륙 규모의 완만한 함몰)
   const guard = startGuard(x, z);
   if (guard > 0.0015) {
     const b = basinField(x, z);
@@ -226,6 +257,13 @@ export function getTerrainHeight(x, z) {
         + 12 * Math.sin(x * 0.021 - 0.7) * Math.cos(z * 0.018 + 1.1)
         + 6 * Math.sin((x + z) * 0.0105);
       h = h * (1 - t2) + f2 * t2;
+    }
+    const t3 = Math.max(smoothstep(1.72, 2.42, b), hadalCore(x, z)) * guard;
+    if (t3 > 0.0015) {
+      const f3 = HADAL_FLOOR
+        + 16 * Math.sin(x * 0.017 + 0.9) * Math.cos(z * 0.014 - 1.3)
+        + 9 * Math.sin((x - z) * 0.0082 + 0.6);
+      h = h * (1 - t3) + f3 * t3;
     }
   }
   return h;
@@ -344,6 +382,7 @@ export class World {
     this._buildFarFloor();
     this._buildRays();
     this._buildParticles();
+    this._buildVents();
     this._buildSchools();
     this._buildCreatures();
     this.setZone(0);
@@ -554,11 +593,11 @@ export class World {
 
   /* ---------------- 먼 바다 바닥 (경계를 안개로 덮는다) ---------------- */
   _buildFarFloor() {
-    const geo = new THREE.CircleGeometry(1500, 32);
+    const geo = new THREE.CircleGeometry(1800, 32);
     geo.rotateX(-Math.PI / 2);
     this.farMat = new THREE.MeshBasicMaterial({ color: this.zone.fog, fog: true, depthWrite: true });
     this.farFloor = new THREE.Mesh(geo, this.farMat);
-    this.farFloor.position.y = ABYSS_FLOOR - 40;
+    this.farFloor.position.y = HADAL_FLOOR - 40;
     this.farFloor.frustumCulled = false;
     this.farFloor.renderOrder = -5;
     this.scene.add(this.farFloor);
@@ -1022,6 +1061,59 @@ export class World {
     this.scene.add(this.plankton);
   }
 
+  /* ---------------- 극심해 열수구 불빛 (2,000m+ 분위기) ---------------- */
+  _buildVents() {
+    const glow = glowTexture();
+    this.ventMat = new THREE.MeshLambertMaterial({ color: 0x241d18 });
+    this.vents = [];
+    for (let i = 0; i < 16; i++) {
+      const group = new THREE.Group();
+      const h = 5 + Math.random() * 9;
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(1.4 + Math.random() * 1.2, h, 7, 1),
+        this.ventMat
+      );
+      cone.position.y = h / 2 - 0.6;
+      cone.rotation.y = Math.random() * 6.28;
+      group.add(cone);
+
+      // 굴뚝 끝에서 타오르는 열기 — 주황 불빛
+      const ember = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0xff7d33, transparent: true, opacity: 0.8,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      ember.position.y = h + 0.3;
+      ember.scale.setScalar(6 + Math.random() * 5);
+      group.add(ember);
+
+      // 굴뚝을 타고 오르는 푸른 생물 발광
+      const cool = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0x58e2ff, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      cool.position.y = h * 0.45;
+      cool.scale.setScalar(3 + Math.random() * 2.5);
+      group.add(cool);
+
+      group.visible = false;
+      group.userData = { ember, cool, phase: Math.random() * 6.28, emberScale: ember.scale.x };
+      this.scene.add(group);
+      this.vents.push(group);
+    }
+  }
+
+  _seedVent(v, px, pz, playerY) {
+    for (let tries = 0; tries < 6; tries++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 240;
+      const x = px + Math.cos(ang) * dist;
+      const z = pz + Math.sin(ang) * dist;
+      const gy = getTerrainHeight(x, z);
+      v.position.set(x, gy - 0.5, z);
+      if (gy < playerY - 3) return;
+    }
+  }
+
   /* ---------------- 물고기 떼 ---------------- */
   _seedSchool(school, rnd, px, pz) {
     const ang = rnd() * Math.PI * 2;
@@ -1124,8 +1216,8 @@ export class World {
       { kind: 'humpback', scale: 1.1, band: [10, 190], radius: 132, angular: 0.03, clearance: 12 },
       { kind: 'blue', scale: 1.05, band: [15, 260], radius: 168, angular: -0.021, clearance: 14 },
       { kind: 'orca', scale: 1.15, band: [10, 400], radius: 116, angular: 0.043, clearance: 10 },
-      { kind: 'sperm', scale: 1.3, band: [380, 1260], radius: 138, angular: 0.026, clearance: 16 },
-      { kind: 'sperm', scale: 1.1, band: [320, 1220], radius: 178, angular: -0.022, clearance: 18 },
+      { kind: 'sperm', scale: 1.3, band: [380, 2700], radius: 138, angular: 0.026, clearance: 16 },
+      { kind: 'sperm', scale: 1.1, band: [320, 2550], radius: 178, angular: -0.022, clearance: 18 },
       { kind: 'manta', scale: 1.15, band: [5, 210], radius: 106, angular: 0.05, clearance: 7 },
       { kind: 'manta', scale: 1.4, band: [10, 280], radius: 142, angular: -0.04, clearance: 9 },
       { kind: 'eagle', scale: 1.15, band: [5, 180], radius: 94, angular: 0.06, clearance: 6 },
@@ -1196,16 +1288,14 @@ export class World {
     // 청크 스트리밍
     this._streamChunks(playerPos);
 
-    // 수심에 따른 물빛 전환 — 표층 산호대에서 초심해 심연까지 네 단계
+    // 수심에 따른 물빛 전환 — 표층 산호대에서 극심해 해구까지 다섯 단계
     const depth = Math.max(0, (SURFACE_Y - playerPos.y) * DEPTH_SCALE);
-    const tNorm = clamp01(depth / DEPTH_GRADIENT_END);
-    this.depthT = tNorm;
+    this.depthT = clamp01(depth / ZONE_DEPTHS[ZONE_DEPTHS.length - 1]);
     this.zoneIndex = zoneIndexForDepth(depth);
-    const t = tNorm * (ZONES.length - 1);
-    const a = Math.min(ZONES.length - 2, Math.floor(t));
-    const b = a + 1;
-    let u = clamp01(t - a);
-    u = u * u * (3 - 2 * u);
+    const blend = zoneBlendAt(depth);
+    const a = blend.a;
+    const b = blend.b;
+    const u = blend.u;
     const c0 = this.zoneCols[a];
     const c1 = this.zoneCols[b];
     const z0 = ZONES[a];
@@ -1366,9 +1456,30 @@ export class World {
       if (c.obj.update) c.obj.update(c.t);
     }
 
+    // 극심해 열수구 — 1,800m 아래에서만 바닥 가까이에 모습을 드러낸다
+    const ventK = clamp01((depth - 1500) / 480);
+    if (ventK > 0.01 || this._ventsOn) {
+      this._ventsOn = ventK > 0.01;
+      for (const v of this.vents) {
+        if (ventK <= 0.01) { v.visible = false; continue; }
+        const vd = v.position;
+        const dx = vd.x - playerPos.x;
+        const dz = vd.z - playerPos.z;
+        if (dx * dx + dz * dz > 320 * 320 || vd.y > playerPos.y - 2) {
+          this._seedVent(v, playerPos.x, playerPos.z, playerPos.y);
+        }
+        const u = v.userData;
+        const pulse = 0.65 + 0.35 * Math.sin(this.time * 1.7 + u.phase);
+        u.ember.material.opacity = ventK * (0.45 + pulse * 0.5);
+        u.cool.material.opacity = ventK * 0.32 * pulse;
+        u.ember.scale.setScalar(u.emberScale * (0.85 + pulse * 0.3));
+        v.visible = vd.y < playerPos.y - 2;
+      }
+    }
+
     // 하늘 돔·먼 바닥은 플레이어를 따라간다
     this.sky.position.set(playerPos.x, playerPos.y, playerPos.z);
-    this.farFloor.position.set(playerPos.x, ABYSS_FLOOR - 40, playerPos.z);
+    this.farFloor.position.set(playerPos.x, HADAL_FLOOR - 40, playerPos.z);
   }
 
   reset() {

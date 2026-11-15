@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611180n';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180n';
+import { Sound } from './audio.js?v=202611190a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611180n';
-import { FX } from './fx.js?v=202611180n';
+} from './models.js?v=202611190a';
+import { FX } from './fx.js?v=202611190a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -28,17 +28,23 @@ const SUB_R = 1.7;               // 잠수정 충돌 반경
 const REGEN_DELAY = 3;           // 마지막 피격 후 회복 시작까지 (초)
 const REGEN_RATE = 5.5;          // 초당 회복량
 const REGEN_FADE_FROM = 450;     // 이 수심까지는 정상 회복
-const REGEN_FADE_TO = 950;       // 이 수심부터는 회복이 거의 멈춘다
-const REGEN_FLOOR = 0.16;        // 심연에서 남는 회복 비율
-const PRESSURE_START = 460;      // 수압이 내구력을 깎기 시작하는 수심(m)
-const PRESSURE_FULL = 1300;      // 수압 감소가 최대가 되는 수심(m)
-const PRESSURE_RATE_MIN = 0.45;  // 460m 에서 초당 감소량
-const PRESSURE_RATE_MAX = 2.5;   // 1,300m 에서 초당 감소량
+const REGEN_FADE_TO = 1500;      // 이 수심부터는 회복이 거의 멈춘다
+const REGEN_FLOOR = 0.18;        // 심연에서 남는 회복 비율
+const PRESSURE_START = 500;      // 수압이 내구력을 깎기 시작하는 수심(m)
+/* 수심(m) → 초당 내구력 감소 — 1,000m에서 바로 티지지 않고 2,500m+까지 완만하게 오른다 */
+const PRESSURE_CURVE = [
+  [500, 0.30],
+  [900, 0.85],
+  [1300, 1.50],
+  [1800, 2.40],
+  [2400, 3.80],
+  [2800, 4.60],
+];
 const DMG_CONTACT = 14;          // 적 생물 접촉
 const DMG_SPIKE = 18;            // 복어·아귀 폭발
 const DMG_ORB = 12;              // 크라켄 구체
 const DMG_BOSS = 22;             // 크라켄 몸통 접촉
-const MAX_HULL_CAP = 300;        // 선체 보강 반복 상한
+const MAX_HULL_CAP = 360;        // 선체 보강 반복 상한
 
 /* ---------------- DOM ---------------- */
 const canvas = $('game');
@@ -151,8 +157,8 @@ const P = {
   roll: 0,
   speed: 32,
   backSpeed: 18,
-  lift: 24,
-  turnRate: 1.7,
+  lift: 26,
+  turnRate: 1.65,          // 좌/우 조이스틱 최대 선회 속도 (rad/s)
   bob: 0,
   bobPhase: 0,
 };
@@ -191,9 +197,15 @@ const LOOK_SENS = 0.0055;
 const PITCH_MIN = -1.2;
 const PITCH_MAX = 1.15;
 
+/* 마지막으로 사용자가 시점을 직접 건드린 시각(초).
+   이 직후에는 자동 추적 카메라가 시점을 가로채지 않는다. */
+let lastLookAt = -10;
+const nowSec = () => performance.now() * 0.001;
+
 function applyLook(dx, dy) {
   CAM.yaw -= dx * LOOK_SENS;
   CAM.pitch = clamp(CAM.pitch - dy * LOOK_SENS, PITCH_MIN, PITCH_MAX);
+  lastLookAt = nowSec();
 }
 
 function applyPinch(d0, d, base) {
@@ -204,6 +216,14 @@ function applyPinch(d0, d, base) {
 function applyZoom(deltaY, deltaMode) {
   const k = deltaMode === 1 ? 0.05 : 0.0018;
   CAM.dist = clamp(CAM.dist * (1 + deltaY * k), CAM.minDist, CAM.maxDist);
+}
+
+/** 두 각도의 최단 차이 (-π ~ π) */
+function angDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
 }
 
 /** 카메라를 잠수정 기준 기본 위치로 돌린다 */
@@ -577,10 +597,11 @@ function updateInput() {
   kb.move = 0;
   kb.turn = 0;
   kb.lift = 0;
-  if (keys.has('w') || keys.has('ㅈ')) kb.move += 1;
-  if (keys.has('s') || keys.has('ㄴ')) kb.move -= 1;
-  if (keys.has('a') || keys.has('ㅁ')) kb.turn -= 1;
-  if (keys.has('d') || keys.has('ㅇ')) kb.turn += 1;
+  // WASD·방향키 = 전진/후진/좌회전/우회전 (조이스틱과 같은 조향)
+  if (keys.has('w') || keys.has('ㅈ') || keys.has('arrowup')) kb.move += 1;
+  if (keys.has('s') || keys.has('ㄴ') || keys.has('arrowdown')) kb.move -= 1;
+  if (keys.has('a') || keys.has('ㅁ') || keys.has('arrowleft')) kb.turn -= 1;
+  if (keys.has('d') || keys.has('ㅇ') || keys.has('arrowright')) kb.turn += 1;
   if (keys.has('q') || keys.has('r') || keys.has('shift')) kb.lift += 1;
   if (keys.has('e') || keys.has('f')) kb.lift -= 1;
 
@@ -626,11 +647,19 @@ function updateDurabilityHud() {
   }
 }
 
-/** 수심별 수압 감소량 (내구력/초) — 1,000m 언저리는 완만하고 심연으로 갈수록 급해진다 */
+/** 수심별 수압 감소량 (내구력/초) — 500m부터 시작해 2,800m에서 최대 */
 function pressureRateAt(depth) {
   if (depth < PRESSURE_START) return 0;
-  const t = clamp((depth - PRESSURE_START) / (PRESSURE_FULL - PRESSURE_START), 0, 1);
-  return PRESSURE_RATE_MIN + (PRESSURE_RATE_MAX - PRESSURE_RATE_MIN) * Math.pow(t, 1.8);
+  const pts = PRESSURE_CURVE;
+  for (let i = 1; i < pts.length; i++) {
+    if (depth <= pts[i][0]) {
+      const [d0, r0] = pts[i - 1];
+      const [d1, r1] = pts[i];
+      const t = (depth - d0) / (d1 - d0);
+      return r0 + (r1 - r0) * t;
+    }
+  }
+  return pts[pts.length - 1][1];
 }
 
 /** 수심별 자동 회복 배율 — 450m 까지는 정상, 심연으로 갈수록 줄어든다 */
@@ -896,7 +925,8 @@ function ecoAt(depth) {
   if (depth < 150) return { cap: 6, min: 1.8, max: 3.4 };
   if (depth < 550) return { cap: 8, min: 1.5, max: 2.8 };
   if (depth < 1000) return { cap: 9, min: 1.3, max: 2.5 };
-  return { cap: 7, min: 1.9, max: 3.4 };
+  if (depth < 1800) return { cap: 8, min: 1.6, max: 3.0 };
+  return { cap: 7, min: 1.9, max: 3.4 };   // 극심해 해구 — 생물이 드물다
 }
 
 function seedAmbientLife() {
@@ -906,7 +936,6 @@ function seedAmbientLife() {
 
 /* 수적 생물 — 깊은 심해(700m+)에서만 드물게 조우하는 전설 */
 const KRAKEN_DEPTH = 700;
-
 function maybeSpawnKraken(dt) {
   if (G.state !== 'playing' || G.boss) return;
   if (G.depth < KRAKEN_DEPTH) {
@@ -923,7 +952,7 @@ function maybeSpawnKraken(dt) {
 
 function spawnKraken() {
   const b = makeKraken();
-  const hp = 40 + Math.round(Math.max(0, G.depth - 600) / 100) * 6;
+  const hp = Math.min(96, 40 + Math.round(Math.max(0, G.depth - 600) / 120) * 6);
   computeForward(forward);
   b.group.position.copy(P.pos).addScaledVector(forward, 76);
   b.group.position.y = clamp(
@@ -984,6 +1013,10 @@ function removeBoss() {
 }
 
 /* ---------------- 적 (살아 있는 해양 생물) ---------------- */
+/* 상어류(백상아리·귀상어)가 사는 가장 깊은 수심 — 이보다 깊은 심해에는 스폰도, 개체도 없다 */
+const SHARK_DEPTH_MAX = 650;
+const SHARK_FADE_TIME = 1.5;
+
 const ENEMY_STATS = {
   shark: { hp: 2, r: 1.7, score: 130 },   // 백상아리
   hammer: { hp: 3, r: 2.0, score: 180 },  // 귀상어
@@ -993,7 +1026,7 @@ const ENEMY_STATS = {
   angler: { hp: 2, r: 1.6, score: 140 },  // 심해 아귀
 };
 
-/** 수심에 따라 그 깊이에 사는 생물이 나온다 */
+/** 수심에 따라 그 깊이에 사는 생물이 나온다 — 상어류는 650m 까지만 */
 function pickEnemyType(depth) {
   const roll = Math.random();
   if (depth < 150) {
@@ -1010,16 +1043,25 @@ function pickEnemyType(depth) {
     if (roll < 0.84) return 'jelly';
     return 'lion';
   }
-  if (depth < 1000) {
+  if (depth < SHARK_DEPTH_MAX) {
+    // 550~650m — 상어류가 마지막으로 보이는 경계층
     if (roll < 0.4) return 'angler';
-    if (roll < 0.64) return 'jelly';
-    if (roll < 0.84) return 'hammer';
+    if (roll < 0.62) return 'jelly';
+    if (roll < 0.82) return 'hammer';
     return 'shark';
   }
-  if (roll < 0.5) return 'angler';
-  if (roll < 0.8) return 'jelly';
-  if (roll < 0.93) return 'hammer';
-  return 'shark';
+  if (depth < 1300) {
+    // 심해 해구 — 상어 대신 아귀와 발광 해파리
+    if (roll < 0.55) return 'angler';
+    return 'jelly';
+  }
+  if (depth < 2000) {
+    if (roll < 0.46) return 'angler';
+    return 'jelly';
+  }
+  // 초심해 심연·극심해 해구 — 아주 드문 아귀와 발광 해파리뿐
+  if (roll < 0.36) return 'angler';
+  return 'jelly';
 }
 
 function makeEnemyModel(type) {
@@ -1115,14 +1157,14 @@ function killEnemy(e) {
   if (idx >= 0) enemies.splice(idx, 1);
 
   // 깊은 심해일수록 선체 보강·수리 키트가 더 자주 나온다
-  const dropChance = 0.16 + Math.min(0.16, G.depth / 7000);
+  const dropChance = 0.18 + Math.min(0.22, G.depth / 5200);
   if (Math.random() < dropChance) dropItem(p.x, p.y, p.z);
   refreshHud();
 }
 
 function dropItem(x, y, z, forced) {
   // 선체 보강 · 긴급 수리도 꾸준히 나오도록 가중치를 둔다
-  const pool = G.depth > 450 ? DEEP_ITEM_POOL : ITEM_POOL;
+  const pool = G.depth > 1500 ? HADAL_ITEM_POOL : G.depth > 450 ? DEEP_ITEM_POOL : ITEM_POOL;
   const t = forced || pool[Math.floor(Math.random() * pool.length)];
   const mesh = new THREE.Mesh(itemGeos[t], itemMats[t]);
   const halo = spriteGlow(itemHalo[t], 3.0, 0.78);
@@ -1164,6 +1206,12 @@ const ITEM_POOL = [
 const DEEP_ITEM_POOL = [
   'hull', 'repair', 'hull', 'repair', 'hull',
   'bomb', 'multi', 'rapid', 'shield', 'repair',
+];
+
+/* 초심해·극심해(1,500m+) — 2,500m 바닥까지 버티도록 보강 위주 */
+const HADAL_ITEM_POOL = [
+  'hull', 'repair', 'hull', 'repair', 'hull', 'repair',
+  'shield', 'hull', 'repair', 'bomb', 'rapid', 'hull',
 ];
 
 /* ---------------- 아이템 ---------------- */
@@ -1349,42 +1397,22 @@ function clampToWorld(pos, vel) {
 function updatePlayer(dt) {
   updateInput();
 
-  // 조이스틱을 카메라 기준 이동 벡터로 (화면 보는 방향이 전진)
-  const cy = Math.cos(CAM.yaw);
-  const sy = Math.sin(CAM.yaw);
-  let mx = -sy * input.move + cy * input.turn;
-  let mz = -cy * input.move - sy * input.turn;
-  let mag = Math.hypot(mx, mz);
-  if (mag > 1) {
-    mx /= mag;
-    mz /= mag;
-    mag = 1;
-  }
-  const moving = mag > 0.06;
+  /* --- 탱크 조향 ---
+     왼쪽 조이스틱 상/하 = 전진·후진, 좌/우 = 잠수정 좌회전·우회전(yaw).
+     대각선으로 밀면 달리면서 부드럽게 선회한다. */
+  const turnIn = clamp(input.turn, -1, 1);
+  const driveIn = clamp(input.move, -1, 1);
+  P.yaw -= turnIn * P.turnRate * dt;          // 오른쪽 = 우회전(시계방향)
 
-  // 기체는 진행 방향을 바라보며 부드럽게 돌아간다 (발사 중엔 시점 쪽으로 더 빠르게)
-  const turnLerp = (v) => damp(v, dt);
-  if (moving) {
-    const want = Math.atan2(-mx, -mz);
-    let d = want - P.yaw;
-    while (d > Math.PI) d -= Math.PI * 2;
-    while (d < -Math.PI) d += Math.PI * 2;
-    P.yaw += d * turnLerp(input.fire ? 9 : 4.6);
-  } else if (input.fire) {
-    let d = CAM.yaw - P.yaw;
-    while (d > Math.PI) d -= Math.PI * 2;
-    while (d < -Math.PI) d += Math.PI * 2;
-    P.yaw += d * turnLerp(8);
-  }
+  // 기울기: 선회 방향으로 몸을 기울인다
+  const targetRoll = clamp(-turnIn * 0.4, -0.5, 0.5);
+  P.roll += (targetRoll - P.roll) * damp(5.5, dt);
 
-  const targetRoll = clamp(-input.turn * 0.42, -0.5, 0.5);
-  P.roll += (targetRoll - P.roll) * damp(6, dt);
-
-  // 추진 — 방향은 기체가 바라보는 쪽 (진행 방향을 따라간다)
+  // 추진 — 방향은 잠수정이 바라보는 정면
   computeHorizontal(horizontal);
-  const thrust = mag * P.speed;
-  // 깊은 심해일수록 상승·하강이 빠르다 (1,000m 이상을 답답하지 않게 오가도록)
-  const liftSpeed = P.lift + Math.min(64, Math.max(0, G.depth) * 0.075);
+  const thrust = driveIn >= 0 ? driveIn * P.speed : driveIn * P.backSpeed;
+  // 깊은 심해일수록 상승·하강이 빠르다 (2,500m+까지 답답하지 않게 오가도록)
+  const liftSpeed = P.lift + Math.min(96, Math.max(0, G.depth) * 0.05);
   const desired = tmpVec2.set(
     horizontal.x * thrust,
     input.lift * liftSpeed,
@@ -1398,10 +1426,10 @@ function updatePlayer(dt) {
   P.pos.addScaledVector(P.vel, dt);
   clampToWorld(P.pos, P.vel);
 
-  // 기울기 — 상승·하강과 카메라 시점을 함께 따른다
-  const aimW = clamp(mag + (input.fire ? 1 : 0), 0, 1);
+  // 기울기 — 상승·하강과 조준 시점을 함께 따른다
+  const aimW = clamp(Math.abs(driveIn) * 0.35 + (input.fire ? 0.65 : 0), 0, 1);
   const targetPitch = clamp(
-    clamp(P.vel.y * 0.02, -0.26, 0.26) + CAM.pitch * 0.8 * aimW,
+    clamp(P.vel.y * 0.02, -0.26, 0.26) + CAM.pitch * 0.5 * aimW,
     -0.95, 0.95
   );
   P.pitch += (targetPitch - P.pitch) * damp(6, dt);
@@ -1456,11 +1484,16 @@ function setSubVisible(v) {
 }
 
 function updateCamera(dt) {
-  // PC: 방향키 = 시점 회전
-  const kx = (keys.has('arrowleft') ? 1 : 0) - (keys.has('arrowright') ? 1 : 0);
-  const ky = (keys.has('arrowup') ? 1 : 0) - (keys.has('arrowdown') ? 1 : 0);
-  if (kx) CAM.yaw += kx * 1.9 * dt;
-  if (ky) CAM.pitch = clamp(CAM.pitch + ky * 1.4 * dt, -1.2, 1.15);
+  // 카메라가 잠수정 뒤를 부드럽게 따라간다
+  //  · 사용자가 오른쪽 빈 화면을 드래그하는 동안은 시점을 가로채지 않는다
+  //  · 조이스틱으로 달리거나 선회할 때는 잠수정 진행 방향 뒤로 정렬된다
+  const sinceLook = nowSec() - lastLookAt;
+  const turning = Math.abs(input.turn) > 0.12;
+  const driving = turning || Math.abs(input.move) > 0.1;
+  if (sinceLook > 0.35 && driving) {
+    const k = turning ? 7.5 : 3.2;
+    CAM.yaw += angDiff(P.yaw, CAM.yaw) * damp(k, dt);
+  }
 
   camDirFrom(camLook, CAM.yaw, CAM.pitch);
   CAM.distNow += (CAM.dist - CAM.distNow) * damp(11, dt);
@@ -1509,6 +1542,8 @@ function updateCamera(dt) {
 /* ---------------- 적 갱신 ---------------- */
 function updateEnemies(dt) {
   const pp = P.pos;
+  // 깊은 심해로 내려가면 상어류는 얕은 쪽으로 떠나간다 (스폰도 끊긴다)
+  const deepNow = G.depth > SHARK_DEPTH_MAX;
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     const o = e.obj;
@@ -1516,6 +1551,22 @@ function updateEnemies(dt) {
     e.phase += dt * e.swirl;
     if (e.bumpCd > 0) e.bumpCd -= dt;
     if (e.hitCd > 0) e.hitCd -= dt;
+
+    // 퇴장 중인 상어 — 멀어지며 서서히 사라진다
+    if (e.exiting !== undefined) {
+      e.exiting -= dt;
+      o.position.y += 4.5 * dt;
+      o.scale.setScalar(e.scale0 * Math.max(0, e.exiting / SHARK_FADE_TIME));
+      if (e.exiting <= 0) {
+        scene.remove(o);
+        enemies.splice(i, 1);
+      }
+      continue;
+    }
+    if (deepNow && (e.type === 'shark' || e.type === 'hammer') && e.exiting === undefined) {
+      e.exiting = SHARK_FADE_TIME;
+      continue;
+    }
 
     tmpVec.copy(pp).sub(o.position);
     const dist = tmpVec.length() || 1;
@@ -1783,6 +1834,7 @@ function findTarget(fromPos, coneCos) {
   let best = null;
   let bestScore = -Infinity;
   for (const e of enemies) {
+    if (e.exiting !== undefined) continue;   // 떠나가는 상어는 겨냥하지 않는다
     const dx = e.obj.position.x - fromPos.x;
     const dy = e.obj.position.y - fromPos.y;
     const dz = e.obj.position.z - fromPos.z;
@@ -2280,6 +2332,115 @@ async function runCamSelfTest() {
   return R;
 }
 
+/* ---------------- 검증용: 조이스틱 조향 자체 테스트 (?steertest) ----------------
+   실제 손가락 대신 합성 Pointer 이벤트를 조이스틱에 던져
+   "좌/우 = 선회(yaw)", "상/하 = 전진/후진", "카메라 뒤따라오기"를 확인한다. */
+async function runSteerSelfTest() {
+  const R = (window.__steerTest = {});
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const base = el.joystick.querySelector('.joy-base');
+  const rect = base.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const rad = rect.width * 0.42;
+  const ev = (type, x, y) => base.dispatchEvent(new PointerEvent(type, {
+    pointerId: 77, pointerType: 'touch', isPrimary: true,
+    bubbles: true, cancelable: true, clientX: x, clientY: y,
+  }));
+
+  try {
+    if (G.state !== 'playing') startGame();
+    await wait(400);
+
+    /* 1) 오른쪽으로 밀면 우회전 — yaw 가 줄어든다 */
+    const yaw0 = P.yaw;
+    ev('pointerdown', cx, cy);
+    ev('pointermove', cx + rad * 0.95, cy);
+    await wait(500);
+    const yawRight = P.yaw;
+    R.turnRight = {
+      dYaw: +(yawRight - yaw0).toFixed(3),
+      joyTurn: +joy.turn.toFixed(2),
+      pass: yawRight < yaw0 - 0.2 && joy.turn > 0.5,
+    };
+
+    /* 2) 왼쪽으로 밀면 좌회전 — yaw 가 늘어난다 */
+    ev('pointermove', cx - rad * 0.95, cy);
+    await wait(500);
+    const yawLeft = P.yaw;
+    R.turnLeft = { dYaw: +(yawLeft - yawRight).toFixed(3), pass: yawLeft > yawRight + 0.2 };
+
+    /* 3) 위로 밀면 전진 — 잠수정이 바라보는 쪽으로 나아간다 */
+    ev('pointerup', cx, cy);
+    await wait(120);
+    const p0 = P.pos.clone();
+    const yawFwd = P.yaw;
+    ev('pointerdown', cx, cy);
+    ev('pointermove', cx, cy - rad * 0.95);
+    await wait(800);
+    const p1 = P.pos.clone();
+    const movedDist = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    const fwdDir = new THREE.Vector3(-Math.sin(yawFwd), 0, -Math.cos(yawFwd));
+    const fwdDot = movedDist > 0.01
+      ? ((p1.x - p0.x) * fwdDir.x + (p1.z - p0.z) * fwdDir.z) / movedDist
+      : 0;
+    R.forward = {
+      moved: +movedDist.toFixed(2), dot: +fwdDot.toFixed(3),
+      camGap: +Math.abs(angDiff(P.yaw, CAM.yaw)).toFixed(3),
+      pass: movedDist > 4 && fwdDot > 0.9,
+    };
+
+    /* 4) 아래로 밀면 후진 — 정면 반대쪽으로 물러난다 */
+    ev('pointerup', cx, cy);
+    await wait(900);              // 전진 속도가 서서히 죽기를 기다린다
+    const p2 = P.pos.clone();
+    ev('pointerdown', cx, cy);
+    ev('pointermove', cx, cy + rad * 0.95);
+    await wait(900);
+    const p3 = P.pos.clone();
+    const backDist = Math.hypot(p3.x - p2.x, p3.z - p2.z);
+    const backDot = backDist > 0.01
+      ? ((p3.x - p2.x) * fwdDir.x + (p3.z - p2.z) * fwdDir.z) / backDist
+      : 0;
+    R.backward = { moved: +backDist.toFixed(2), dot: +backDot.toFixed(3), pass: backDist > 2 && backDot < -0.5 };
+    ev('pointerup', cx, cy);
+
+    /* 5) 선회하는 동안 카메라가 잠수정 뒤를 따라온다 */
+    ev('pointerdown', cx, cy);
+    ev('pointermove', cx + rad * 0.95, cy);
+    await wait(900);
+    const gap = Math.abs(angDiff(P.yaw, CAM.yaw));
+    R.camFollow = { gap: +gap.toFixed(3), pass: gap < 0.35 };
+    ev('pointerup', cx, cy);
+    await wait(150);
+
+    /* 6) 수심별 스폰 표 — 650m 아래에는 상어류가 없다 */
+    const table = {};
+    for (const d of [100, 400, 600, 700, 1000, 1500, 2000, 2500]) {
+      const t = {};
+      for (let i = 0; i < 500; i++) {
+        const k = pickEnemyType(d);
+        t[k] = (t[k] || 0) + 1;
+      }
+      table[d] = t;
+    }
+    R.spawnTable = table;
+    const sharkFree = [700, 1000, 1500, 2000, 2500].every((d) => !table[d].shark && !table[d].hammer);
+    R.sharkFreeDeeperThan650 = sharkFree;
+
+    /* 7) 해구 깊이 — 2,500m 아래 바닥이 실제로 존재하는가 */
+    R.deepestTerrain = window.__abyss.maxTerrainDepth(1800);
+    R.pass = !!(R.turnRight.pass && R.turnLeft.pass && R.forward.pass &&
+      R.backward.pass && R.camFollow.pass && sharkFree &&
+      R.deepestTerrain.depth >= 2500);
+    R.errors = (window.__errors || []).slice(0, 5);
+  } catch (err) {
+    R.fail = String(err && err.message ? err.message : err);
+    R.pass = false;
+  }
+  return R;
+}
+
 function boot() {
   try {
     initThree();
@@ -2299,7 +2460,8 @@ function boot() {
   setTimeout(() => { el.loading.style.display = 'none'; }, 800);
 
   G.pingTimer = 4;
-  if (new URLSearchParams(location.search).has('debug')) {
+  const params = new URLSearchParams(location.search);
+  if (params.has('debug') || params.has('steertest')) {
     window.__abyss = {
       G, P, enemies, items, orbs, world, renderer, camera, scene, player, torpedoes,
       startGame, spawnKraken, maybeSpawnKraken, damageBoss, removeBoss, spawnEnemy, useBomb,
@@ -2402,6 +2564,70 @@ function boot() {
         if (o.move !== undefined) joy.move = o.move;
         if (o.turn !== undefined) joy.turn = o.turn;
       },
+      /* 조향·추적 검증용 */
+      steer: () => ({
+        subYaw: +P.yaw.toFixed(3),
+        camYaw: +CAM.yaw.toFixed(3),
+        camGap: +angDiff(P.yaw, CAM.yaw).toFixed(3),
+        move: +joy.move.toFixed(2), turn: +joy.turn.toFixed(2),
+        vel: +P.vel.length().toFixed(2),
+        pos: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)],
+      }),
+      enemyCounts: () => {
+        const c = {};
+        for (const e of enemies) c[e.type] = (c[e.type] || 0) + 1;
+        return c;
+      },
+      spawnTable: (depth, n) => {
+        const c = {};
+        const total = n || 400;
+        for (let i = 0; i < total; i++) {
+          const t = pickEnemyType(depth);
+          c[t] = (c[t] || 0) + 1;
+        }
+        return c;
+      },
+      /** 이 지역에서 가장 깊은 해저 수심(m) — 해구 확장 검증용 */
+      maxTerrainDepth: (r) => {
+        const R = r || 1800;
+        let best = 0;
+        let at = [0, 0];
+        for (let x = -R; x <= R; x += 60) {
+          for (let z = -R; z <= R; z += 60) {
+            const d = (SURFACE_Y - terrainHeight(x, z)) * DEPTH_SCALE;
+            if (d > best) { best = d; at = [x, z]; }
+          }
+        }
+        return { depth: +best.toFixed(0), at };
+      },
+      /** 수면 바로 아래에서 바닥까지 실제로 내려가 본다 (수압·버팀 검증용) */
+      fullDescent: async (m) => {
+        const target = m || 2500;
+        const t0 = performance.now();
+        G.hull = G.maxHull = Math.max(G.maxHull, 300);
+        P.pos.set(210, SURFACE_Y - 6, -1430);
+        P.vel.set(0, 0, 0);
+        G.depth = 0;
+        joy.lift = -1;
+        let minHull = G.hull;
+        while (G.depth < target && performance.now() - t0 < 45000) {
+          await new Promise((r) => setTimeout(r, 100));
+          minHull = Math.min(minHull, G.hull);
+          if (G.state !== 'playing') break;
+        }
+        joy.lift = 0;
+        const y = P.pos.y;
+        await new Promise((r) => setTimeout(r, 700));
+        return {
+          depth: +G.depth.toFixed(0),
+          seconds: +((performance.now() - t0) / 1000).toFixed(1),
+          hullLeft: +G.hull.toFixed(0),
+          minHull: +minHull.toFixed(0),
+          groundY: +terrainHeight(P.pos.x, P.pos.z).toFixed(1),
+          y: +y.toFixed(1),
+          state: G.state,
+        };
+      },
       previewCreature, clearPreviews,
       previews: () => previews.map((p) => p.kind),
       creatureModels: () => ({
@@ -2412,8 +2638,11 @@ function boot() {
     };
   }
   loop();
-  if (new URLSearchParams(location.search).has('camtest')) {
+  if (params.has('camtest')) {
     runCamSelfTest();
+  }
+  if (params.has('steertest')) {
+    runSteerSelfTest();
   }
 }
 
