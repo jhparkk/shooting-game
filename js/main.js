@@ -3,13 +3,13 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js';
+import { Sound } from './audio.js?v=20261115b';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261115b';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
-} from './models.js';
-import { FX } from './fx.js';
+} from './models.js?v=20261115b';
+import { FX } from './fx.js?v=20261115b';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1415,6 +1415,7 @@ function loop() {
     const fps = frames / acc;
     frames = 0;
     acc = 0;
+    G.fps = Math.round(fps);
     if (fps < 45 && pixelRatio > 1 && G.lowFpsChecks < 2) {
       pixelRatio = Math.max(1, pixelRatio - 0.5);
       renderer.setPixelRatio(pixelRatio);

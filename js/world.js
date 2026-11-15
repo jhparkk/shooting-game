@@ -10,7 +10,7 @@ import {
   makeWhale, makeManta, makeTurtle, makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js';
+} from './models.js?v=20261115b';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;   // 해구 바닥 (수심 약 113m)
@@ -548,7 +548,7 @@ export class World {
           m.setPosition(
             ax + Math.cos(a) * R * Math.cos(rot),
             gy + 1.5 + Math.sin(a) * R * 1.05,
-            az + Math.cos(a) * R * Math.sin(rot) * Math.cos(rot) + (rnd() - 0.5) * 2
+            az + Math.cos(a) * R * Math.sin(rot)
           );
           geo.applyMatrix4(m);
           geos.push(geo);

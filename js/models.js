@@ -1641,10 +1641,14 @@ export function makeFishSchool(count) {
 export function rockGeometry(radius, seed) {
   const geo = new THREE.IcosahedronGeometry(radius, 1);
   const pos = geo.attributes.position;
-  const rnd = mulberry(seed);
   for (let i = 0; i < pos.count; i++) {
-    const f = 0.82 + rnd() * 0.38;
-    pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f * 0.82, pos.getZ(i) * f);
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    // 위치 기반 해시 — 같은 자리의 정점은 같은 변위를 받아 표면이 찢어지지 않는다
+    const h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + seed * 0.017) * 43758.5453;
+    const f = 0.86 + (h - Math.floor(h)) * 0.3;
+    pos.setXYZ(i, x * f, y * f * 0.82, z * f);
   }
   geo.computeVertexNormals();
   return geo;
