@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611190e';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190e';
+import { Sound } from './audio.js?v=20261116a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
-  makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
+  makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611190e';
-import { FX } from './fx.js?v=202611190e';
+} from './models.js?v=20261116a';
+import { FX } from './fx.js?v=20261116a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1540,7 +1540,29 @@ function updateCamera(dt) {
 }
 
 /* ---------------- 적 갱신 ---------------- */
+/** 종별 기준 속도 — 이보다 빨리 헤엄치는 개체가 많을수록 꼬리 박자가 잦아진다 */
+const SWIM_BASE_SPEED = { shark: 14, hammer: 10.5, puffer: 3.3, lion: 3.3, angler: 5.2 };
+const swimRateNow = {};
+
+function updateSwimRates(dt) {
+  const sum = {};
+  const n = {};
+  for (const e of enemies) {
+    const base = SWIM_BASE_SPEED[e.type];
+    if (!base) continue;
+    sum[e.type] = (sum[e.type] || 0) + e.speed;
+    n[e.type] = (n[e.type] || 0) + 1;
+  }
+  for (const k in sum) {
+    const want = Math.max(0.7, Math.min(1.45, sum[k] / n[k] / SWIM_BASE_SPEED[k]));
+    const cur = swimRateNow[k] === undefined ? want : swimRateNow[k];
+    swimRateNow[k] = cur + (want - cur) * Math.min(1, dt * 1.2);
+    setSwimRate(k, swimRateNow[k]);
+  }
+}
+
 function updateEnemies(dt) {
+  updateSwimRates(dt);
   const pp = P.pos;
   // 깊은 심해로 내려가면 상어류는 얕은 쪽으로 떠나간다 (스폰도 끊긴다)
   const deepNow = G.depth > SHARK_DEPTH_MAX;
@@ -1578,9 +1600,16 @@ function updateEnemies(dt) {
       o.position.addScaledVector(tmpVec, e.speed * dt);
       o.position.addScaledVector(side, Math.sin(e.phase * 2) * e.swayAmp * dt);
       o.position.y += Math.sin(e.phase * 1.7) * 1.6 * dt;
-      o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+      const yaw = Math.atan2(-tmpVec.x, -tmpVec.z);
+      // 급하게 방향을 틀수록 몸을 안쪽으로 기울인다 (banking roll)
+      const dYaw = e.prevYaw === undefined ? 0 : angDiff(yaw, e.prevYaw);
+      e.prevYaw = yaw;
+      const turnRate = dt > 0 ? dYaw / dt : 0;
+      const bankWant = Math.max(-0.45, Math.min(0.45, turnRate * 0.1));
+      e.bank = (e.bank || 0) + (bankWant - (e.bank || 0)) * Math.min(1, dt * 5);
+      o.rotation.y = yaw;
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.7;
-      o.rotation.z = Math.sin(e.phase * 2) * 0.3;
+      o.rotation.z = Math.sin(e.phase * 2) * 0.14 + e.bank;
     } else if (e.type === 'jelly') {
       o.position.addScaledVector(tmpVec, e.speed * dt);
       o.position.x += Math.sin(e.phase) * dt * 2.2;

@@ -12,8 +12,8 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=202611190e';
-import { getTextures } from './textures.js?v=202611190e';
+} from './models.js?v=20261116a';
+import { getTextures } from './textures.js?v=20261116a';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1401,6 +1401,7 @@ export class World {
     // 물고기 떼 (원형 유영) — 무한 바다이므로 플레이어를 따라 새로 자리잡는다
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
+    const eul = new THREE.Euler(0, 0, 0, 'YXZ');
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
     const yAxis = new THREE.Vector3(0, 1, 0);
@@ -1412,6 +1413,8 @@ export class World {
       const cz = s.center.z + Math.sin(s.angle) * s.radius;
       const cy = s.center.y + Math.sin(this.time * 0.5 + s.bob) * 3.5;
       const heading = Math.atan2(-Math.sin(s.angle) * Math.sign(s.angular), Math.cos(s.angle) * Math.sign(s.angular));
+      // 떼 전체가 선회 방향 안쪽으로 기울고, 한 마리씩 조금씩 다른 자세로 흔들린다
+      const bank = -Math.sign(s.angular) * 0.2;
       for (let i = 0; i < s.offsets.length; i++) {
         const o = s.offsets[i];
         pos.set(
@@ -1419,7 +1422,12 @@ export class World {
           cy + o.y + Math.cos(this.time * 1.4 + o.p) * 0.6,
           cz + o.z + Math.cos(this.time * 1.1 + o.p) * 1.4
         );
-        q.setFromAxisAngle(yAxis, heading + Math.PI + Math.sin(this.time * 2 + o.p) * 0.2);
+        eul.set(
+          Math.sin(this.time * 1.4 + o.p) * 0.12,
+          heading + Math.sin(this.time * 2 + o.p) * 0.2,
+          bank + Math.sin(this.time * 2 + o.p) * 0.12
+        );
+        q.setFromEuler(eul);
         scl.setScalar(o.s * s.scale * 0.55);
         m.compose(pos, q, scl);
         s.mesh.setMatrixAt(i, m);
@@ -1437,7 +1445,8 @@ export class World {
       if (!c.seeded || far || drift) this._seedCreature(c, playerPos.x, playerPos.z, depth);
 
       const g = c.obj.group;
-      const R = c.radius;
+      // 원 궤도 위에서 반지름을 살짝 흔들며 도는 부드러운 유영 — 딱딱한 원운동을 벗어난다
+      const R = c.radius * (1 + Math.sin(c.t * 0.23 + c.bobPhase * 1.7) * 0.07);
       const cx = c.center.x + Math.cos(c.angle) * R;
       const cz = c.center.z + Math.sin(c.angle) * R;
       const ground = getTerrainHeight(cx, cz) + c.clearance;
@@ -1447,16 +1456,29 @@ export class World {
       const hide = shallowestY < ground - 3;
       if (g.visible === hide) g.visible = !hide;
       if (hide) continue;
-      let cy = wantY + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4;
+      let cy = wantY
+        + Math.sin(c.t * 0.35 + c.bobPhase) * 2.4
+        + Math.sin(c.t * 0.92 + c.bobPhase * 2.3) * 0.7;
       if (cy < ground) cy = ground;
       if (cy > SURFACE_Y - 4) cy = SURFACE_Y - 4;
       const dir = c.angular >= 0 ? 1 : -1;
       const vx = -Math.sin(c.angle) * dir;
       const vz = Math.cos(c.angle) * dir;
+      const speed = Math.abs(c.angular) * R;
+      const vy = c.lastY === undefined || dt <= 0 ? 0 : (cy - c.lastY) / dt;
+      c.lastY = cy;
+      if (c.roll === undefined) { c.roll = 0; c.pitch = 0; }
+      // 선회 방향 안쪽으로 몸을 기울이고(bank), 오르내릴 때 머리가 진행 방향을 따라 기운다(pitch)
+      const bankWant = -dir * Math.min(0.34, 0.1 + speed * 0.016) +
+        Math.sin(c.t * 0.4 + c.bobPhase) * 0.03;
+      const pitchWant = Math.max(-0.3, Math.min(0.3, Math.atan2(vy, Math.max(1.2, speed)) * 0.85));
+      const kk = Math.min(1, dt * 1.8);
+      c.roll += (bankWant - c.roll) * kk;
+      c.pitch += (pitchWant - c.pitch) * kk;
       g.position.set(cx, cy, cz);
       g.rotation.y = Math.atan2(-vx, -vz);
-      g.rotation.z = Math.sin(c.t * 0.5) * 0.08;
-      g.rotation.x = Math.sin(c.t * 0.33 + c.bobPhase) * 0.05;
+      g.rotation.z = c.roll;
+      g.rotation.x = c.pitch;
       if (c.obj.update) c.obj.update(c.t);
     }
 

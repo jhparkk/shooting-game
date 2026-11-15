@@ -2,7 +2,7 @@
    ABYSS DIVER — 파티클 / 폭발 / 음파 링 이펙트
    ========================================================= */
 import * as THREE from 'three';
-import { glowTexture } from './models.js?v=20261115g';
+import { glowTexture } from './models.js?v=20261116a';
 
 export class FX {
   constructor(scene, max = 420) {

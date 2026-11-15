@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=202611190e';
+import { getTextures } from './textures.js?v=20261116a';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -331,15 +331,29 @@ function assemble(parts, z0, z1) {
   return merged;
 }
 
+/* 종별 유영 박자 — 게임 쪽에서 실제 이동 속도에 맞춰 바꾼다.
+   (재질은 종마다 하나를 함께 쓰므로, 박자도 종 단위로 맞춘다) */
+const SWIM_RATE = {};
+
+/** 헤엄 박자 배율 (1 = 기본 속도) — 빠르게 헤엄칠수록 꼬리질이 잦아진다 */
+export function setSwimRate(kind, factor) {
+  const r = SWIM_RATE[kind];
+  if (!r) return;
+  const f = factor < 0.62 ? 0.62 : factor > 1.55 ? 1.55 : factor;
+  r.u.value = r.base * f;
+}
+
 /** 유영 셰이더 재질 — 몸통이 좌우로 S 자로 흔들린다 */
-function swimMaterial(params, bend) {
+function swimMaterial(params, bend, kind) {
   const mat = new THREE.MeshPhongMaterial(params);
   if (params && params.vertexColors) addSkin(mat, 0.45);
+  const rate = bend.rateU || (bend.rateU = { value: bend.speed });
+  if (kind) SWIM_RATE[kind] = { u: rate, base: bend.speed };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = ANIM.time;
     shader.uniforms.uBendAmp = { value: bend.amp };
     shader.uniforms.uBendFreq = { value: bend.freq };
-    shader.uniforms.uBendSpeed = { value: bend.speed };
+    shader.uniforms.uBendSpeed = rate;
     shader.vertexShader =
       'uniform float uTime;\nuniform float uBendAmp;\nuniform float uBendFreq;\nuniform float uBendSpeed;\nattribute float aBend;\n' +
       shader.vertexShader.replace(
@@ -351,8 +365,10 @@ function swimMaterial(params, bend) {
           #ifdef USE_INSTANCING
             seed = instanceMatrix[3].x * 0.11 + instanceMatrix[3].z * 0.07;
           #endif
+          // 머리는 거의 고정, 뒤쪽 몸통·꼬리로 갈수록 크게 휘는 좌우 S자 파동
           float ph = uTime * uBendSpeed + seed - bt * uBendFreq;
-          float k = bt * bt;
+          float k = smoothstep(0.0, 1.0, bt);
+          k = k * k * (0.6 + 0.4 * bt);
           transformed.x += sin(ph) * uBendAmp * k;
           transformed.y += cos(ph * 0.7) * uBendAmp * 0.16 * k;
         }`
@@ -362,12 +378,70 @@ function swimMaterial(params, bend) {
   return mat;
 }
 
+/** 고래 유영 셰이더 재질 — 좌우가 아니라 위아래(Y축) S자 파동.
+ *  머리는 안정적이고 허리에서 꼬리로 갈수록 위아래 진폭이 커진다. */
+function whaleSwimMaterial(params, cfg, kind) {
+  const mat = new THREE.MeshPhongMaterial(params);
+  if (params && params.vertexColors) addSkin(mat, cfg.bump === undefined ? 0.5 : cfg.bump);
+  const amp = { value: cfg.amp };
+  const freq = { value: cfg.freq };
+  const rate = cfg.rateU || (cfg.rateU = { value: cfg.speed });
+  if (kind) SWIM_RATE[kind] = { u: rate, base: cfg.speed };
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = ANIM.time;
+    shader.uniforms.uBodyAmp = amp;
+    shader.uniforms.uBodyFreq = freq;
+    shader.uniforms.uBodyRate = rate;
+    shader.vertexShader =
+      `uniform float uTime;
+       uniform float uBodyAmp;
+       uniform float uBodyFreq;
+       uniform float uBodyRate;
+       attribute float aBend;
+      ` +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          float bt = aBend;
+          float seed = modelMatrix[3].x * 0.11 + modelMatrix[3].z * 0.07;
+          float ph = uTime * uBodyRate + seed - bt * uBodyFreq;
+          float k = smoothstep(0.0, 1.0, bt);
+          k = k * k * (0.55 + 0.45 * bt);
+          // 위아래 물결 — 허리에서 꼬리로 갈수록 크게
+          transformed.y += sin(ph) * uBodyAmp * k;
+          // 파동을 따라 몸이 아주 살짝 옆으로도 흐른다 (고래는 좌우로 흔들지 않는다)
+          transformed.x += sin(ph + 1.15) * uBodyAmp * 0.06 * k;
+        }`
+      );
+  };
+  mat.customProgramCacheKey = () => 'whaleBend';
+  return mat;
+}
+
+/** 그룹의 조각 전부를 감싸는 안쪽 그룹 — 몸통 전체의 부력(뜨고 가라앉기)용 */
+function heaveCore(g) {
+  const core = new THREE.Group();
+  while (g.children.length) core.add(g.children[0]);
+  g.add(core);
+  return core;
+}
+
+/** 굽힘 계수를 모두 0 으로 — 꼬리 조각은 그룹 변환으로만 움직인다 */
+function noBend(geo) {
+  bendify(geo, 0, 1);
+  const ab = geo.attributes.aBend;
+  for (let i = 0; i < ab.count; i++) ab.setX(i, 0);
+  return geo;
+}
+
 /** 같은 위상으로 꼬리 그룹을 흔든다 (셰이더 굽힘과 이어지게) */
 function tailSwing(m, t) {
   const b = m.bend;
   if (!b || !m.tail) return;
+  const spd = b.rateU ? b.rateU.value : b.speed;
   const seed = m.group.position.x * 0.11 + m.group.position.z * 0.07;
-  const ph = t * b.speed + seed - m.tailT * b.freq;
+  const ph = t * spd + seed - m.tailT * b.freq;
   const k = m.tailT * m.tailT;
   m.tail.position.x = Math.sin(ph) * b.amp * k;
   m.tail.position.y = Math.cos(ph * 0.7) * b.amp * 0.16 * k;
@@ -519,7 +593,7 @@ export function makeSubmarine() {
 /* =========================================================
    백상아리 — 유선형 몸통 · 회청색 등 / 흰 배
    ========================================================= */
-const SHARK_BEND = { amp: 0.15, freq: 3.3, speed: 3.4, wag: 0.40 };
+const SHARK_BEND = { amp: 0.22, freq: 3.6, speed: 3.2, wag: 0.46 };
 
 let _sharkGeo = null;
 let _sharkTailGeo = null;
@@ -630,7 +704,7 @@ export function makeShark() {
   if (!_sharkMat) {
     _sharkMat = swimMaterial(
       { vertexColors: true, shininess: 26, specular: 0x33454f },
-      SHARK_BEND
+      SHARK_BEND, 'shark'
     );
   }
   const g = new THREE.Group();
@@ -648,7 +722,7 @@ export function makeShark() {
 /* =========================================================
    귀상어(해머헤드) — 넓은 머리 날개
    ========================================================= */
-const HAMMER_BEND = { amp: 0.16, freq: 3.1, speed: 3.0, wag: 0.44 };
+const HAMMER_BEND = { amp: 0.22, freq: 3.4, speed: 2.9, wag: 0.48 };
 
 let _hammerGeo = null;
 let _hammerTailGeo = null;
@@ -763,7 +837,7 @@ export function makeHammerhead() {
   if (!_hammerMat) {
     _hammerMat = swimMaterial(
       { vertexColors: true, shininess: 20, specular: 0x2d3a32 },
-      HAMMER_BEND
+      HAMMER_BEND, 'hammer'
     );
   }
   const g = new THREE.Group();
@@ -846,7 +920,7 @@ export function makeJellyfish(color) {
 /* =========================================================
    독가시 복어 — 둥근 몸통 · 짧은 부채 꼬리
    ========================================================= */
-const PUFFER_BEND = { amp: 0.07, freq: 2.4, speed: 2.2, wag: 0.30 };
+const PUFFER_BEND = { amp: 0.1, freq: 3.0, speed: 2.2, wag: 0.34 };
 
 let _pufferBodyGeo = null;
 let _pufferTailGeo = null;
@@ -937,7 +1011,7 @@ function pufferGeometries() {
   if (!_pufferMat) {
     _pufferMat = swimMaterial(
       { vertexColors: true, shininess: 34, specular: 0x6b5a30 },
-      PUFFER_BEND
+      PUFFER_BEND, 'puffer'
     );
     _pufferSpikeMat = new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 70, specular: 0x8a7340,
@@ -963,7 +1037,7 @@ export function makePuffer() {
 /* =========================================================
    쏠배감펭(lionfish) — 세로로 넓적한 몸 · 줄무늬 · 부채 지느러미
    ========================================================= */
-const LION_BEND = { amp: 0.11, freq: 2.9, speed: 2.6, wag: 0.34 };
+const LION_BEND = { amp: 0.15, freq: 3.2, speed: 2.6, wag: 0.38 };
 
 let _lionGeo = null;
 let _lionTailGeo = null;
@@ -1071,7 +1145,7 @@ function lionGeometries() {
   if (!_lionMat) {
     _lionMat = swimMaterial(
       { vertexColors: true, shininess: 44, specular: 0x8a4a30 },
-      LION_BEND
+      LION_BEND, 'lion'
     );
     _lionFinMat = new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 22, specular: 0x5a3320,
@@ -1467,6 +1541,8 @@ const HUMP_PROFILE = [
 let _humpGeo = null;
 let _humpFluke = null;
 let _humpMat = null;
+/** 위아래 S자 파동 · 가슴지느러미 노 젓기 */
+const HUMP_SWIM = { amp: 1.5, freq: 2.5, speed: 0.9, bump: 0.6 };
 
 function humpbackGeometry() {
   if (_humpGeo) return _humpGeo;
@@ -1542,7 +1618,7 @@ function humpbackFlukeGeometry() {
     [2.6, -0.52], [1.4, -0.78], [0.5, -0.66], [0, -0.56], [-0.5, -0.66],
     [-1.4, -0.78], [-2.6, -0.52],
   ];
-  _humpFluke = hfin(pts, 0.18, 0x2b3a42, { smooth: true, curveSegments: 10 });
+  _humpFluke = noBend(hfin(pts, 0.18, 0x2b3a42, { smooth: true, curveSegments: 10 }));
   return _humpFluke;
 }
 
@@ -1569,36 +1645,51 @@ function humpbackPectoral(sign) {
 export function makeHumpbackWhale() {
   const geo = humpbackGeometry();
   if (!_humpMat) {
-    _humpMat = addSkin(new THREE.MeshPhongMaterial({
+    _humpMat = whaleSwimMaterial({
       vertexColors: true, shininess: 24, specular: 0x4d6473, side: THREE.DoubleSide,
-    }), 0.6);
+    }, HUMP_SWIM, 'humpback');
   }
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, _humpMat));
+  const core = new THREE.Group();
+  g.add(core);
+  core.add(new THREE.Mesh(geo, _humpMat));
 
   const fluke = new THREE.Group();
   fluke.position.set(0, 0.08, 7.1);
   fluke.add(new THREE.Mesh(humpbackFlukeGeometry(), _humpMat));
-  g.add(fluke);
+  core.add(fluke);
 
   const fins = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group();
     pivot.position.set(1.55 * s, -0.85, -3.1);
     pivot.add(new THREE.Mesh(humpbackPectoral(s), _humpMat));
-    g.add(pivot);
+    core.add(pivot);
     fins.push({ pivot, sign: s });
   }
 
   return {
-    group: g, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: fluke,
     update(t) {
-      fluke.rotation.x = Math.sin(t * 0.9) * 0.32;
-      fluke.rotation.z = Math.sin(t * 0.43) * 0.06;
-      for (const f of fins) {
-        f.pivot.rotation.z = -0.24 * f.sign + Math.sin(t * 0.55 + (f.sign > 0 ? 0.7 : 0)) * 0.14;
-        f.pivot.rotation.y = 0.34 * f.sign;
+      const b = HUMP_SWIM;
+      const rate = b.rateU ? b.rateU.value : b.speed;
+      const f = rate / b.speed;
+      const seed = g.position.x * 0.11 + g.position.z * 0.07;
+      // 몸통 파동과 같은 위상으로 꼬리지느러미가 뒤따라 친다
+      const ph = t * rate + seed - b.freq;
+      fluke.position.y = 0.08 + Math.sin(ph) * b.amp;
+      fluke.rotation.x = Math.cos(ph) * 0.5;
+      fluke.rotation.z = Math.sin(ph * 0.5) * 0.05;
+      // 가슴지느러미 — 노 젓듯 크게 위아래로, 앞뒤로도 살짝
+      const fa = t * 0.6 * f + seed;
+      for (const fin of fins) {
+        const beat = Math.sin(fa + (fin.sign > 0 ? 0.45 : 0));
+        fin.pivot.rotation.z = fin.sign * (-0.26 + beat * 0.24);
+        fin.pivot.rotation.x = Math.sin(fa + 1.25) * 0.13;
+        fin.pivot.rotation.y = fin.sign * (0.3 + beat * 0.06);
       }
+      // 부력 — 몸 전체가 아주 느리게 떠오르고 가라앉는다
+      core.position.y = Math.sin(t * 0.42 * f + seed) * 0.13;
     },
   };
 }
@@ -1613,6 +1704,7 @@ const ORCA_PROFILE = [
 let _orcaGeo = null;
 let _orcaFluke = null;
 let _orcaMat = null;
+const ORCA_SWIM = { amp: 0.62, freq: 2.4, speed: 1.55, bump: 0.35 };
 
 function orcaGeometry() {
   if (_orcaGeo) return _orcaGeo;
@@ -1661,7 +1753,7 @@ function orcaFlukeGeometry() {
     [-1.55, -0.06], [-1.0, 0.28], [-0.4, 0.36], [0, 0.2], [0.4, 0.36],
     [1.0, 0.28], [1.55, -0.06], [0.7, -0.32], [0, -0.38], [-0.7, -0.32],
   ];
-  _orcaFluke = hfin(pts, 0.12, 0x11171c, { smooth: true, curveSegments: 8 });
+  _orcaFluke = noBend(hfin(pts, 0.12, 0x11171c, { smooth: true, curveSegments: 8 }));
   return _orcaFluke;
 }
 
@@ -1678,35 +1770,47 @@ function orcaPectoral(sign) {
 export function makeOrca() {
   const geo = orcaGeometry();
   if (!_orcaMat) {
-    _orcaMat = addSkin(new THREE.MeshPhongMaterial({
+    _orcaMat = whaleSwimMaterial({
       vertexColors: true, shininess: 68, specular: 0x8fa8b8, side: THREE.DoubleSide,
-    }), 0.35);
+    }, ORCA_SWIM, 'orca');
   }
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, _orcaMat));
+  const core = new THREE.Group();
+  g.add(core);
+  core.add(new THREE.Mesh(geo, _orcaMat));
 
   const fluke = new THREE.Group();
   fluke.position.set(0, 0.02, 4.55);
   fluke.add(new THREE.Mesh(orcaFlukeGeometry(), _orcaMat));
-  g.add(fluke);
+  core.add(fluke);
 
   const fins = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group();
     pivot.position.set(0.95 * s, -0.5, -1.9);
     pivot.add(new THREE.Mesh(orcaPectoral(s), _orcaMat));
-    g.add(pivot);
+    core.add(pivot);
     fins.push({ pivot, sign: s });
   }
 
   return {
-    group: g, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: fluke,
     update(t) {
-      fluke.rotation.x = Math.sin(t * 1.15) * 0.36;
-      fluke.rotation.z = Math.sin(t * 0.5) * 0.05;
-      for (const f of fins) {
-        f.pivot.rotation.z = -0.16 * f.sign + Math.sin(t * 0.8 + (f.sign > 0 ? 0.5 : 0)) * 0.16;
+      const b = ORCA_SWIM;
+      const rate = b.rateU ? b.rateU.value : b.speed;
+      const f = rate / b.speed;
+      const seed = g.position.x * 0.11 + g.position.z * 0.07;
+      const ph = t * rate + seed - b.freq;
+      fluke.position.y = 0.02 + Math.sin(ph) * b.amp;
+      fluke.rotation.x = Math.cos(ph) * 0.58;
+      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
+      const fa = t * 0.85 * f + seed;
+      for (const fin of fins) {
+        const beat = Math.sin(fa + (fin.sign > 0 ? 0.4 : 0));
+        fin.pivot.rotation.z = fin.sign * (-0.16 + beat * 0.2);
+        fin.pivot.rotation.x = Math.sin(fa + 1.2) * 0.11;
       }
+      core.position.y = Math.sin(t * 0.5 * f + seed) * 0.06;
     },
   };
 }
@@ -1721,6 +1825,7 @@ const SPERM_PROFILE = [
 let _spermGeo = null;
 let _spermFluke = null;
 let _spermMat = null;
+const SPERM_SWIM = { amp: 1.0, freq: 2.1, speed: 0.95, bump: 0.75 };
 
 function spermGeometry() {
   if (_spermGeo) return _spermGeo;
@@ -1797,28 +1902,37 @@ function spermFlukeGeometry() {
     [0.4, 0.44], [1.2, 0.62], [2.2, 0.4], [3.0, -0.1],
     [1.6, -0.46], [0.6, -0.62], [0, -0.5], [-0.6, -0.62], [-1.6, -0.46],
   ];
-  _spermFluke = hfin(pts, 0.15, 0x424038, { smooth: true, curveSegments: 8 });
+  _spermFluke = noBend(hfin(pts, 0.15, 0x424038, { smooth: true, curveSegments: 8 }));
   return _spermFluke;
 }
 
 export function makeSpermWhale() {
   const geo = spermGeometry();
   if (!_spermMat) {
-    _spermMat = addSkin(new THREE.MeshPhongMaterial({
+    _spermMat = whaleSwimMaterial({
       vertexColors: true, shininess: 16, specular: 0x5a5346, side: THREE.DoubleSide,
-    }), 0.75);
+    }, SPERM_SWIM, 'sperm');
   }
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, _spermMat));
+  const core = new THREE.Group();
+  g.add(core);
+  core.add(new THREE.Mesh(geo, _spermMat));
   const fluke = new THREE.Group();
   fluke.position.set(0, 0.08, 7.2);
   fluke.add(new THREE.Mesh(spermFlukeGeometry(), _spermMat));
-  g.add(fluke);
+  core.add(fluke);
   return {
-    group: g, fluke, fins: [], tail: fluke,
+    group: g, core, fluke, fins: [], tail: fluke,
     update(t) {
-      fluke.rotation.x = Math.sin(t * 0.62) * 0.3;
-      fluke.rotation.z = Math.sin(t * 0.3) * 0.05;
+      const b = SPERM_SWIM;
+      const rate = b.rateU ? b.rateU.value : b.speed;
+      const f = rate / b.speed;
+      const seed = g.position.x * 0.11 + g.position.z * 0.07;
+      const ph = t * rate + seed - b.freq;
+      fluke.position.y = 0.08 + Math.sin(ph) * b.amp;
+      fluke.rotation.x = Math.cos(ph) * 0.46;
+      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
+      core.position.y = Math.sin(t * 0.36 * f + seed) * 0.12;
     },
   };
 }
@@ -1834,6 +1948,7 @@ const BLUE_PROFILE = [
 let _blueGeo = null;
 let _blueFluke = null;
 let _blueMat = null;
+const BLUE_SWIM = { amp: 1.75, freq: 2.3, speed: 0.8, bump: 0.45 };
 
 function blueGeometry() {
   if (_blueGeo) return _blueGeo;
@@ -1884,7 +1999,7 @@ function blueFlukeGeometry() {
     [0.6, 0.5], [1.9, 0.66], [3.3, 0.46], [4.2, -0.1],
     [2.2, -0.46], [1.0, -0.64], [0, -0.5], [-1.0, -0.64], [-2.2, -0.46],
   ];
-  _blueFluke = hfin(pts, 0.15, 0x44586b, { smooth: true, curveSegments: 8 });
+  _blueFluke = noBend(hfin(pts, 0.15, 0x44586b, { smooth: true, curveSegments: 8 }));
   return _blueFluke;
 }
 
@@ -1898,34 +2013,46 @@ function bluePectoral(sign) {
 export function makeBlueWhale() {
   const geo = blueGeometry();
   if (!_blueMat) {
-    _blueMat = addSkin(new THREE.MeshPhongMaterial({
+    _blueMat = whaleSwimMaterial({
       vertexColors: true, shininess: 20, specular: 0x6a8296, side: THREE.DoubleSide,
-    }), 0.45);
+    }, BLUE_SWIM, 'blue');
   }
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, _blueMat));
+  const core = new THREE.Group();
+  g.add(core);
+  core.add(new THREE.Mesh(geo, _blueMat));
 
   const fluke = new THREE.Group();
   fluke.position.set(0, 0.06, 10.2);
   fluke.add(new THREE.Mesh(blueFlukeGeometry(), _blueMat));
-  g.add(fluke);
+  core.add(fluke);
 
   const fins = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group();
     pivot.position.set(1.2 * s, -0.8, -3.6);
     pivot.add(new THREE.Mesh(bluePectoral(s), _blueMat));
-    g.add(pivot);
+    core.add(pivot);
     fins.push({ pivot, sign: s });
   }
   return {
-    group: g, fluke, fins, tail: fluke,
+    group: g, core, fluke, fins, tail: fluke,
     update(t) {
-      fluke.rotation.x = Math.sin(t * 0.7) * 0.3;
-      fluke.rotation.z = Math.sin(t * 0.33) * 0.05;
-      for (const f of fins) {
-        f.pivot.rotation.z = -0.22 * f.sign + Math.sin(t * 0.42 + (f.sign > 0 ? 0.6 : 0)) * 0.1;
+      const b = BLUE_SWIM;
+      const rate = b.rateU ? b.rateU.value : b.speed;
+      const f = rate / b.speed;
+      const seed = g.position.x * 0.11 + g.position.z * 0.07;
+      const ph = t * rate + seed - b.freq;
+      fluke.position.y = 0.06 + Math.sin(ph) * b.amp;
+      fluke.rotation.x = Math.cos(ph) * 0.42;
+      fluke.rotation.z = Math.sin(ph * 0.5) * 0.04;
+      const fa = t * 0.5 * f + seed;
+      for (const fin of fins) {
+        const beat = Math.sin(fa + (fin.sign > 0 ? 0.4 : 0));
+        fin.pivot.rotation.z = fin.sign * (-0.22 + beat * 0.18);
+        fin.pivot.rotation.x = Math.sin(fa + 1.2) * 0.1;
       }
+      core.position.y = Math.sin(t * 0.3 * f + seed) * 0.16;
     },
   };
 }
@@ -2059,7 +2186,7 @@ export function makeMantaRay() {
   if (!_mantaMat) {
     _mantaMat = flapMaterial(
       { vertexColors: true, shininess: 22, specular: 0x3c4e5e },
-      { amp: 0.55, freq: 3.4, speed: 2.0, span: 5.8 }
+      { amp: 0.68, freq: 4.4, speed: 2.0, span: 5.8 }
     );
   }
   const g = new THREE.Group();
@@ -2134,14 +2261,24 @@ export function makeMantaRay() {
   tail.add(new THREE.Mesh(paint(tailG, 0x243141), _mantaMat));
   g.add(tail);
 
+  const core = heaveCore(g);
+
   return {
-    group: g, wings, tail, fins: [],
+    group: g, core, wings, tail, fins: [],
     update(t) {
+      const beat = t * 2.0;
       for (const w of wings) {
-        w.pivot.rotation.z = w.sign * (0.16 + Math.sin(t * 2.0 + (w.sign > 0 ? 0.35 : 0)) * 0.52);
+        // 어깨 관절이 크게 오르내리고, 날개 끝은 셰이더가 조금 늦게 따라온다
+        w.pivot.rotation.z = w.sign * (0.2 + Math.sin(beat + (w.sign > 0 ? 0.06 : 0)) * 0.62);
+        w.pivot.rotation.x = Math.sin(beat + 1.4) * 0.07;
+        w.pivot.rotation.y = w.sign * Math.sin(beat * 0.5) * 0.05;
       }
-      tail.rotation.z = Math.sin(t * 1.1) * 0.1;
-      tail.rotation.x = Math.sin(t * 0.6) * 0.06;
+      // 날갯짓 박자에 맞춘 부력 — 몸통 전체가 떠오르고 가라앉는다
+      core.position.y = Math.cos(beat + 0.35) * 0.34;
+      core.rotation.z = Math.sin(beat + 1.0) * 0.05;
+      // 뒤따라 흐르는 꼬리 물결
+      tail.rotation.z = Math.sin(t * 1.05 - 0.8) * 0.16;
+      tail.rotation.x = Math.sin(t * 0.7 - 0.5) * 0.1;
     },
   };
 }
@@ -2173,7 +2310,7 @@ export function makeEagleRay() {
   if (!_eagleMat) {
     _eagleMat = flapMaterial(
       { vertexColors: true, shininess: 24, specular: 0x3a4a58 },
-      { amp: 0.42, freq: 3.8, speed: 2.3, span: 4.4 }
+      { amp: 0.52, freq: 4.8, speed: 2.3, span: 4.4 }
     );
   }
   const g = new THREE.Group();
@@ -2234,13 +2371,21 @@ export function makeEagleRay() {
   tail.add(new THREE.Mesh(xf(paint(spine, 0xd8dcd2), [0, 0.02, 1.1]), _eagleMat));
   g.add(tail);
 
+  const core = heaveCore(g);
+
   return {
-    group: g, wings, tail, fins: [],
+    group: g, core, wings, tail, fins: [],
     update(t) {
+      const beat = t * 2.3;
       for (const w of wings) {
-        w.pivot.rotation.z = w.sign * (0.2 + Math.sin(t * 2.4 + (w.sign > 0 ? 0.3 : 0)) * 0.46);
+        w.pivot.rotation.z = w.sign * (0.22 + Math.sin(beat + (w.sign > 0 ? 0.05 : 0)) * 0.5);
+        w.pivot.rotation.x = Math.sin(beat + 1.5) * 0.06;
+        w.pivot.rotation.y = w.sign * Math.sin(beat * 0.5) * 0.06;
       }
-      tail.rotation.x = Math.sin(t * 1.3) * 0.12;
+      core.position.y = Math.cos(beat + 0.5) * 0.22;
+      core.rotation.z = Math.sin(beat + 1.1) * 0.05;
+      tail.rotation.x = Math.sin(beat * 0.6 - 0.7) * 0.14;
+      tail.rotation.z = Math.sin(beat * 0.45 - 0.4) * 0.1;
     },
   };
 }
@@ -2324,7 +2469,10 @@ function discMaterial(params, cfg) {
         `#include <begin_vertex>
         {
           float r = clamp(length(position.xz) / ${cfg.radius.toFixed(2)}, 0.0, 1.0);
-          transformed.y += sin(uTime * uRipSpeed - position.z * 1.15) * uRipAmp * (0.25 + 0.75 * r);
+          // 앞→뒤로 미끄러지는 물결 + 가장자리 전체가 한 박자에 날개짓하는 맥동
+          float w = sin(uTime * uRipSpeed - position.z * 1.15) * 0.55
+                  + sin(uTime * uRipSpeed - r * 2.6) * 0.45;
+          transformed.y += w * uRipAmp * (0.2 + 0.8 * r * r);
         }`
       );
   };
@@ -2337,7 +2485,7 @@ export function makeStingray() {
   if (!_stingMat) {
     _stingMat = discMaterial(
       { vertexColors: true, shininess: 26, specular: 0x867a4e },
-      { amp: 0.22, speed: 2.1, radius: 3.1 }
+      { amp: 0.28, speed: 2.3, radius: 3.1 }
     );
     _stingDiscTop = discGeometry(7, 26, 3.1, 2.9, 0xb08a4a, 0xd9d3c0, 0x6d5228);
   }
@@ -2369,11 +2517,18 @@ export function makeStingray() {
   tail.add(new THREE.Mesh(xf(paint(barb, 0x3d3226), [0, 0.02, 1.6]), _stingMat));
   g.add(tail);
 
+  const core = heaveCore(g);
+
   return {
-    group: g, tail, wings: [], fins: [],
+    group: g, core, tail, wings: [], fins: [],
     update(t) {
-      tail.rotation.x = Math.sin(t * 1.05) * 0.18;
-      tail.rotation.z = Math.sin(t * 0.8) * 0.22;
+      const beat = t * 2.3;
+      // 납작한 원반이 날개짓 박자에 맞춰 떠오르고 가라앉는다
+      core.position.y = Math.cos(beat + 0.3) * 0.26;
+      core.rotation.z = Math.sin(beat + 0.9) * 0.06;
+      core.rotation.x = Math.sin(beat * 0.5) * 0.04;
+      tail.rotation.x = Math.sin(beat * 0.55 - 0.8) * 0.2;
+      tail.rotation.z = Math.sin(beat * 0.42 - 0.5) * 0.24;
     },
   };
 }
@@ -2414,8 +2569,7 @@ export function makeTurtle() {
   // 지느러미 4개
   const flipG = new THREE.SphereGeometry(1, 8, 6);
   flipG.scale(0.85, 0.1, 0.4);
-  const flippers = [];
-  const specs = [
+  const flippers = [];  const specs = [
     [-0.95, 0, -1.05, 0.5],
     [0.95, 0, -1.05, -0.5],
     [-0.85, 0, 1.05, 0.4],
@@ -2434,12 +2588,23 @@ export function makeTurtle() {
     flippers.push(pivot);
   });
 
+  const core = heaveCore(g);
+
   return {
-    group: g, flippers,
+    group: g, core, head, flippers,
     update(t) {
-      for (const pivot of flippers) {
-        pivot.rotation.z = pivot.userData.base + Math.sin(t * 1.5 + pivot.userData.phase) * 0.45;
+      for (let i = 0; i < flippers.length; i++) {
+        const p = flippers[i];
+        const front = i < 2;
+        // 앞지느린발은 크게, 뒤지느린발은 반 박자 늦게 작게 — 8자 노 젓기
+        const beat = t * 1.55 + (front ? 0 : Math.PI * 0.8) + (i % 2 ? 0.2 : 0);
+        p.rotation.z = p.userData.base + Math.sin(beat) * (front ? 0.62 : 0.26);
+        p.rotation.x = Math.cos(beat) * (front ? 0.38 : 0.18);
       }
+      // 몸통이 살짝 피치·롤링하며 떠간다
+      core.position.y = Math.sin(t * 1.55 + 0.4) * 0.06;
+      core.rotation.z = Math.sin(t * 0.5) * 0.07;
+      core.rotation.x = Math.sin(t * 1.55 + 2.0) * 0.035;
       head.rotation.y = Math.sin(t * 0.5) * 0.12;
     },
   };
@@ -2448,7 +2613,7 @@ export function makeTurtle() {
 /* =========================================================
    관상 물고기 떼 (InstancedMesh)
    ========================================================= */
-const SCHOOL_BEND = { amp: 0.085, freq: 2.6, speed: 6.5, wag: 0.0 };
+const SCHOOL_BEND = { amp: 0.1, freq: 4.0, speed: 6.0, wag: 0.0 };
 let _schoolGeo = null;
 let _schoolMat = null;
 
@@ -2502,7 +2667,7 @@ export function makeFishSchool(count) {
   if (!_schoolMat) {
     _schoolMat = swimMaterial({
       vertexColors: true, shininess: 30, specular: 0x556677,
-    }, SCHOOL_BEND);
+    }, SCHOOL_BEND, 'school');
   }
   const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
