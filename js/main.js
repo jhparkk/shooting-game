@@ -1898,13 +1898,26 @@ function boot() {
         snapCamera();
       },
       depthTo: (m) => {
-        const y = SURFACE_Y - m / DEPTH_SCALE;
-        P.pos.y = Math.max(terrainHeight(P.pos.x, P.pos.z) + 3, Math.min(SURFACE_Y - 7, y));
+        // 요청한 수심까지 내려갈 수 있는 가까운 해구를 찾아 이동한다 (검증용)
+        const targetY = SURFACE_Y - m / DEPTH_SCALE;
+        let best = null;
+        for (let r = 0; r <= 480 && !best; r += 24) {
+          for (let a = 0; a < 16; a++) {
+            const ang = (a / 16) * Math.PI * 2;
+            const x = P.pos.x + Math.cos(ang) * r;
+            const z = P.pos.z + Math.sin(ang) * r;
+            if (terrainHeight(x, z) + 5 < targetY) { best = { x, z }; break; }
+          }
+        }
+        if (!best) return G.depth;
+        P.pos.set(best.x, targetY, best.z);
         P.vel.set(0, 0, 0);
         G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
+        updateSubTransform(0);
         snapCamera();
         return G.depth;
       },
+      terrain: (x, z) => terrainHeight(x, z),
       setInput: (o) => {
         if (o.fire !== undefined) btnFiring = !!o.fire;
         if (o.lift !== undefined) joy.lift = o.lift;
