@@ -2177,6 +2177,8 @@ function onResize() {
 const PREVIEW_MAKERS = {
   humpback: makeHumpbackWhale, blue: makeBlueWhale, orca: makeOrca, sperm: makeSpermWhale,
   manta: makeMantaRay, eagle: makeEagleRay, stingray: makeStingray, turtle: makeTurtle,
+  shark: makeShark, hammer: makeHammerhead, puffer: makePuffer,
+  lion: makeLionfish, angler: makeAnglerfish,
   kraken: makeKraken,
 };
 const previews = [];
@@ -2207,6 +2209,8 @@ function previewCreature(kind, opts) {
 function updatePreviews() {
   for (const p of previews) {
     if (p.model && p.model.update) p.model.update(ANIM.time.value);
+    // 어류·상어는 몸통 S자 파동을 공용 유영 함수로 그린다
+    if (p.model && p.model.bend) swim(p.model, ANIM.time.value);
   }
 }
 
