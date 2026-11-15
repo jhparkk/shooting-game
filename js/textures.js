@@ -206,7 +206,7 @@ function bakeRock(size) {
     const crack = smooth(0.93, 0.998, ridge + fine * 0.03);
 
     let shade = 0.46 + (strata - 0.5) * 0.34 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.10;
-    shade *= 1 - crack * 0.34;
+    shade *= 1 - crack * 0.2;
     // 이끼·규조가 붙은 듯한 녹회색
     const moss = smooth(0.55, 0.9, fbm(u, v, 5, 3, 201)) * 0.28;
     o[0] = clamp01(shade * 0.94 - moss * 0.14) * 255;

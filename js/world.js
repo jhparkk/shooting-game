@@ -13,8 +13,8 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116k';
-import { getTextures } from './textures.js?v=20261116k';
+} from './models.js?v=20261116m';
+import { getTextures } from './textures.js?v=20261116m';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -544,9 +544,9 @@ export class World {
           float pMid = abyssFbm( vWPosV.xz * 0.075 + 11.3 );
           float pFine = abyssNoise( vWPosV.xz * 0.34 + 3.7 );
 
-          float sandK = smoothstep( -12.0, 15.0, vWPosV.y );
+          float sandK = smoothstep( -20.0, 8.0, vWPosV.y );
           float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
-          float flatK = smoothstep( 0.40, 0.82, vWNrmV.y );
+          float flatK = smoothstep( 0.33, 0.62, vWNrmV.y );
           float sandW = sandK * flatK;
 
           // 평지 — 보통 모래 ↔ 밝고 분홍빛이 도는 산호 모래
