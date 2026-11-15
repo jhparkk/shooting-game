@@ -7,6 +7,36 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { getTextures } from './textures.js?v=20261117a';
+
+/** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
+let _skinSet = null;
+function skins() {
+  if (!_skinSet) _skinSet = getTextures();
+  return _skinSet;
+}
+
+/** 생물 피부 질감(미세 얼룩 + 범프)을 재질에 입힌다 */
+function addSkin(mat, bump) {
+  const t = skins();
+  if (!mat.map) {
+    mat.map = t.skin;
+    mat.bumpMap = t.skinBump;
+    mat.bumpScale = bump === undefined ? 0.5 : bump;
+  }
+  return mat;
+}
+
+/** 금속 패널/리벳 텍스처 */
+function addMetal(mat, bump) {
+  const t = skins();
+  if (!mat.map) {
+    mat.map = t.metal;
+    mat.bumpMap = t.metalBump;
+    mat.bumpScale = bump === undefined ? 0.6 : bump;
+  }
+  return mat;
+}
 
 /** 모든 어류가 함께 쓰는 시간 유니폼 (게임 루프에서 증가) */
 export const ANIM = { time: { value: 0 } };
@@ -77,15 +107,15 @@ const smoothstep = (a, b, x) => {
 };
 
 const MET = {
-  hull: new THREE.MeshPhongMaterial({ color: 0xffc172, shininess: 78, specular: 0x6b8fa8 }),
-  hullDark: new THREE.MeshPhongMaterial({ color: 0xe89a45, shininess: 46, specular: 0x334455 }),
+  hull: addMetal(new THREE.MeshPhongMaterial({ color: 0xffc172, shininess: 78, specular: 0x6b8fa8 }), 0.5),
+  hullDark: addMetal(new THREE.MeshPhongMaterial({ color: 0xe89a45, shininess: 46, specular: 0x334455 }), 0.45),
   accent: new THREE.MeshPhongMaterial({ color: 0x2b3d55, shininess: 70, specular: 0x7799bb }),
   glass: new THREE.MeshPhongMaterial({
     color: 0x9ef6ff, emissive: 0x1f8b96, emissiveIntensity: 1.1,
-    transparent: true, opacity: 0.66, shininess: 120, specular: 0xffffff,
+    transparent: true, opacity: 0.66, shininess: 160, specular: 0xffffff,
   }),
-  metal: new THREE.MeshPhongMaterial({ color: 0x6d7d8a, shininess: 120, specular: 0xd0e6ff }),
-  metalDark: new THREE.MeshPhongMaterial({ color: 0x2b3540, shininess: 90, specular: 0x88aacc }),
+  metal: addMetal(new THREE.MeshPhongMaterial({ color: 0x6d7d8a, shininess: 120, specular: 0xd0e6ff })),
+  metalDark: addMetal(new THREE.MeshPhongMaterial({ color: 0x2b3540, shininess: 90, specular: 0x88aacc }), 0.5),
   eyeRed: new THREE.MeshBasicMaterial({ color: 0xff3b3b }),
   eyeYellow: new THREE.MeshBasicMaterial({ color: 0xffd457 }),
   bone: new THREE.MeshLambertMaterial({ color: 0xf4f7ea }),
@@ -304,6 +334,7 @@ function assemble(parts, z0, z1) {
 /** 유영 셰이더 재질 — 몸통이 좌우로 S 자로 흔들린다 */
 function swimMaterial(params, bend) {
   const mat = new THREE.MeshPhongMaterial(params);
+  if (params && params.vertexColors) addSkin(mat, 0.45);
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = ANIM.time;
     shader.uniforms.uBendAmp = { value: bend.amp };
@@ -1265,17 +1296,17 @@ function krakenLimb(segCount, len, thick, curl, color) {
 
 export function makeKraken() {
   const g = new THREE.Group();
-  const skin = new THREE.MeshPhongMaterial({
+  const skin = addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantle, shininess: 42, specular: 0xb07090,
     emissive: 0x2a0a18, emissiveIntensity: 0.55,
-  });
-  const skinDark = new THREE.MeshPhongMaterial({
+  }), 0.7);
+  const skinDark = addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantleDark, shininess: 30, specular: 0x7a5060,
-  });
-  const limbMat = new THREE.MeshPhongMaterial({
+  }), 0.6);
+  const limbMat = addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 16, specular: 0x5a3a48,
     emissive: 0x24080f, emissiveIntensity: 0.5,
-  });
+  }), 0.7);
 
   // 머리 + 몸통(망토)
   const mantle = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), skin);
@@ -1538,9 +1569,9 @@ function humpbackPectoral(sign) {
 export function makeHumpbackWhale() {
   const geo = humpbackGeometry();
   if (!_humpMat) {
-    _humpMat = new THREE.MeshPhongMaterial({
+    _humpMat = addSkin(new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 24, specular: 0x4d6473, side: THREE.DoubleSide,
-    });
+    }), 0.6);
   }
   const g = new THREE.Group();
   g.add(new THREE.Mesh(geo, _humpMat));
@@ -1647,9 +1678,9 @@ function orcaPectoral(sign) {
 export function makeOrca() {
   const geo = orcaGeometry();
   if (!_orcaMat) {
-    _orcaMat = new THREE.MeshPhongMaterial({
+    _orcaMat = addSkin(new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 68, specular: 0x8fa8b8, side: THREE.DoubleSide,
-    });
+    }), 0.35);
   }
   const g = new THREE.Group();
   g.add(new THREE.Mesh(geo, _orcaMat));
@@ -1773,9 +1804,9 @@ function spermFlukeGeometry() {
 export function makeSpermWhale() {
   const geo = spermGeometry();
   if (!_spermMat) {
-    _spermMat = new THREE.MeshPhongMaterial({
+    _spermMat = addSkin(new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 16, specular: 0x5a5346, side: THREE.DoubleSide,
-    });
+    }), 0.75);
   }
   const g = new THREE.Group();
   g.add(new THREE.Mesh(geo, _spermMat));
@@ -1867,9 +1898,9 @@ function bluePectoral(sign) {
 export function makeBlueWhale() {
   const geo = blueGeometry();
   if (!_blueMat) {
-    _blueMat = new THREE.MeshPhongMaterial({
+    _blueMat = addSkin(new THREE.MeshPhongMaterial({
       vertexColors: true, shininess: 20, specular: 0x6a8296, side: THREE.DoubleSide,
-    });
+    }), 0.45);
   }
   const g = new THREE.Group();
   g.add(new THREE.Mesh(geo, _blueMat));
@@ -1956,6 +1987,20 @@ function wingGeometry(spec) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
+  planarUV(g, 0.42);
+  return g;
+}
+
+/** 지오메트리에 위에서 내려다본 평면 uv 를 심는다 (uv 가 없는 날개·원반용) */
+function planarUV(g, scale) {
+  const p = g.attributes.position;
+  const uv = new Float32Array(p.count * 2);
+  const s = scale === undefined ? 0.35 : scale;
+  for (let i = 0; i < p.count; i++) {
+    uv[i * 2] = p.getX(i) * s;
+    uv[i * 2 + 1] = p.getZ(i) * s;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return g;
 }
 
@@ -1963,6 +2008,7 @@ function wingGeometry(spec) {
 let _flapKey = 0;
 function flapMaterial(params, cfg) {
   const mat = new THREE.MeshPhongMaterial(params);
+  if (params && params.vertexColors) addSkin(mat, 0.38);
   const amp = { value: cfg.amp };
   const freq = { value: cfg.freq };
   const speed = { value: cfg.speed };
@@ -2257,6 +2303,7 @@ function discGeometry(rings, segs, R, rz, top, bottom, edge) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
+  planarUV(g, 0.4);
   return g;
 }
 
@@ -2264,6 +2311,7 @@ function discGeometry(rings, segs, R, rz, top, bottom, edge) {
 let _discKey = 0;
 function discMaterial(params, cfg) {
   const mat = new THREE.MeshPhongMaterial(params);
+  if (params && params.vertexColors) addSkin(mat, 0.4);
   const amp = { value: cfg.amp };
   const speed = { value: cfg.speed };
   mat.onBeforeCompile = (shader) => {

@@ -12,7 +12,11 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116r';
+} from './models.js?v=20261117a';
+import { getTextures } from './textures.js?v=20261117a';
+
+/* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
+const UV_WORLD = 0.0625;
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -406,8 +410,17 @@ export class World {
 
   /* ---------------- 청크용 재질 (공유) ---------------- */
   _buildMaterials() {
-    this.rockMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    this.coralMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    this.tex = getTextures();
+    this.rockMat = this._terrainMaterial();
+    this.coralMat = new THREE.MeshPhongMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      map: this.tex.coral,
+      bumpMap: this.tex.coralBump,
+      bumpScale: 0.34,
+      specular: 0x2a3a3a,
+      shininess: 14,
+    });
     this.kelpMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     const kelpTime = this.kelpUniform;
     this.kelpMat.onBeforeCompile = (shader) => {
@@ -425,6 +438,88 @@ export class World {
       );
     };
     this.floorMats = [this.rockMat, this.coralMat, this.kelpMat];
+  }
+
+  /**
+   * 해저 지형 재질 — 수심에 따라 모래 → 암벽 → 심해 현무암으로 표면이 바뀌고,
+   * 그 위에 실시간 수중 빛무늬(caustics)가 일렁인다.
+   * (MeshPhongMaterial + onBeforeCompile 주입으로 아이폰에서도 가볍게)
+   */
+  _terrainMaterial() {
+    const t = this.tex;
+    const mat = new THREE.MeshPhongMaterial({
+      vertexColors: true,
+      map: t.sand,              // USE_MAP 활성화 (vMapUv 사용) — 셰이더에서 직접 블렌딩
+      bumpMap: t.sandBump,
+      bumpScale: 0.32,
+      specular: 0x2c4145,
+      shininess: 7,
+    });
+    const uni = {
+      uSand: { value: t.sand },
+      uRock: { value: t.rock },
+      uBasalt: { value: t.basalt },
+      uCaustics: { value: t.caustics },
+      uTime: { value: 0 },
+      uCausticI: { value: 1 },
+    };
+    this.terrainUniforms = uni;
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uni);
+      shader.vertexShader =
+        'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
+        shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vWPosV = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          vWNrmV = normalize(mat3(modelMatrix) * objectNormal);`
+        );
+      shader.fragmentShader =
+        'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
+        'uniform sampler2D uSand;\nuniform sampler2D uRock;\n' +
+        'uniform sampler2D uBasalt;\nuniform sampler2D uCaustics;\n' +
+        'uniform float uTime;\nuniform float uCausticI;\n' +
+        shader.fragmentShader.replace(
+          '#include <map_fragment>',
+          `
+          vec2 tuv = vMapUv;
+          vec3 cSand = texture2D( uSand, tuv ).rgb;
+          vec3 cRock = texture2D( uRock, tuv * 0.72 ).rgb;
+          vec3 cBasalt = texture2D( uBasalt, tuv * 0.9 ).rgb;
+          float sandK = smoothstep( -12.0, 15.0, vWPosV.y );
+          float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
+          vec3 detail = mix( cRock, cSand, sandK );
+          detail = mix( detail, cBasalt, deepK );
+          detail *= 1.14;
+          diffuseColor.rgb *= detail;
+          `
+        ).replace(
+          'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
+          `
+          // 수중 빛무늬 — 얕은 곳에서 또렷하고 심해로 갈수록 사라진다
+          float upK = clamp( vWNrmV.y, 0.0, 1.0 );
+          float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
+          vec2 cuv = vWPosV.xz * 0.035;
+          float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.010, uTime * 0.007 ) ).r;
+          float cb = texture2D( uCaustics, cuv * 1.47 + vec2( -uTime * 0.013, uTime * 0.011 ) ).r;
+          float caustic = ca * cb * 2.2 * cFade * ( 0.30 + 0.70 * upK ) * uCausticI;
+          vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
+            + vec3( 0.62, 0.95, 1.0 ) * caustic * 0.55;
+          `
+        );
+    };
+    return mat;
+  }
+
+  /** 지형/바위 지오메트리의 uv 를 월드 좌표 기준으로 다시 심는다 */
+  _worldUv(geo, ox, oz) {
+    const ua = geo.attributes.uv;
+    const pa = geo.attributes.position;
+    if (!ua || !pa || ua.count !== pa.count) return;
+    for (let i = 0; i < ua.count; i++) {
+      ua.setXY(i, (pa.getX(i) + ox) * UV_WORLD, (pa.getZ(i) + oz) * UV_WORLD);
+    }
+    ua.needsUpdate = true;
   }
 
   /* ---------------- 지형 소품 템플릿 (한 번만 만들어 재사용) ---------------- */
@@ -586,8 +681,10 @@ export class World {
           fcolOut[o18 + 1] = vcol[s + 1];
           fcolOut[o18 + 2] = vcol[s + 2];
           o18 += 3;
-          fuv[o12] = ((order[t] % N) / SEG);
-          fuv[o12 + 1] = (Math.floor(order[t] / N) / SEG);
+          const vi = order[t];
+          // uv 를 월드 좌표로 — 청크가 바뀜 없이 텍스처가 이어지도록
+          fuv[o12] = (vpos[vi * 3] + ox) * UV_WORLD;
+          fuv[o12 + 1] = (vpos[vi * 3 + 2] + oz) * UV_WORLD;
           o12 += 2;
         }
       }
@@ -615,6 +712,7 @@ export class World {
       m.scale(new THREE.Vector3(r, r, r));
       m.setPosition(lx, getTerrainHeight(ox + lx, oz + lz) + r * 0.16, lz);
       geo.applyMatrix4(m);
+      this._worldUv(geo, ox, oz);
       geos.push(geo);
     }
 
@@ -641,6 +739,7 @@ export class World {
             az + Math.cos(a) * R * Math.sin(rot)
           );
           geo.applyMatrix4(m);
+          this._worldUv(geo, ox, oz);
           geos.push(geo);
         }
       }
@@ -789,7 +888,9 @@ export class World {
   _buildRays() {
     this.rayTex = streakTexture();
     this.rays = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 22; i++) {
+      const tall = 150 + Math.random() * 150;
+      const wide = 20 + Math.random() * 44;
       const mat = new THREE.MeshBasicMaterial({
         map: this.rayTex,
         transparent: true,
@@ -800,15 +901,16 @@ export class World {
         fog: false,
         color: 0xe8fffb,
       });
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(18 + Math.random() * 24, 130), mat);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), mat);
       m.position.set(
         (Math.random() - 0.5) * 340,
-        SURFACE_Y - 46 + Math.random() * 20,
+        SURFACE_Y - tall * 0.42 + Math.random() * 18,
         (Math.random() - 0.5) * 340
       );
       m.rotation.z = (Math.random() - 0.5) * 0.3;
       m.rotation.y = Math.random() * Math.PI;
       m.userData.phase = Math.random() * 6.28;
+      m.userData.base = 0.18 + Math.random() * 0.22;
       this.scene.add(m);
       this.rays.push(m);
     }
@@ -1094,9 +1196,12 @@ export class World {
     this.skyUniforms.mid.value.lerp(tc.copy(c0.skyMid).lerp(c1.skyMid, u), k);
     this.skyUniforms.bottom.value.lerp(tc.copy(c0.skyBottom).lerp(c1.skyBottom, u), k);
 
-    // 빛줄기 살랑임 + 플레이어 주변으로 재배치
+    // 빛줄기 살랑임 + 플레이어 주변으로 재배치 (수심이 깊으면 사라진다)
+    const rayFade = clamp01(1 - depth / 320);
     for (const r of this.rays) {
-      r.material.opacity = 0.22 + Math.sin(this.time * 0.7 + r.userData.phase) * 0.08;
+      const base = r.userData.base === undefined ? 0.26 : r.userData.base;
+      r.material.opacity = (base + Math.sin(this.time * 0.7 + r.userData.phase) * 0.08) * rayFade;
+      r.visible = rayFade > 0.02;
       r.rotation.z = Math.sin(this.time * 0.12 + r.userData.phase) * 0.08;
       const dx = r.position.x - playerPos.x;
       const dz = r.position.z - playerPos.z;
@@ -1104,6 +1209,12 @@ export class World {
         r.position.x = playerPos.x + (Math.random() - 0.5) * 320;
         r.position.z = playerPos.z + (Math.random() - 0.5) * 320;
       }
+    }
+
+    // 실시간 수중 빛무늬 시간·세기
+    if (this.terrainUniforms) {
+      this.terrainUniforms.uTime.value = this.time;
+      this.terrainUniforms.uCausticI.value = mix(z0.sunI, z1.sunI, u) * 1.5;
     }
 
     // 기포 — 수면까지 올라간 뒤 플레이어 주변에서 다시 시작

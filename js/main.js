@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116r';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116r';
+import { Sound } from './audio.js?v=20261117a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116r';
-import { FX } from './fx.js?v=20261116r';
+} from './models.js?v=20261117a';
+import { FX } from './fx.js?v=20261117a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -161,8 +161,37 @@ const forward = new THREE.Vector3();
 const horizontal = new THREE.Vector3();
 const tmpVec = new THREE.Vector3();
 const tmpVec2 = new THREE.Vector3();
+const camTmp = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
+
+/* ---------------- 카메라 (로블록스식 오빗) ----------------
+   yaw/pitch 는 카메라가 바라보는 방향, dist 는 잠수정에서 카메라까지의 거리.
+   · 화면 빈 곳 한 손가락 드래그 → 시점 회전 (멀티터치 지원)
+   · 두 손가락 핀치 / 마우스 휠 → 3D 줌 (2.5 ~ 26 유닛) */
+const CAM = {
+  yaw: 0,
+  pitch: -0.24,
+  dist: 15,
+  distNow: 15,
+  minDist: 2.5,
+  maxDist: 26,
+  targetY: 1.15,
+};
+const camLook = new THREE.Vector3(0, 0, -1);   // 카메라가 보는 방향(단위벡터)
+const aim = new THREE.Vector3(0, 0, -1);       // 조준 방향(화면 중앙)
+
+function camDirFrom(out, yaw, pitch) {
+  const cp = Math.cos(pitch);
+  return out.set(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+}
+
+/** 카메라를 잠수정 기준 기본 위치로 돌린다 */
+function resetCameraView() {
+  CAM.yaw = P.yaw;
+  CAM.pitch = -0.24;
+  CAM.dist = 15;
+}
 
 function computeForward(out) {
   const cy = Math.cos(P.yaw);
@@ -373,13 +402,78 @@ function bindInput() {
   holdButton(el.upBtn, () => { joy.lift = 1; }, () => { if (joy.lift > 0) joy.lift = 0; });
   holdButton(el.downBtn, () => { joy.lift = -1; }, () => { if (joy.lift < 0) joy.lift = 0; });
 
-  /* --- PC: 마우스 클릭 발사 --- */
+  /* --- 시점 회전(드래그) · 3D 줌(핀치·휠) — 멀티터치 분리 --- */
+  const lookPointers = new Map();   // pointerId -> {x, y}
+  let pinch = null;                 // { d0, base }
+  let tap = null;                   // 마우스 클릭(발사) 판정
+  const LOOK_SENS = 0.0055;
+
+  function startPinch() {
+    const ids = [...lookPointers.keys()];
+    if (ids.length < 2) return;
+    const a = lookPointers.get(ids[0]);
+    const b = lookPointers.get(ids[1]);
+    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, base: CAM.dist };
+    tap = null;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') mouseFiring = true;
+    if (e.pointerType === 'mouse' && e.button > 0) return;
+    lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (lookPointers.size === 1) {
+      pinch = null;
+      tap = e.pointerType === 'mouse'
+        ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }
+        : null;
+    } else if (lookPointers.size === 2) {
+      startPinch();
+    }
+    if (e.pointerType !== 'mouse') e.preventDefault();
   });
-  window.addEventListener('pointerup', (e) => {
-    if (e.pointerType === 'mouse' || e.pointerType === 'pen') mouseFiring = false;
-  });
+
+  window.addEventListener('pointermove', (e) => {
+    const p = lookPointers.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    p.x = e.clientX;
+    p.y = e.clientY;
+
+    if (pinch && lookPointers.size >= 2) {
+      const ids = [...lookPointers.keys()];
+      const a = lookPointers.get(ids[0]);
+      const b = lookPointers.get(ids[1]);
+      const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      // 손을 벌리면 줌인(가까이), 오므리면 줌아웃
+      CAM.dist = clamp(pinch.base * (pinch.d0 / d), CAM.minDist, CAM.maxDist);
+      return;
+    }
+
+    if (tap && tap.id === e.pointerId) tap.moved += Math.abs(dx) + Math.abs(dy);
+    CAM.yaw -= dx * LOOK_SENS;
+    CAM.pitch = clamp(CAM.pitch - dy * LOOK_SENS, -1.2, 1.15);
+  }, { passive: false });
+
+  function endLook(e) {
+    if (!lookPointers.has(e.pointerId)) return;
+    lookPointers.delete(e.pointerId);
+    if (pinch && lookPointers.size < 2) pinch = null;
+    // PC: 드래그 없이 짧게 클릭하면 한 발 발사
+    if (tap && tap.id === e.pointerId) {
+      const quick = performance.now() - tap.t < 420 && tap.moved < 8;
+      tap = null;
+      if (quick && G.state === 'playing') fire();
+    }
+  }
+  window.addEventListener('pointerup', endLook);
+  window.addEventListener('pointercancel', endLook);
+
+  /* PC: 마우스 휠 = 3D 줌 */
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const k = e.deltaMode === 1 ? 0.05 : 0.0018;
+    CAM.dist = clamp(CAM.dist * (1 + e.deltaY * k), CAM.minDist, CAM.maxDist);
+  }, { passive: false });
 
   /* --- 키보드 --- */
   window.addEventListener('keydown', (e) => {
@@ -417,10 +511,10 @@ function updateInput() {
   kb.move = 0;
   kb.turn = 0;
   kb.lift = 0;
-  if (keys.has('w') || keys.has('ㅈ') || keys.has('arrowup')) kb.move += 1;
-  if (keys.has('s') || keys.has('ㄴ') || keys.has('arrowdown')) kb.move -= 1;
-  if (keys.has('a') || keys.has('ㅁ') || keys.has('arrowleft')) kb.turn -= 1;
-  if (keys.has('d') || keys.has('ㅇ') || keys.has('arrowright')) kb.turn += 1;
+  if (keys.has('w') || keys.has('ㅈ')) kb.move += 1;
+  if (keys.has('s') || keys.has('ㄴ')) kb.move -= 1;
+  if (keys.has('a') || keys.has('ㅁ')) kb.turn -= 1;
+  if (keys.has('d') || keys.has('ㅇ')) kb.turn += 1;
   if (keys.has('q') || keys.has('r') || keys.has('shift')) kb.lift += 1;
   if (keys.has('e') || keys.has('f')) kb.lift -= 1;
 
@@ -643,6 +737,9 @@ function resetGame() {
   fireKeyHeld = false;
   el.knob.style.transform = 'translate(0px, 0px)';
   player.obj.visible = true;
+  _camClose = false;
+  setSubVisible(true);
+  resetCameraView();
 
   world.reset();
   updateSubTransform(0);
@@ -971,14 +1068,14 @@ function dropItem(x, y, z, forced) {
 
 /* ---------------- 발사 ---------------- */
 function fire() {
-  computeForward(forward);
-  const nose = tmpVec.copy(P.pos).addScaledVector(forward, 2.6);
+  // 화면 중앙(조준선) 방향으로 발사 — 카메라를 돌리면 그쪽으로 나간다
+  const nose = tmpVec.copy(P.pos).addScaledVector(aim, 2.2);
   const count = G.multi > 0 ? 3 : 1;
   for (let i = 0; i < count; i++) {
     const t = torpedoes.find((x) => !x.active);
     if (!t) break;
     const spread = count === 0 ? 0 : (i - (count - 1) / 2) * 0.1;
-    const v = forward.clone().applyAxisAngle(UP, spread);
+    const v = aim.clone().applyAxisAngle(UP, spread);
     t.active = true;
     t.life = 1.8;
     t.mesh.visible = true;
@@ -1186,14 +1283,40 @@ function clampToWorld(pos, vel) {
 function updatePlayer(dt) {
   updateInput();
 
-  // 회전
-  P.yaw -= input.turn * P.turnRate * dt;
-  const targetRoll = clamp(-input.turn * 0.5, -0.55, 0.55);
+  // 조이스틱을 카메라 기준 이동 벡터로 (화면 보는 방향이 전진)
+  const cy = Math.cos(CAM.yaw);
+  const sy = Math.sin(CAM.yaw);
+  let mx = -sy * input.move + cy * input.turn;
+  let mz = -cy * input.move - sy * input.turn;
+  let mag = Math.hypot(mx, mz);
+  if (mag > 1) {
+    mx /= mag;
+    mz /= mag;
+    mag = 1;
+  }
+  const moving = mag > 0.06;
+
+  // 기체는 진행 방향을 바라보며 부드럽게 돌아간다 (발사 중엔 시점 쪽으로 더 빠르게)
+  const turnLerp = (v) => damp(v, dt);
+  if (moving) {
+    const want = Math.atan2(-mx, -mz);
+    let d = want - P.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    P.yaw += d * turnLerp(input.fire ? 9 : 4.6);
+  } else if (input.fire) {
+    let d = CAM.yaw - P.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    P.yaw += d * turnLerp(8);
+  }
+
+  const targetRoll = clamp(-input.turn * 0.42, -0.5, 0.5);
   P.roll += (targetRoll - P.roll) * damp(6, dt);
 
-  // 추진
+  // 추진 — 방향은 기체가 바라보는 쪽 (진행 방향을 따라간다)
   computeHorizontal(horizontal);
-  const thrust = input.move >= 0 ? input.move * P.speed : input.move * P.backSpeed;
+  const thrust = mag * P.speed;
   // 깊은 심해일수록 상승·하강이 빠르다 (1,000m 이상을 답답하지 않게 오가도록)
   const liftSpeed = P.lift + Math.min(64, Math.max(0, G.depth) * 0.075);
   const desired = tmpVec2.set(
@@ -1209,9 +1332,13 @@ function updatePlayer(dt) {
   P.pos.addScaledVector(P.vel, dt);
   clampToWorld(P.pos, P.vel);
 
-  // 기울기(상승/하강에 반응)
-  const targetPitch = clamp(P.vel.y * 0.022, -0.42, 0.42);
-  P.pitch += (targetPitch - P.pitch) * damp(5, dt);
+  // 기울기 — 상승·하강과 카메라 시점을 함께 따른다
+  const aimW = clamp(mag + (input.fire ? 1 : 0), 0, 1);
+  const targetPitch = clamp(
+    clamp(P.vel.y * 0.02, -0.26, 0.26) + CAM.pitch * 0.8 * aimW,
+    -0.95, 0.95
+  );
+  P.pitch += (targetPitch - P.pitch) * damp(6, dt);
 
   updateSubTransform(dt);
 
@@ -1236,27 +1363,80 @@ function updatePlayer(dt) {
 
 /* ---------------- 카메라 ---------------- */
 function snapCamera() {
-  computeForward(forward);
-  camera.position.copy(P.pos).addScaledVector(forward, -14.5).add(new THREE.Vector3(0, 6.2, 0));
-  camera.lookAt(P.pos.x + forward.x * 30, P.pos.y + forward.y * 30 + 0.6, P.pos.z + forward.z * 30);
+  camDirFrom(camLook, CAM.yaw, CAM.pitch);
+  CAM.distNow = CAM.dist;
+  const lift = Math.min(1.9, CAM.distNow * 0.13);
+  camera.position.set(
+    P.pos.x - camLook.x * CAM.distNow,
+    P.pos.y + CAM.targetY - camLook.y * CAM.distNow + lift,
+    P.pos.z - camLook.z * CAM.distNow
+  );
+  const gy = terrainHeight(camera.position.x, camera.position.z) + 1.8;
+  if (camera.position.y < gy) camera.position.y = gy;
+  if (camera.position.y > SURFACE_Y - 1.2) camera.position.y = SURFACE_Y - 1.2;
+  camera.lookAt(
+    P.pos.x + camLook.x * 30,
+    P.pos.y + CAM.targetY + camLook.y * 30,
+    P.pos.z + camLook.z * 30
+  );
+  camera.getWorldDirection(aim);
+}
+
+let _camClose = false;
+function setSubVisible(v) {
+  player.obj.traverse((o) => {
+    if (o.isMesh) o.visible = v;
+  });
 }
 
 function updateCamera(dt) {
-  computeForward(forward);
-  const shakeX = G.shake > 0 ? rand(-1, 1) * G.shake * 0.55 : 0;
-  const shakeY = G.shake > 0 ? rand(-1, 1) * G.shake * 0.55 : 0;
-  const target = tmpVec.copy(P.pos).addScaledVector(forward, -14.5);
-  target.y += 6.2 + shakeY;
-  target.x += shakeX;
-  camera.position.lerp(target, damp(5.0, dt));
-  const minY = terrainHeight(camera.position.x, camera.position.z) + 3.2;
-  if (camera.position.y < minY) camera.position.y = minY;
-  camera.lookAt(
-    P.pos.x + forward.x * 34,
-    P.pos.y + forward.y * 34 + 0.8,
-    P.pos.z + forward.z * 34
+  // PC: 방향키 = 시점 회전
+  const kx = (keys.has('arrowleft') ? 1 : 0) - (keys.has('arrowright') ? 1 : 0);
+  const ky = (keys.has('arrowup') ? 1 : 0) - (keys.has('arrowdown') ? 1 : 0);
+  if (kx) CAM.yaw += kx * 1.9 * dt;
+  if (ky) CAM.pitch = clamp(CAM.pitch + ky * 1.4 * dt, -1.2, 1.15);
+
+  camDirFrom(camLook, CAM.yaw, CAM.pitch);
+  CAM.distNow += (CAM.dist - CAM.distNow) * damp(11, dt);
+
+  const shake = G.shake;
+  const sx = shake > 0 ? rand(-1, 1) * shake * 0.45 : 0;
+  const sy = shake > 0 ? rand(-1, 1) * shake * 0.45 : 0;
+  const tx = P.pos.x;
+  const ty = P.pos.y + CAM.targetY;
+  const tz = P.pos.z;
+  // 가까이 당길수록 위쪽 보정을 줄여 1인칭처럼 자연스럽게
+  const lift = Math.min(1.9, CAM.distNow * 0.13);
+
+  camTmp.set(
+    tx - camLook.x * CAM.distNow + sx,
+    ty - camLook.y * CAM.distNow + lift + sy,
+    tz - camLook.z * CAM.distNow
   );
-  camera.rotation.z += P.roll * 0.14;
+  // 해저 지형·수면 클램핑 (카메라가 바닥을 뚫지 않게)
+  const gy = terrainHeight(camTmp.x, camTmp.z) + 1.8;
+  if (camTmp.y < gy) camTmp.y = gy;
+  if (camTmp.y > SURFACE_Y - 1.2) camTmp.y = SURFACE_Y - 1.2;
+
+  camera.position.lerp(camTmp, damp(CAM.distNow < 7 ? 17 : 9, dt));
+  const gy2 = terrainHeight(camera.position.x, camera.position.z) + 1.6;
+  if (camera.position.y < gy2) camera.position.y = gy2;
+
+  camera.lookAt(
+    tx + camLook.x * 30,
+    ty + camLook.y * 30,
+    tz + camLook.z * 30
+  );
+  camera.rotation.z += P.roll * 0.12;
+  camera.getWorldDirection(aim);
+
+  // 아주 가까이 당기면 잠수정 몸체를 숨겨 1인칭 조종석 시점처럼
+  const close = CAM.distNow < 4.6;
+  if (close !== _camClose) {
+    _camClose = close;
+    setSubVisible(!close);
+  }
+
   G.shake = Math.max(0, G.shake - dt * 2.2);
 }
 
@@ -1533,7 +1713,7 @@ function resolveCreatureContacts() {
 
 /* ---------------- 어뢰 ---------------- */
 function findTarget(fromPos, coneCos) {
-  computeForward(forward);
+  forward.copy(aim);
   let best = null;
   let bestScore = -Infinity;
   for (const e of enemies) {
@@ -1721,6 +1901,10 @@ function loop() {
 
 function updateIdle(dt) {
   G.elapsed += dt;
+  if (_camClose) {
+    _camClose = false;
+    setSubVisible(true);
+  }
   if (G.state === 'menu') {
     P.bob += dt * 0.6;
     P.yaw = Math.sin(G.elapsed * 0.18) * 0.5;
@@ -1901,6 +2085,10 @@ function bindButtons() {
   $('btn-restart').addEventListener('click', startGame);
   el.pause.addEventListener('click', () => togglePause(G.state === 'playing'));
   el.mute.addEventListener('click', toggleMute);
+  $('btn-cam').addEventListener('click', () => {
+    resetCameraView();
+    if (G.state === 'playing') toast('시점 초기화 · 줌 15');
+  });
   // 음파 폭탄: 조이스틱을 잡은 채 두 번째 손가락으로 누르면(멀티터치) 사파리가
   // click 을 생략할 수 있어 pointerdown 에서 먼저 처리하고, 뒤따르는 click 은 중복으로 본다.
   let bombUsedAt = -1e9;
@@ -1955,6 +2143,27 @@ function boot() {
         beamOpacity: player.beam ? player.beam.material.opacity : null,
         beamScale: player.beam ? player.beam.scale.z : null,
       }),
+      cam: () => ({
+        yaw: +CAM.yaw.toFixed(3), pitch: +CAM.pitch.toFixed(3),
+        dist: +CAM.dist.toFixed(2), distNow: +CAM.distNow.toFixed(2),
+        subYaw: +P.yaw.toFixed(3), subPitch: +P.pitch.toFixed(3),
+        pos: [+camera.position.x.toFixed(2), +camera.position.y.toFixed(2), +camera.position.z.toFixed(2)],
+        aim: [+aim.x.toFixed(3), +aim.y.toFixed(3), +aim.z.toFixed(3)],
+        subVisible: !_camClose,
+        errors: (window.__errors || []).length,
+        fps: G.fps || 0,
+      }),
+      setCam: (yaw, pitch, dist) => {
+        if (yaw !== undefined && yaw !== null) CAM.yaw = yaw;
+        if (pitch !== undefined && pitch !== null) CAM.pitch = pitch;
+        if (dist !== undefined && dist !== null) CAM.dist = dist;
+        snapCamera();
+      },
+      CAM, aim,
+      texInfo: () => {
+        const t = world.tex || {};
+        return { keys: Object.keys(t), ms: t.ms };
+      },
       creatures: () => world.creatures.map((c) => ({
         kind: c.kind,
         pos: [+c.obj.group.position.x.toFixed(2), +c.obj.group.position.y.toFixed(2), +c.obj.group.position.z.toFixed(2)],
