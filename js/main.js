@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=202611190a';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190a';
+import { Sound } from './audio.js?v=202611190b';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611190b';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=202611190a';
-import { FX } from './fx.js?v=202611190a';
+} from './models.js?v=202611190b';
+import { FX } from './fx.js?v=202611190b';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2352,32 +2352,50 @@ async function runSteerSelfTest() {
     if (G.state !== 'playing') startGame();
     await wait(400);
 
-    /* 1) 오른쪽으로 밀면 우회전 — yaw 가 줄어든다 */
+    const t0 = () => G.elapsed;
+
+    /* 1) 오른쪽으로 밀면 우회전 — yaw 가 줄어든다 (게임 시간 기준 각속도) */
+    let e0 = t0();
     const yaw0 = P.yaw;
     ev('pointerdown', cx, cy);
     ev('pointermove', cx + rad * 0.95, cy);
-    await wait(500);
+    await wait(1500);
+    const dtR = Math.max(0.001, t0() - e0);
     const yawRight = P.yaw;
+    const rateR = (yawRight - yaw0) / dtR;
     R.turnRight = {
       dYaw: +(yawRight - yaw0).toFixed(3),
+      gameSeconds: +dtR.toFixed(2),
+      radPerSec: +rateR.toFixed(2),
       joyTurn: +joy.turn.toFixed(2),
-      pass: yawRight < yaw0 - 0.2 && joy.turn > 0.5,
+      pass: rateR < -0.9 && joy.turn > 0.5,
     };
 
     /* 2) 왼쪽으로 밀면 좌회전 — yaw 가 늘어난다 */
+    e0 = t0();
     ev('pointermove', cx - rad * 0.95, cy);
-    await wait(500);
+    await wait(1500);
+    const dtL = Math.max(0.001, t0() - e0);
     const yawLeft = P.yaw;
-    R.turnLeft = { dYaw: +(yawLeft - yawRight).toFixed(3), pass: yawLeft > yawRight + 0.2 };
+    const rateL = (yawLeft - yawRight) / dtL;
+    R.turnLeft = {
+      dYaw: +(yawLeft - yawRight).toFixed(3),
+      radPerSec: +rateL.toFixed(2),
+      pass: rateL > 0.9,
+    };
 
     /* 3) 위로 밀면 전진 — 잠수정이 바라보는 쪽으로 나아간다 */
     ev('pointerup', cx, cy);
-    await wait(120);
+    await wait(150);
+    // 속도가 잠잠해질 때까지 기다린다 (기기 프레임레이트와 무관하게)
+    for (let i = 0; i < 40 && Math.hypot(P.vel.x, P.vel.z) > 1.5; i++) await wait(250);
     const p0 = P.pos.clone();
     const yawFwd = P.yaw;
+    e0 = t0();
     ev('pointerdown', cx, cy);
     ev('pointermove', cx, cy - rad * 0.95);
-    await wait(800);
+    await wait(1500);
+    const dtF = Math.max(0.001, t0() - e0);
     const p1 = P.pos.clone();
     const movedDist = Math.hypot(p1.x - p0.x, p1.z - p0.z);
     const fwdDir = new THREE.Vector3(-Math.sin(yawFwd), 0, -Math.cos(yawFwd));
@@ -2385,30 +2403,40 @@ async function runSteerSelfTest() {
       ? ((p1.x - p0.x) * fwdDir.x + (p1.z - p0.z) * fwdDir.z) / movedDist
       : 0;
     R.forward = {
-      moved: +movedDist.toFixed(2), dot: +fwdDot.toFixed(3),
+      moved: +movedDist.toFixed(2),
+      unitsPerSec: +(movedDist / dtF).toFixed(1),
+      dot: +fwdDot.toFixed(3),
       camGap: +Math.abs(angDiff(P.yaw, CAM.yaw)).toFixed(3),
-      pass: movedDist > 4 && fwdDot > 0.9,
+      pass: movedDist / dtF > 12 && fwdDot > 0.85,
     };
 
     /* 4) 아래로 밀면 후진 — 정면 반대쪽으로 물러난다 */
     ev('pointerup', cx, cy);
-    await wait(900);              // 전진 속도가 서서히 죽기를 기다린다
+    await wait(150);
+    for (let i = 0; i < 40 && Math.hypot(P.vel.x, P.vel.z) > 1.5; i++) await wait(250);
     const p2 = P.pos.clone();
+    e0 = t0();
     ev('pointerdown', cx, cy);
     ev('pointermove', cx, cy + rad * 0.95);
-    await wait(900);
+    await wait(1500);
+    const dtB = Math.max(0.001, t0() - e0);
     const p3 = P.pos.clone();
     const backDist = Math.hypot(p3.x - p2.x, p3.z - p2.z);
     const backDot = backDist > 0.01
       ? ((p3.x - p2.x) * fwdDir.x + (p3.z - p2.z) * fwdDir.z) / backDist
       : 0;
-    R.backward = { moved: +backDist.toFixed(2), dot: +backDot.toFixed(3), pass: backDist > 2 && backDot < -0.5 };
+    R.backward = {
+      moved: +backDist.toFixed(2),
+      unitsPerSec: +(backDist / dtB).toFixed(1),
+      dot: +backDot.toFixed(3),
+      pass: backDist / dtB > 4 && backDot < -0.5,
+    };
     ev('pointerup', cx, cy);
 
     /* 5) 선회하는 동안 카메라가 잠수정 뒤를 따라온다 */
     ev('pointerdown', cx, cy);
     ev('pointermove', cx + rad * 0.95, cy);
-    await wait(900);
+    await wait(1800);
     const gap = Math.abs(angDiff(P.yaw, CAM.yaw));
     R.camFollow = { gap: +gap.toFixed(3), pass: gap < 0.35 };
     ev('pointerup', cx, cy);
