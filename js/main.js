@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116j';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116j';
+import { Sound } from './audio.js?v=20261116k';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116k';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116j';
-import { FX } from './fx.js?v=20261116j';
+} from './models.js?v=20261116k';
+import { FX } from './fx.js?v=20261116k';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -20,7 +20,7 @@ const damp = (k, dt) => 1 - Math.exp(-k * dt);
 
 const BEST_KEY = 'abyss-diver-best';
 // 산호 언덕 위에서 시작 — 앞쪽으로 해저 협곡이 깊게 떨어진다
-const START_POS = new THREE.Vector3(-20, terrainHeight(-20, 60) + 7, 60);
+const START_POS = new THREE.Vector3(-20, terrainHeight(-20, 60) + 11, 60);
 
 /* ---------------- 내구력 · 충돌 · 수압 밸런스 ---------------- */
 const BASE_MAX_HULL = 100;       // 기본 최대 내구력
