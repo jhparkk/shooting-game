@@ -11,10 +11,10 @@ import {
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
   makeFishSchool, glowTexture, setSwimRate,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
-  fanCoralGeometry, brainCoralGeometry,
+  fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116h';
-import { getTextures } from './textures.js?v=20261116h';
+} from './models.js?v=20261116i';
+import { getTextures } from './textures.js?v=20261116i';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -552,13 +552,13 @@ export class World {
           // 평지 — 보통 모래 ↔ 밝고 분홍빛이 도는 산호 모래
           vec3 sandy = mix( cSand, cCoralSand, smoothstep( 0.36, 0.78, pMid ) );
           // 벽면 — 회색 암벽 ↔ 이끼·해조류 낀 암반 ↔ 다채로운 산호석 암초
-          vec3 rocky = mix( cRock, cAlgae, smoothstep( 0.40, 0.70, pBig ) );
-          rocky = mix( rocky, cReef, smoothstep( 0.46, 0.84, pMid ) * ( 0.6 + 0.4 * pFine ) );
+          vec3 rocky = mix( cRock, cAlgae, smoothstep( 0.36, 0.62, pBig ) );
+          rocky = mix( rocky, cReef, smoothstep( 0.30, 0.72, pMid ) * ( 0.7 + 0.3 * pFine ) );
 
           vec3 detail = mix( rocky, sandy, sandW );
           // 얕은 산호 지대 — 암초에 분홍·주황 기운을 살짝 얹어 힐링감을 더한다
-          float reefK = smoothstep( -34.0, 4.0, vWPosV.y ) * smoothstep( 0.38, 0.92, pFine ) * ( 1.0 - sandW * 0.45 );
-          detail = mix( detail, detail * vec3( 1.24, 0.90, 1.03 ), reefK * 0.42 );
+          float reefK = smoothstep( -40.0, 6.0, vWPosV.y ) * smoothstep( 0.34, 0.86, pFine ) * ( 0.35 + 0.65 * ( 1.0 - flatK ) );
+          detail = mix( detail, detail * vec3( 1.26, 0.88, 1.04 ), reefK * 0.5 );
           detail = mix( detail, cBasalt, deepK );
           detail *= 1.18;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
@@ -598,13 +598,14 @@ export class World {
 
   /* ---------------- 지형 소품 템플릿 (한 번만 만들어 재사용) ---------------- */
   _buildTemplates() {
-    this.tpl = { rock: [], branch: [], blob: [], tube: [], fan: [], brain: [] };
+    this.tpl = { rock: [], branch: [], blob: [], tube: [], fan: [], brain: [], tuft: [] };
     for (let i = 0; i < 5; i++) this.tpl.rock.push(paint(rockGeometry(1, 500 + i * 91), 0xffffff));
     for (let i = 0; i < 7; i++) this.tpl.branch.push(branchCoralGeometry(0xffffff, 610 + i * 37));
     for (let i = 0; i < 7; i++) this.tpl.blob.push(blobCoralGeometry(0xffffff, 720 + i * 41));
     for (let i = 0; i < 5; i++) this.tpl.tube.push(tubeCoralGeometry(0xffffff, 830 + i * 43));
     for (let i = 0; i < 6; i++) this.tpl.fan.push(fanCoralGeometry(0xffffff, 940 + i * 47));
     for (let i = 0; i < 5; i++) this.tpl.brain.push(brainCoralGeometry(0xffffff, 1050 + i * 53));
+    for (let i = 0; i < 6; i++) this.tpl.tuft.push(tuftCoralGeometry(0xffffff, 1160 + i * 59));
     this._tint = new THREE.Color();
   }
 
@@ -857,7 +858,7 @@ export class World {
       const coralGeos = [];
       const zone = this.zone;
       const tmpCol = new THREE.Color();
-      for (let i = 0; i < 36; i++) {
+      for (let i = 0; i < 42; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.94;
         const lz = (rnd() - 0.5) * CHUNK * 0.94;
         const wx = ox + lx;
@@ -892,6 +893,27 @@ export class World {
           geo.applyMatrix4(m);
           coralGeos.push(geo);
         }
+      }
+      // 산호 카펫 — 바닥과 경사면을 작은 산호 다발로 촘촘히 덮는다
+      for (let i = 0; i < 46; i++) {
+        const lx = (rnd() - 0.5) * CHUNK * 0.96;
+        const lz = (rnd() - 0.5) * CHUNK * 0.96;
+        const wx = ox + lx;
+        const wz = oz + lz;
+        const gy = getTerrainHeight(wx, wz);
+        if (gy < -30) continue;
+        if (slopeAt(wx, wz) > 1.6) continue;
+        const tpl = this.tpl.tuft[Math.floor(rnd() * this.tpl.tuft.length)];
+        const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
+        let geo = this._clonePainted(tpl, color);
+        if (geo.index) geo = geo.toNonIndexed();
+        const sc = 0.8 + rnd() * 1.5;
+        const m = new THREE.Matrix4();
+        m.makeRotationY(rnd() * Math.PI * 2);
+        m.scale(new THREE.Vector3(sc, sc * (0.8 + rnd() * 0.8), sc));
+        m.setPosition(lx, gy + 0.05, lz);
+        geo.applyMatrix4(m);
+        coralGeos.push(geo);
       }
       // 색이 산호 같은 작은 암초 덩이 — 바닥에 다채로운 색 반점을 준다
       for (let i = 0; i < 7; i++) {

@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261116h';
+import { getTextures } from './textures.js?v=20261116i';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2770,6 +2770,25 @@ export function brainCoralGeometry(color, seed) {
   }
   geo.computeVertexNormals();
   return paint(geo, color);
+}
+
+/** 작은 산호 다발 — 5조각 낮은 폴리 (바닥을 촘촘히 덮는 산호 카펫용) */
+export function tuftCoralGeometry(color, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const n = 4 + Math.floor(rnd() * 4);
+  for (let i = 0; i < n; i++) {
+    const h = 0.26 + rnd() * 0.42;
+    const g = new THREE.ConeGeometry(0.11 + rnd() * 0.09, h, 5, 1);
+    g.translate(0, h / 2, 0);
+    const m = new THREE.Matrix4().makeRotationY(rnd() * Math.PI * 2);
+    const tilt = new THREE.Matrix4().makeRotationZ((rnd() - 0.5) * 0.9);
+    m.multiply(tilt);
+    m.setPosition((rnd() - 0.5) * 0.7, 0, (rnd() - 0.5) * 0.7);
+    g.applyMatrix4(m);
+    parts.push(paint(g, color));
+  }
+  return mergeGeometries(parts, false);
 }
 
 /** 관형 스펀지 산호 */
