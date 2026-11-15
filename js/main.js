@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117f';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117f';
+import { Sound } from './audio.js?v=202611180a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=202611180a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117f';
-import { FX } from './fx.js?v=20261117f';
+} from './models.js?v=202611180a';
+import { FX } from './fx.js?v=202611180a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -184,6 +184,26 @@ const aim = new THREE.Vector3(0, 0, -1);       // 조준 방향(화면 중앙)
 function camDirFrom(out, yaw, pitch) {
   const cp = Math.cos(pitch);
   return out.set(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+}
+
+/* 시점·줌 공통 연산 — 포인터 핸들러·휠이 모두 이 함수를 쓴다 */
+const LOOK_SENS = 0.0055;
+const PITCH_MIN = -1.2;
+const PITCH_MAX = 1.15;
+
+function applyLook(dx, dy) {
+  CAM.yaw -= dx * LOOK_SENS;
+  CAM.pitch = clamp(CAM.pitch - dy * LOOK_SENS, PITCH_MIN, PITCH_MAX);
+}
+
+function applyPinch(d0, d, base) {
+  const from = base === undefined ? CAM.dist : base;
+  CAM.dist = clamp(from * (d0 / (d || 1)), CAM.minDist, CAM.maxDist);
+}
+
+function applyZoom(deltaY, deltaMode) {
+  const k = deltaMode === 1 ? 0.05 : 0.0018;
+  CAM.dist = clamp(CAM.dist * (1 + deltaY * k), CAM.minDist, CAM.maxDist);
 }
 
 /** 카메라를 잠수정 기준 기본 위치로 돌린다 */
@@ -406,7 +426,6 @@ function bindInput() {
   const lookPointers = new Map();   // pointerId -> {x, y}
   let pinch = null;                 // { d0, base }
   let tap = null;                   // 마우스 클릭(발사) 판정
-  const LOOK_SENS = 0.0055;
 
   function startPinch() {
     const ids = [...lookPointers.keys()];
@@ -445,13 +464,12 @@ function bindInput() {
       const b = lookPointers.get(ids[1]);
       const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
       // 손을 벌리면 줌인(가까이), 오므리면 줌아웃
-      CAM.dist = clamp(pinch.base * (pinch.d0 / d), CAM.minDist, CAM.maxDist);
+      applyPinch(pinch.d0, d, pinch.base);
       return;
     }
 
     if (tap && tap.id === e.pointerId) tap.moved += Math.abs(dx) + Math.abs(dy);
-    CAM.yaw -= dx * LOOK_SENS;
-    CAM.pitch = clamp(CAM.pitch - dy * LOOK_SENS, -1.2, 1.15);
+    applyLook(dx, dy);
   }, { passive: false });
 
   function endLook(e) {
@@ -471,8 +489,7 @@ function bindInput() {
   /* PC: 마우스 휠 = 3D 줌 */
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const k = e.deltaMode === 1 ? 0.05 : 0.0018;
-    CAM.dist = clamp(CAM.dist * (1 + e.deltaY * k), CAM.minDist, CAM.maxDist);
+    applyZoom(e.deltaY, e.deltaMode);
   }, { passive: false });
 
   /* --- 키보드 --- */
@@ -2159,7 +2176,7 @@ function boot() {
         if (dist !== undefined && dist !== null) CAM.dist = dist;
         snapCamera();
       },
-      CAM, aim,
+      CAM, aim, applyLook, applyPinch, applyZoom, resetCameraView, snapCamera,
       texInfo: () => {
         const t = world.tex || {};
         return { keys: Object.keys(t), ms: t.ms };
