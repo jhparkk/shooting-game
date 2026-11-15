@@ -2116,7 +2116,7 @@ function eagleWings() {
     dihedral: (u) => -0.15 + u * u * 0.75,
     top: 0x1c2836,
     bottom: 0xdfe6e6,
-    spot: { color: 0xeaf2f2, threshold: 0.78, mix: 0.9 },
+    spot: { color: 0xeaf2f2, threshold: 0.87, mix: 0.85 },
   });
   return _eagleWing;
 }
