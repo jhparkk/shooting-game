@@ -874,7 +874,7 @@ function pufferGeometries() {
   _pufferTailGeo = tail;
 
   // 가시 — 부드러운 6각 침
-  const spikeG = spikeGeo(0.045, 0.30, 6);
+  const spikeG = spikeGeo(0.05, 0.42, 6);
   const spikeParts = [];
   const up = new THREE.Vector3(0, 1, 0);
   const n = 72;
@@ -889,12 +889,12 @@ function pufferGeometries() {
     const geo = spikeG.clone();
     const q = new THREE.Quaternion().setFromUnitVectors(up, d.normalize());
     const m = new THREE.Matrix4().compose(
-      d.clone().multiplyScalar(0.80),
+      d.clone().multiplyScalar(0.84),
       q,
       new THREE.Vector3(1, 1, 1)
     );
     geo.applyMatrix4(m);
-    spikeParts.push(paint(geo, 0xd9a252));
+    spikeParts.push(paint(geo, 0xe0ab5e));
   }
   _pufferSpikeGeo = mergeGeometries(spikeParts, false);
 
