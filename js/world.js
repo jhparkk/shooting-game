@@ -882,7 +882,8 @@ export class World {
           const dx = c === 0 ? 0 : (rnd() - 0.5) * 4.2;
           const dz = c === 0 ? 0 : (rnd() - 0.5) * 4.2;
           const cgy = c === 0 ? gy : getTerrainHeight(wx + dx, wz + dz);
-          const geo = this._clonePainted(tpl, color);
+          let geo = this._clonePainted(tpl, color);
+          if (geo.index) geo = geo.toNonIndexed();   // 바퀴·산호를 섞어 병합하려면 인덱스 여부를 통일
           const sc = (1.38 + rnd() * 2.0) * (steep ? 0.78 : 1.0);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
@@ -902,7 +903,8 @@ export class World {
         if (gy < -30) continue;
         const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
         const cc = zone.coral[Math.floor(rnd() * zone.coral.length)];
-        const geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xd8cfc0), 0.42).getHex());
+        let geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xd8cfc0), 0.42).getHex());
+        if (geo.index) geo = geo.toNonIndexed();
         const sc = 0.7 + rnd() * 1.5;
         const m = new THREE.Matrix4();
         m.makeRotationY(rnd() * Math.PI * 2);
