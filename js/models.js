@@ -1553,7 +1553,7 @@ export function makeHumpbackWhale() {
   const fins = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group();
-    pivot.position.set(1.5 * s, -0.8, -1.9);
+    pivot.position.set(1.55 * s, -0.85, -3.1);
     pivot.add(new THREE.Mesh(humpbackPectoral(s), _humpMat));
     g.add(pivot);
     fins.push({ pivot, sign: s });
@@ -1565,8 +1565,8 @@ export function makeHumpbackWhale() {
       fluke.rotation.x = Math.sin(t * 0.9) * 0.32;
       fluke.rotation.z = Math.sin(t * 0.43) * 0.06;
       for (const f of fins) {
-        f.pivot.rotation.z = -0.2 * f.sign + Math.sin(t * 0.55 + (f.sign > 0 ? 0.7 : 0)) * 0.14;
-        f.pivot.rotation.y = 0.16 * f.sign;
+        f.pivot.rotation.z = -0.24 * f.sign + Math.sin(t * 0.55 + (f.sign > 0 ? 0.7 : 0)) * 0.14;
+        f.pivot.rotation.y = 0.34 * f.sign;
       }
     },
   };
@@ -1598,7 +1598,7 @@ function orcaGeometry() {
   // 눈 뒤 흰 패치 (postocular patch)
   for (const s of [-1, 1]) {
     const r = radiusAt(profile, -3.35) * 0.93;
-    ellipsePatch(parts, WHITE, [r * 0.95 * s, 0.18, -3.35], [r * 0.34, 0.3, 0.72]);
+    ellipsePatch(parts, WHITE, [r * 0.96 * s, 0.1, -3.35], [r * 0.3, 0.22, 0.6]);
   }
   // 안장 무늬 (등지느러미 뒤 옅은 회색)
   ellipsePatch(parts, 0x9aa7ae, [0, radiusAt(profile, 1.5) * 0.93, 1.5], [0.44, 0.22, 0.62]);
@@ -1722,11 +1722,11 @@ function spermGeometry() {
 
   // 몸통 주름 — 배와 옆면의 가로 홈
   const rnd = mulberry(5150);
-  for (let i = 0; i < 16; i++) {
-    const z = -1.4 + i * 0.5;
-    const r = radiusAt(profile, z) * 0.985;
-    const ring = new THREE.TorusGeometry(r, 0.055, 4, 22);
-    parts.push(xf(paint(ring, 0x37332c), [0, 0, z], [0, 0, 0], [1, 0.95, 1]));
+  for (let i = 0; i < 11; i++) {
+    const z = -0.4 + i * 0.68;
+    const r = radiusAt(profile, z) * 0.99;
+    const ring = new THREE.TorusGeometry(r, 0.032, 4, 22);
+    parts.push(xf(paint(ring, 0x453f36), [0, 0, z], [0, 0, 0], [1, 0.95, 1]));
   }
 
   // 등 혹 (작은 등지느러미)
@@ -1734,7 +1734,7 @@ function spermGeometry() {
     [-0.4, 0], [-0.22, 0.4], [0.05, 0.5], [0.3, 0.28], [0.36, 0],
   ], 0.09, 0x3e392f), [0, 1.5, 2.9], [0, 0, 0], [1, 1, 1]));
 
-  // 작은 가슴지느러미
+  // 작은 가슴지느러미 (앞쪽 아래)
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
       [0, 0.26], [0.5, 0.1], [0.78, -0.24], [0.62, -0.42], [0.2, -0.28], [0, -0.1],
@@ -1999,9 +1999,9 @@ function mantaWings() {
     back: (u) => 2.3 - 0.95 * u,
     thick: (u) => 0.26 * (1 - u * 0.75),
     dihedral: (u) => -0.1 + u * u * 0.55,
-    top: 0x2e3d4a,
+    top: 0x36485a,
     bottom: 0xf0f4f4,
-    spot: { color: 0x3d5162, threshold: 0.88, mix: 0.5 },
+    spot: { color: 0x2b3a49, threshold: 0.9, mix: 0.4 },
   });
   return _mantaWing;
 }
@@ -2137,7 +2137,7 @@ export function makeEagleRay() {
   ], { radial: 16, sx: 0.82, sy: 0.6 });
   paintSkin(bodyG, {
     back: SKIN, belly: 0xe4eaea, halfHeight: 0.55, blend: [-0.5, 0.12],
-    spot: { color: 0xf0f6f6, threshold: 0.9, mix: 0.85 },
+    spot: { color: 0xe8f0f0, threshold: 0.94, mix: 0.5 },
   });
   // 몸통을 살짝 솟구치게
   bodyG.translate(0, 0.12, 0);
@@ -2212,7 +2212,7 @@ function discGeometry(rings, segs, R, rz, top, bottom, edge) {
   const cEdge = new THREE.Color(edge);
   const row = segs;
   for (let side = 0; side < 2; side++) {
-    const base = side * ((rings + 1) * row + 1);
+    const base = side * (rings * row + 1);
     // 중심점
     pos.push(0, side === 0 ? 0.12 : -0.1, 0);
     const cc = side === 0 ? cTop : cBot;
