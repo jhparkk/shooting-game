@@ -12,7 +12,7 @@ import {
   makeFishSchool, glowTexture,
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261116c';
+} from './models.js?v=20261116d';
 
 export const SURFACE_Y = 34;
 export const FLOOR_Y = -50;      // 얕은 해구 바닥 (수심 약 113m)
@@ -47,7 +47,7 @@ export const ZONES = [
   },
   {
     name: '심해 해구',
-    fog: 0x0a2a72, density: 0.0085,
+    fog: 0x0a2a72, density: 0.0068,
     skyTop: 0x2f6bc0, skyMid: 0x0d2f6e, skyBottom: 0x020a20,
     hemiSky: 0x6fa8ff, hemiGround: 0x081a3a, hemi: 0.5,
     ambient: 0x3f6cc0, ambientI: 0.32,
@@ -56,7 +56,7 @@ export const ZONES = [
   },
   {
     name: '초심해 심연',
-    fog: 0x040a1e, density: 0.0125,
+    fog: 0x040a1e, density: 0.0078,
     skyTop: 0x0b1f4a, skyMid: 0x030a20, skyBottom: 0x000206,
     hemiSky: 0x2a4c92, hemiGround: 0x03060e, hemi: 0.42,
     ambient: 0x22386f, ambientI: 0.34,

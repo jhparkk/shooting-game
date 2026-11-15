@@ -469,7 +469,7 @@ export function makeSubmarine() {
   const spot = new THREE.SpotLight(0xcdf6ff, 26, 80, 0.5, 0.72, 1.1);
   spot.position.set(0, 0.25, -1.8);
   const spotTarget = new THREE.Object3D();
-  spotTarget.position.set(0, -1.2, -26);
+  spotTarget.position.set(0, -4.5, -20);
   g.add(spot, spotTarget);
   spot.target = spotTarget;
 

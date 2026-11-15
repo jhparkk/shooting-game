@@ -3,15 +3,15 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116c';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116c';
+import { Sound } from './audio.js?v=20261116d';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116d';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116c';
-import { FX } from './fx.js?v=20261116c';
+} from './models.js?v=20261116d';
+import { FX } from './fx.js?v=20261116d';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1151,13 +1151,13 @@ function updateHeadlight(dt, instant) {
 
   // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
   if (player.frontLight) {
-    player.frontLight.intensity += (deep * 70 - player.frontLight.intensity) * k;
-    player.frontLight.distance = 18 + deep * 46;
+    player.frontLight.intensity += (deep * 110 - player.frontLight.intensity) * k;
+    player.frontLight.distance = 18 + deep * 52;
   }
-  // 잠수정 주변을 감싸는 옅은 빛무리
+  // 잠수정 아래를 밝히는 빛무리 — 급한 사면을 따라 내려갈 때 발밑이 보이게
   if (player.under) {
-    player.under.intensity += ((6 + deep * 46) - player.under.intensity) * k;
-    player.under.distance = 16 + deep * 34;
+    player.under.intensity += ((6 + deep * 150) - player.under.intensity) * k;
+    player.under.distance = 16 + deep * 62;
   }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
