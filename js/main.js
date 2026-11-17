@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117k';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117k';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117k';
+import { Sound } from './audio.js?v=20261117m';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117m';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117m';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117k';
-import { FX } from './fx.js?v=20261117k';
+} from './models.js?v=20261117m';
+import { FX } from './fx.js?v=20261117m';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1450,8 +1450,8 @@ function updateHeadlight(dt, instant) {
   }
   // 잠수정 아래를 밝히는 빛무리 — 급한 사면을 따라 내려갈 때 발밑이 보이게
   if (player.under) {
-    player.under.intensity += ((6 + deep * 150) - player.under.intensity) * k;
-    player.under.distance = 16 + deep * 62;
+    player.under.intensity += ((6 + deep * 260) - player.under.intensity) * k;
+    player.under.distance = 16 + deep * 95;
   }
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
@@ -2218,6 +2218,8 @@ function renderFrame(dt) {
       const depth = Math.max(0, G.depth || 0);
       const u = pipeline.uni;
       u.uDepth.value = Math.min(1, depth / 900);
+      // 깊어질수록 노출을 조금 올려 심해가 완전히 검게 죽지 않게
+      u.uExposure.value = 1.0 + 0.42 * Math.min(1, depth / 1400);
       /* 표층에서만 위에서 내려오는 밝은 물빛
    — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
       u.uTopGlow.value = 0.03 * Math.max(0, 1 - depth / 620);

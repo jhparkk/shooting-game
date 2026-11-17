@@ -184,7 +184,7 @@ const PARTICLE_VERT = /* glsl */ `
             * (1.0 - smoothstep(uBeamRange * 0.55, uBeamRange, along)) * uBeamI;
     }
 
-    float nearFade = smoothstep(0.25, 2.2, depth);
+    float nearFade = smoothstep(2.6, 9.0, depth);
     float farFade = 1.0 - smoothstep(uBox.x * 0.30, uBox.x * 0.52, length(rel));
     float twinkle = 0.62 + 0.38 * sin(uTime * 1.7 * sp + aSeed * 44.0);
     vBright = uOpacity * nearFade * farFade * mix(0.32 + 0.55 * twinkle, 1.9, clamp(beamK, 0.0, 1.0));
@@ -499,7 +499,7 @@ export class Atmosphere {
     this.snowUni.uOpacity.value = 0.42 - 0.16 * Math.min(1, depth / 900);
     /* 생물 발광은 350m 아래부터 서서히 나타난다 */
     const bioK = Math.max(0, Math.min(1, (depth - 300) / 500));
-    this.bioUni.uOpacity.value = bioK * 0.85;
+    this.bioUni.uOpacity.value = bioK * 1.05;
     this.bio.visible = bioK > 0.02;
   }
 }

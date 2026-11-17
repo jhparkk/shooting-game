@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117k';
-import { getTextures } from './textures.js?v=20261117k';
-import { Atmosphere } from './atmosphere.js?v=20261117k';
+} from './models.js?v=20261117m';
+import { getTextures } from './textures.js?v=20261117m';
+import { Atmosphere } from './atmosphere.js?v=20261117m';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -65,8 +65,8 @@ export const ZONES = [
   },
   {
     name: '초심해 심연',
-    fog: 0x031430, density: 0.0165,
-    skyTop: 0x08204a, skyMid: 0x020a1e, skyBottom: 0x000306,
+    fog: 0x051c33, density: 0.0158,
+    skyTop: 0x0a2652, skyMid: 0x030c22, skyBottom: 0x010407,
     hemiSky: 0x2a4a90, hemiGround: 0x03060e, hemi: 0.4,
     ambient: 0x1d3163, ambientI: 0.3,
     sun: 0x9db8e8, sunI: 0.2, glow: 0.15,
@@ -74,7 +74,7 @@ export const ZONES = [
   },
   {
     name: '극심해 해구',
-    fog: 0x010815, density: 0.0205,
+    fog: 0x020e1f, density: 0.0195,
     skyTop: 0x03102b, skyMid: 0x010413, skyBottom: 0x000103,
     hemiSky: 0x1a3570, hemiGround: 0x02030a, hemi: 0.36,
     ambient: 0x16244c, ambientI: 0.3,
