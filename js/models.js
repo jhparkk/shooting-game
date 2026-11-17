@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117d6';
+import { getTextures } from './textures.js?v=20261117d7';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2711,10 +2711,10 @@ export function makeFishGeometry(variant) {
   const v = FISH_KINDS[key];
 
   const profile = [
-    [-0.50, 0.02], [-0.40, 0.09], [-0.28, 0.155], [-0.12, 0.195],
-    [0.06, 0.19], [0.22, 0.145], [0.33, 0.09], [0.40, 0.05],
+    [-0.50, 0.02], [-0.40, 0.10], [-0.28, 0.175], [-0.12, 0.225],
+    [0.06, 0.215], [0.22, 0.165], [0.33, 0.10], [0.40, 0.055],
   ];
-  const body = bodyGeometry(profile, { radial: 12, sx: 0.62, sy: 1.0 });
+  const body = bodyGeometry(profile, { radial: 14, sx: 0.72, sy: 1.0 });
   paintSkin(body, {
     back: v.back, belly: v.belly, halfHeight: 0.2, blend: v.blend,
     stripe: v.stripe,
@@ -2723,13 +2723,13 @@ export function makeFishGeometry(variant) {
   const parts = [body];
   // 꼬리 — 갈라진 부채
   const tail = vfin([
-    [0.00, 0.05], [0.13, 0.20], [0.20, 0.24], [0.16, 0.02],
-    [0.21, -0.22], [0.12, -0.19], [0.00, -0.05],
-  ], 0.03, v.tail, { smooth: true });
+    [0.00, 0.04], [0.10, 0.16], [0.16, 0.19], [0.13, 0.02],
+    [0.17, -0.18], [0.10, -0.15], [0.00, -0.04],
+  ], 0.026, v.tail, { smooth: true });
   parts.push(xf(tail, [0, 0, 0.38], [0, 0, 0], [1, 1, 1]));
   // 등지느러미
   const dorsal = vfin([
-    [-0.10, 0.17], [0.02, 0.30], [0.12, 0.31], [0.12, 0.17],
+    [-0.09, 0.19], [0.02, 0.28], [0.11, 0.28], [0.11, 0.19],
   ], 0.022, v.dorsal);
   parts.push(xf(dorsal, [0, 0, 0.0], [0, 0, 0], [1, 1, 1]));
   // 배지느러미

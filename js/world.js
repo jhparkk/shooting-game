@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d6';
-import { getTextures } from './textures.js?v=20261117d6';
-import { Atmosphere } from './atmosphere.js?v=20261117d6';
+} from './models.js?v=20261117d7';
+import { getTextures } from './textures.js?v=20261117d7';
+import { Atmosphere } from './atmosphere.js?v=20261117d7';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1461,7 +1461,7 @@ export class World {
   _seedSchool(school, rnd, px, pz) {
     const ang = rnd() * Math.PI * 2;
     // 산호초를 따라 가까이 헤엄치게 — 너무 멀면 작은 점으로만 보인다
-    const dist = 22 + rnd() * 62;
+    const dist = 30 + rnd() * 66;
     const cx = px + Math.cos(ang) * dist;
     const cz = pz + Math.sin(ang) * dist;
     const gy = getTerrainHeight(cx, cz);
