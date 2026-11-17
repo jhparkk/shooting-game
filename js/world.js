@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117m';
-import { getTextures } from './textures.js?v=20261117m';
-import { Atmosphere } from './atmosphere.js?v=20261117m';
+} from './models.js?v=20261117n';
+import { getTextures } from './textures.js?v=20261117n';
+import { Atmosphere } from './atmosphere.js?v=20261117n';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;

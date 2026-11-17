@@ -363,7 +363,7 @@ export class Atmosphere {
 
   /* ---------- 심해 생물 발광 ---------- */
   _buildBiolume() {
-    const N = 420;
+    const N = 560;
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(N * 3);
     const seed = new Float32Array(N);
@@ -385,7 +385,7 @@ export class Atmosphere {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
 
-    this.bioUni = this._particleUniforms({ size: 0.30, opacity: 0.0, drift: 0.45, box: 180, pulse: 0.7 });
+    this.bioUni = this._particleUniforms({ size: 0.42, opacity: 0.0, drift: 0.45, box: 150, pulse: 0.7 });
     this.bio = new THREE.Points(geo, this._particleMaterial(this.bioUni));
     this.bio.frustumCulled = false;
     this.bio.renderOrder = 7;
