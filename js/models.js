@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261118b4';
+import { getTextures } from './textures.js?v=20261118b5';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -3171,13 +3171,17 @@ export function rockCaveGeometry(seed, opts) {
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i);
     const y = p.getY(i);
+    const z = p.getZ(i);
     const upk = clamp01(nrm.getY(i) * 0.5 + 0.5);
     // 통로 안쪽 면은 빛이 덜 들어 어둡다 (법선이 축을 향한다)
     const inner = nrm.getX(i) * x + nrm.getY(i) * y < 0 ? 1 : 0;
-    let lig = 0.235 + 0.145 * upk + 0.035 * Math.sin(y * 0.7 + s1)
-      + 0.022 * Math.sin(x * 0.9 + s4) + 0.018 * Math.sin((x + y) * 1.7 + s5);
+    // 암반의 얼룩 — 큰 덩어리와 잔 결을 함께 흔들어 단색 플라스틱처럼 보이지 않게
+    let lig = 0.245 + 0.150 * upk
+      + 0.055 * Math.sin(x * 0.42 + s1) * Math.cos(y * 0.37 - s3)
+      + 0.030 * Math.sin(y * 0.9 + s4) + 0.022 * Math.sin((x + y) * 1.9 + s5)
+      + 0.014 * Math.sin(z * 2.3 + x * 0.7 + s6);
     lig *= 1 - 0.30 * inner;
-    col.setHSL(hue, 0.055 + 0.02 * inner, clamp01(lig));
+    col.setHSL(hue + 0.012 * Math.sin(y * 0.5 + s2), 0.050 + 0.045 * (1 - upk) + 0.02 * inner, clamp01(lig));
     colors[i * 3] = col.r;
     colors[i * 3 + 1] = col.g;
     colors[i * 3 + 2] = col.b;
