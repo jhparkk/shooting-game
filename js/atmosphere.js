@@ -52,7 +52,7 @@ const SURFACE_FRAG = /* glsl */ `
     float windowEdge = 0.63 + n.x * 0.035;
     float win = smoothstep(windowEdge - 0.10, windowEdge + 0.06, upness);
 
-    vec3 col = mix(uDeepColor, uSurfaceColor, win);
+    vec3 col = mix(uDeepColor * 0.62, uSurfaceColor, win);
 
     /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
     float c1 = sin(p.x * 0.41 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.37 - t * 0.27 + n.y * 1.6);
@@ -80,10 +80,11 @@ const SURFACE_FRAG = /* glsl */ `
     col += uSunColor * pow(sd, 160.0) * 2.2 * (1.0 - uDeep * 0.85);
     col += uSunColor * pow(sd, 8.0) * 0.16 * (1.0 - uDeep * 0.7);
 
-    /* 거리에 따른 안개 — 수면도 물빛에 잠긴다 */
+    /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
     col = mix(col, uFogColor, clamp(fogF, 0.0, 1.0));
-    gl_FragColor = vec4(col, 1.0);
+    float alpha = 1.0 - smoothstep(160.0, 430.0, dist);
+    gl_FragColor = vec4(col, alpha);
   }
 `;
 
@@ -251,7 +252,7 @@ export class Atmosphere {
       fragmentShader: SURFACE_FRAG,
       side: THREE.DoubleSide,
       depthWrite: false,
-      transparent: false,
+      transparent: true,
       fog: false,
     });
     this.surface = new THREE.Mesh(geo, mat);

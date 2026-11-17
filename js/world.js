@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117d';
-import { getTextures } from './textures.js?v=20261117d';
-import { Atmosphere } from './atmosphere.js?v=20261117d';
+} from './models.js?v=20261117e';
+import { getTextures } from './textures.js?v=20261117e';
+import { Atmosphere } from './atmosphere.js?v=20261117e';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -429,8 +429,8 @@ export class World {
         varying vec3 vDir;
         void main() {
           // 지평선(수평 방향)은 안개색과 같게, 위로 갈수록 표층의 밝은 물빛
-          vec3 c = mix(bottom, mid, smoothstep(0.06, 0.52, vY));
-          c = mix(c, top, smoothstep(0.50, 0.98, vY));
+          vec3 c = mix(bottom * 0.86, mid, smoothstep(0.02, 0.46, vY));
+          c = mix(c, top, smoothstep(0.44, 0.99, vY));
           // 표면 위 태양 — 수중에서 보면 퍼진 빛덩어리로 보인다
           float sd = max(0.0, dot(vDir, uSunDir));
           c += uSunColor * pow(sd, 7.0) * 0.10 * uGlow;
@@ -583,14 +583,15 @@ export class World {
           // 수중 빛무늬 — 표면색을 밝히고(곱셈) 약간의 빛을 더한다(덧셈)
           float upK = clamp( vWNrmV.y, 0.0, 1.0 );
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.14;
+          vec2 cuv = vWPosV.xz * 0.085;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.012, uTime * 0.008 ) ).r;
-          float cb = texture2D( uCaustics, cuv * 2.31 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
-          // 셀 경계의 날카로운 선 대신, 큰 패치 안에서만 부드럽게 번지는 빛
-          float cshape = smoothstep( 0.30, 1.05, ca * 0.72 + cb * 0.5 );
-          float cpatch = smoothstep( 0.34, 0.78, abyssFbm( vWPosV.xz * 0.045 + 21.0 ) );
+          float cb = texture2D( uCaustics, cuv * 1.71 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
+          // 얇은 셀 선이 아니라, 넓게 번지는 부드러운 빛 덩어리
+          float cshape = smoothstep( 0.55, 1.15, ca * 0.55 + cb * 0.65 );
+          cshape = cshape * cshape;
+          float cpatch = smoothstep( 0.30, 0.82, abyssFbm( vWPosV.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.04 + 0.96 * upK * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.42;
+          detail *= 1.0 + caustic * 0.5;
           diffuseColor.rgb *= detail;
           `
         ).replace(
