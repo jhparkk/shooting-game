@@ -16,9 +16,9 @@ import {
   rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118b2';
-import { getTextures } from './textures.js?v=20261118b2';
-import { Atmosphere } from './atmosphere.js?v=20261118b2';
+} from './models.js?v=20261118b3';
+import { getTextures } from './textures.js?v=20261118b3';
+import { Atmosphere } from './atmosphere.js?v=20261118b3';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1712,10 +1712,13 @@ export class World {
         }
       }
       if (!deep) break;
-      pos.x += deep.nx * deep.over;
-      pos.y += deep.ny * deep.over;
-      pos.z += deep.nz * deep.over;
-      pushed += deep.over;
+      /* 한 프레임에 밀어내는 양을 제한한다 — 구체가 서로 겹쳐 있어
+         한 번에 다 풀면 잠수정이 벽 반대편까지 튀어나간다. */
+      const mv = Math.min(deep.over, 0.6);
+      pos.x += deep.nx * mv;
+      pos.y += deep.ny * mv;
+      pos.z += deep.nz * mv;
+      pushed += mv;
       if (vel && !bounced) {
         const vn = vel.x * deep.nx + vel.y * deep.ny + vel.z * deep.nz;
         if (vn < 0) {

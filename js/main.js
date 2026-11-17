@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261118b2';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118b2';
-import { RenderPipeline, QUALITY } from './render.js?v=20261118b2';
+import { Sound } from './audio.js?v=20261118b3';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118b3';
+import { RenderPipeline, QUALITY } from './render.js?v=20261118b3';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261118b2';
-import { FX } from './fx.js?v=20261118b2';
+} from './models.js?v=20261118b3';
+import { FX } from './fx.js?v=20261118b3';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2964,9 +2964,10 @@ function boot() {
             distAfter: +d1.toFixed(2),
             minDist: +(s.r + SUB_R).toFixed(2),
             velBefore: +v0.toFixed(1),
-            velAfterAlong: +((vel.x * -n.x + vel.y * -n.y + vel.z * -n.z)).toFixed(2),
+            velAlongBefore: +v0.toFixed(2),   // 벽을 향한 속도
+            velAlongAfter: +(vel.x * -n.x + vel.y * -n.y + vel.z * -n.z).toFixed(2),
             velAfterLen: +vel.length().toFixed(2),
-            bounced: (vel.x * -n.x + vel.y * -n.y + vel.z * -n.z) > 0,  // 벽 쪽 속도가 반대로 뒤집혔다
+            bounced: (vel.x * -n.x + vel.y * -n.y + vel.z * -n.z) < 0,  // 벽 쪽 속도가 반대로 뒤집혔다
             clear: d1 >= s.r + SUB_R - 0.05,   // 밀려난 뒤 구체 밖으로 나왔는가
           };
         };
