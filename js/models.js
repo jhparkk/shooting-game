@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117a8';
+import { getTextures } from './textures.js?v=20261117a9';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2718,7 +2718,7 @@ export function makeFishSchool(count) {
   }
   const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const palette = [0xa6b4b6, 0x93a5aa, 0xb4bfb8, 0x8b9ca1, 0xc0c1b4, 0x8ea9ad, 0xa9ad9c];
+  const palette = [0xd6dedc, 0xc9d4d2, 0xe0dccd, 0xbccccc, 0xd0cbb8, 0xc4d2d4, 0xdad6c6];
   const c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     c.setHex(palette[i % palette.length]);
@@ -2819,7 +2819,7 @@ export function branchCoralGeometry(color, seed) {
 /** 부채형/뇌형 산호 */
 export function blobCoralGeometry(color, seed) {
   const rnd = mulberry(seed);
-  const geo = new THREE.SphereGeometry(0.30 + rnd() * 0.26, 10, 8);
+  const geo = new THREE.SphereGeometry(0.22 + rnd() * 0.17, 10, 8);
   geo.scale(1 + rnd() * 0.45, 0.5 + rnd() * 0.4, 1 + rnd() * 0.35);
   geo.translate(0, 0.2, 0);
   return paint(geo, color);
