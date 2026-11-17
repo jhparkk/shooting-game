@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117d0';
+import { getTextures } from './textures.js?v=20261117d1';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2837,10 +2837,10 @@ export function branchCoralGeometry(color, seed) {
   trunk.computeVertexNormals();
   parts.push(paint(trunk, color));
 
-  const branches = 3 + Math.floor(rnd() * 3);
+  const branches = 4 + Math.floor(rnd() * 4);
   for (let i = 0; i < branches; i++) {
-    const h = 0.55 + rnd() * 0.75;
-    const b = new THREE.CylinderGeometry(0.06, 0.12, h, 6, 2);
+    const h = 0.45 + rnd() * 0.62;
+    const b = new THREE.CylinderGeometry(0.045, 0.10, h, 6, 2);
     b.translate(0, h / 2, 0);
     const bp = b.attributes.position;
     const bend = (rnd() - 0.5) * 0.5;

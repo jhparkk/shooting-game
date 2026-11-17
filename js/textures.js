@@ -168,36 +168,37 @@ function normalize(img, data, target, maxK) {
    ========================================================= */
 function bakeSand(size) {
   return bakePair(size, (u, v, o) => {
-    /* 스케일 간격을 넓게 벌린다 — 셀 크기가 텍셀 크기에 가까우면
-       모아레로 '직조 무늬'가 생긴다(예전 8px 셀 × 2px 노이즈). */
-    const blotch = fbm(u, v, 2, 4, 131);          // 큰 젖은/마른 패치
-    const patch = fbm(u, v, 6, 3, 733);           // 중간 얼룩
-    const warp = fbm(u, v, 3, 2, 127);            // 잔물결을 휘게 하는 노이즈
-    const fine = noise2(u * 110, v * 110, 110, 3);// 모래알
-    const grain = noise2(u * 240, v * 240, 240, 9);
-    const pebble = worley(u, v, 11, 971);         // 자갈
-    const bit = 1 - smooth(0.0, 0.18, pebble.f1);
-    const shell = worley(u, v, 4, 313);           // 큰 조개 부스러기
-    const shellBit = 1 - smooth(0.0, 0.045, shell.f1);
-    /* 잔물결 — 실제 모래바닥의 물결 무늬. 서로 다른 방향의 두 파를 겹쳐
-       한 방향으로 '빗질한' 줄무늬가 생기지 않게 한다. */
-    const ripA = Math.sin((v * 9 + u * 1.8 + warp * 2.6) * TAU);
-    const ripB = Math.sin((u * 13 - v * 2.4 + warp * 2.2) * TAU);
+    /* 진짜 모래밭처럼 — 큰 얼룩은 줄이고, 알갱이·조개 부스러기·잔자갈의
+       작고 또렷한 점이 바닥을 채우게 한다. (큰 얼룩이 많으면 멀리서
+       '나뭇결' 같은 얼룩으로 뭉개진다) */
+    const blotch = fbm(u, v, 2, 3, 131);          // 아주 옅은 젖은/마른 패치
+    const patch = fbm(u, v, 7, 3, 733);           // 중간 얼룩
+    const warp = fbm(u, v, 4, 2, 127);            // 잔물결을 휘게 하는 노이즈
+    const fine = noise2(u * 64, v * 64, 64, 3);   // 모래알 덩어리
+    const grain = noise2(u * 190, v * 190, 190, 9); // 낟알
+    const chip = worley(u, v, 24, 971);           // 잔자갈 · 조개 부스러기
+    const chipK = 1 - smooth(0.0, 0.14, chip.f1);
+    const shell = worley(u, v, 8, 313);           // 큰 조개 조각
+    const shellK = 1 - smooth(0.0, 0.09, shell.f1);
+    /* 잔물결 — 서로 다른 두 방향의 파를 겹쳐 한쪽으로 빗질한 줄무늬가 생기지 않게 */
+    const ripA = Math.sin((v * 7 + u * 1.4 + warp * 3.0) * TAU);
+    const ripB = Math.sin((u * 11 - v * 2.0 + warp * 2.4) * TAU);
 
-    let shade = 0.84
-      + (blotch - 0.5) * 0.14
+    let shade = 0.88
+      + (blotch - 0.5) * 0.05
       + (patch - 0.5) * 0.10
-      + (fine - 0.5) * 0.13
-      + (grain - 0.5) * 0.08
-      + ripA * 0.032 + ripB * 0.02;
-    shade *= 1 - bit * 0.14 - shellBit * 0.10;
+      + (fine - 0.5) * 0.19
+      + (grain - 0.5) * 0.15
+      + ripA * 0.022 + ripB * 0.016;
+    shade *= 1 - chipK * 0.20 - shellK * 0.14;
+    // 조개 부스러기는 살짝 더 하얗고, 잔자갈은 살짝 어둡다
+    shade += shellK * 0.06;
 
     o[0] = clamp01(shade * 1.0) * 255;
-    o[1] = clamp01(shade * 0.965) * 255;
-    o[2] = clamp01(shade * 0.905) * 255;
-    o[3] = clamp01(0.5 + (blotch - 0.5) * 0.16 + (patch - 0.5) * 0.14
-      + (fine - 0.5) * 0.30 + ripA * 0.16 + ripB * 0.12
-      - bit * 0.24 - shellBit * 0.22) * 255;
+    o[1] = clamp01(shade * 0.972) * 255;
+    o[2] = clamp01(shade * 0.915) * 255;
+    o[3] = clamp01(0.5 + (fine - 0.5) * 0.30 + (grain - 0.5) * 0.30
+      + ripA * 0.14 + ripB * 0.10 - chipK * 0.34 - shellK * 0.22) * 255;
   });
 }
 
