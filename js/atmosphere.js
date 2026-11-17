@@ -62,6 +62,8 @@ const SURFACE_FRAG = /* glsl */ `
                   + pow(max(c3, 0.0), 7.0) * 0.28;
     /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
     sparkle *= 0.32 + 0.68 * (sin(p.x * 0.043 + t * 0.03) * sin(p.y * 0.051 - t * 0.024) * 0.5 + 0.5);
+    /* 멀리 있는 물결은 뭉개서 타일·모아레가 보이지 않게 */
+    sparkle *= 1.0 - smoothstep(45.0, 190.0, dist);
     col += uSurfaceColor * sparkle * (0.30 + win * 0.55);
 
     /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
@@ -230,7 +232,7 @@ export class Atmosphere {
 
   /* ---------- 수면 ---------- */
   _buildSurface() {
-    const geo = new THREE.PlaneGeometry(6000, 6000, 1, 1);
+    const geo = new THREE.PlaneGeometry(1000, 1000, 1, 1);
     geo.rotateX(-Math.PI / 2);
     this.surfaceUni = {
       uTime: { value: 0 },

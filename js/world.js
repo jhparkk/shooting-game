@@ -428,9 +428,9 @@ export class World {
         varying float vY;
         varying vec3 vDir;
         void main() {
-          float t = clamp(vY * 0.5 + 0.5, 0.0, 1.0);
-          vec3 c = mix(bottom, mid, smoothstep(0.24, 0.55, t));
-          c = mix(c, top, smoothstep(0.54, 1.0, t));
+          // 지평선(수평 방향)은 안개색과 같게, 위로 갈수록 표층의 밝은 물빛
+          vec3 c = mix(bottom, mid, smoothstep(0.06, 0.52, vY));
+          c = mix(c, top, smoothstep(0.50, 0.98, vY));
           // 표면 위 태양 — 수중에서 보면 퍼진 빛덩어리로 보인다
           float sd = max(0.0, dot(vDir, uSunDir));
           c += uSunColor * pow(sd, 7.0) * 0.10 * uGlow;
@@ -589,7 +589,7 @@ export class World {
           // 셀 경계의 날카로운 선 대신, 큰 패치 안에서만 부드럽게 번지는 빛
           float cshape = smoothstep( 0.30, 1.05, ca * 0.72 + cb * 0.5 );
           float cpatch = smoothstep( 0.34, 0.78, abyssFbm( vWPosV.xz * 0.045 + 21.0 ) );
-          float caustic = cshape * cpatch * cFade * ( 0.16 + 0.84 * upK ) * uCausticI;
+          float caustic = cshape * cpatch * cFade * ( 0.04 + 0.96 * upK * upK ) * uCausticI;
           detail *= 1.0 + caustic * 0.42;
           diffuseColor.rgb *= detail;
           `
@@ -758,7 +758,13 @@ export class World {
         const wpatch = Math.sin(wx * 0.041 + wz * 0.017) * 0.5 + Math.cos(wz * 0.031 - wx * 0.026) * 0.5;
         const hue = 0.10 + dk * 0.45 + wall * (0.09 + wpatch * 0.19);
         const sat = 0.07 + flatness * 0.10 + wall * (0.08 + Math.max(0, wpatch) * 0.10);
-        const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18);
+        // 간이 앰비언트 오클루전 — 골짜기(이웃보다 낮은 곳)는 어둡게, 마루는 밝게.
+        // 그림자 맵 없이도 깊이감이 생긴다.
+        const avgN = (hL + hR + hD + hU) * 0.25;
+        const bowl = clamp01((avgN - y) / (d * 0.75));
+        const ridge = clamp01((y - avgN) / (d * 0.75));
+        const ao = clamp01(1.0 - bowl * 0.55 + ridge * 0.10);
+        const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18) * ao;
         fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
