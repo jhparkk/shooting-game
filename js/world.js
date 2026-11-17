@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c4';
-import { getTextures } from './textures.js?v=20261117c4';
-import { Atmosphere } from './atmosphere.js?v=20261117c4';
+} from './models.js?v=20261117c5';
+import { getTextures } from './textures.js?v=20261117c5';
+import { Atmosphere } from './atmosphere.js?v=20261117c5';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -40,11 +40,11 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x1c8a92, density: 0.0044,
-    skyTop: 0xaeeae4, skyMid: 0x44b0b6, skyBottom: 0x1c8a92,
-    hemiSky: 0xd8f5f2, hemiGround: 0x2b6f6a, hemi: 0.82,
-    ambient: 0xa6e2e4, ambientI: 0.44,
-    sun: 0xfffdf0, sunI: 2.05, glow: 1.0,
+    fog: 0x16737f, density: 0.0050,
+    skyTop: 0x9ee0dc, skyMid: 0x389cab, skyBottom: 0x16737f,
+    hemiSky: 0xd0f0ef, hemiGround: 0x2b6f6a, hemi: 0.72,
+    ambient: 0x9edcde, ambientI: 0.38,
+    sun: 0xfffdf0, sunI: 1.75, glow: 1.0,
     // 밝은 산호초 팔레트 — 자연스러운 코랄 핑크·오렌지·연보라·에메랄드·황금빛.
     // 형광 원색이 아니라 햇빛 아래 실제 산호가 띠는 색으로, 개체마다 조금씩 다르다.
     coral: [
@@ -670,7 +670,7 @@ export class World {
           detail = mix( detail, basaltC, deepK * 0.88 );
 
           // 알베도 — 햇빛 받는 모래·석회암은 밝고, 암반은 중간, 현무암은 어둡다
-          detail *= mix( 1.0, 1.10, flatK );
+          detail *= mix( 1.0, 1.02, flatK );
           detail *= mix( vec3( 1.0 ), vec3( 1.03, 1.0, 0.94 ), flatK );   // 따뜻한 모래빛
           detail *= mix( 1.0, 0.82, deepK );                              // 깊은 곳은 가라앉은 톤
           detail *= mix( vec3( 1.0 ), vec3( 0.76, 0.82, 0.92 ), deepK );  // 현무암은 푸르게
@@ -1008,7 +1008,7 @@ export class World {
         // 협곡 · 중층 — 층진 석회암 판과 굴러온 바위, 가끔 기둥
         if (pick < 0.42) {
           tpl = this.tpl.slab[Math.floor(rnd() * this.tpl.slab.length)];
-          r = 1.8 + rnd() * 3.4; hue = 0.11; sat = 0.07; lig = 0.27 + rnd() * 0.10;
+          r = 1.8 + rnd() * 3.4; hue = 0.105; sat = 0.06; lig = 0.21 + rnd() * 0.09;
         } else if (pick < 0.68) {
           tpl = this.tpl.column[Math.floor(rnd() * this.tpl.column.length)];
           r = 1.2 + rnd() * 2.2; hue = 0.58; sat = 0.04; lig = 0.16 + rnd() * 0.08;
@@ -1019,19 +1019,19 @@ export class World {
       } else if (pick < 0.24) {
         // 얕은 바닥의 조약돌 무리 — 모래에 굴러다니는 둥근 자갈
         tpl = this.tpl.pebble[Math.floor(rnd() * this.tpl.pebble.length)];
-        r = 1.4 + rnd() * 2.4; hue = 0.10; sat = 0.08; lig = 0.30 + rnd() * 0.12; flat = 0.7;
+        r = 1.4 + rnd() * 2.4; hue = 0.09; sat = 0.06; lig = 0.21 + rnd() * 0.10; flat = 0.7;
       } else if (pick < 0.48) {
         // 석회암 선반 — 햇빛 받는 밝은 판
         tpl = this.tpl.slab[Math.floor(rnd() * this.tpl.slab.length)];
-        r = 1.6 + rnd() * 3.2; hue = 0.11; sat = 0.08; lig = 0.30 + rnd() * 0.12;
+        r = 1.6 + rnd() * 3.2; hue = 0.105; sat = 0.06; lig = 0.23 + rnd() * 0.10;
       } else if (pick < 0.68) {
         // 이끼 낀 둥근 바위
         tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
-        r = 1.2 + rnd() * 2.4; hue = 0.22; sat = 0.16; lig = 0.20 + rnd() * 0.09;
+        r = 1.2 + rnd() * 2.4; hue = 0.21; sat = 0.13; lig = 0.15 + rnd() * 0.07;
       } else {
         // 굴러온 둥근 바위
         tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
-        r = 1.0 + rnd() * 2.8; hue = 0.09; sat = 0.06; lig = 0.22 + rnd() * 0.12;
+        r = 1.0 + rnd() * 2.8; hue = 0.09; sat = 0.05; lig = 0.16 + rnd() * 0.09;
       }
       // 회갈색 현무암 ~ 이끼 낀 암반 ~ 밝은 석회암 — 원색 없이 낮은 채도로
       const geo = this._clonePainted(tpl, rockCol.setHSL(hue, sat, lig).getHex());
@@ -1054,7 +1054,7 @@ export class World {
         const gy = getTerrainHeight(ox + lx, oz + lz);
         const pebble = this.tpl.pebble[Math.floor(rnd() * this.tpl.pebble.length)];
         const sc = 0.35 + rnd() * 0.75;
-        const light = gy < -60 ? 0.15 + rnd() * 0.08 : 0.24 + rnd() * 0.14;
+        const light = gy < -60 ? 0.13 + rnd() * 0.07 : 0.18 + rnd() * 0.11;
         const hue2 = gy < -60 ? 0.58 : 0.09;
         const geo = this._clonePainted(pebble, rockCol.setHSL(hue2, 0.07, light).getHex());
         const m = new THREE.Matrix4();
@@ -1118,7 +1118,8 @@ export class World {
           if (geo.index) geo = geo.toNonIndexed();   // 바퀴·산호를 섞어 병합하려면 인덱스 여부를 통일
           const big = this.tpl.blob.indexOf(tpl) >= 0 || this.tpl.brain.indexOf(tpl) >= 0 ||
             this.tpl.table.indexOf(tpl) >= 0;
-          const sc = (2.1 + rnd() * 2.7) * (steep ? 0.78 : 1.0) * (big ? 0.72 : 1.0);
+          const tall = this.tpl.fan.indexOf(tpl) >= 0;   // 부채산호는 키가 커서 줄인다
+          const sc = (1.9 + rnd() * 2.2) * (steep ? 0.78 : 1.0) * (big ? 0.7 : 1.0) * (tall ? 0.55 : 1.0);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
