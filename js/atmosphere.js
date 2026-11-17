@@ -50,9 +50,10 @@ const SURFACE_FRAG = /* glsl */ `
     float dist = length(vWorld - uCamPos);
     float upness = view.y;
 
-    /* 거리에 따라 고주파 성분을 감쇠 — 멀리서 지글거림(에일리어싱)이 생기지 않게 */
-    float fMid = 1.0 - smoothstep(16.0, 70.0, dist);
-    float fNear = 1.0 - smoothstep(7.0, 26.0, dist);
+    /* 거리에 따라 고주파 성분을 감쇠 — 멀리·비스듬히 볼 때 지글거림(에일리어싱) 방지.
+       바로 위를 올려다볼 때는 30~40유닛 떨어져 있어도 잔물결이 또렷하게 남아야 한다. */
+    float fMid = 1.0 - smoothstep(60.0, 220.0, dist);
+    float fNear = 1.0 - smoothstep(26.0, 95.0, dist);
 
     /* ---- 파도 합성 : 방향이 서로 다른 7개 성분 ----
        실제 수면은 규칙적인 격자가 아니라, 서로 다른 방향의 너울이 겹쳐
@@ -60,13 +61,13 @@ const SURFACE_FRAG = /* glsl */ `
     float h = 0.0;
     vec2 g = vec2(0.0);
     float amp = 0.0;
-    addWave(h, g, amp, p, normalize(vec2(0.82, 0.57)), 33.0, 0.86, 0.34, t);
-    addWave(h, g, amp, p, normalize(vec2(-0.38, 0.92)), 22.0, 0.72, 0.46, t);
-    addWave(h, g, amp, p, normalize(vec2(0.95, -0.31)), 12.6, 0.56 * (0.35 + 0.65 * fMid), 0.62, t);
-    addWave(h, g, amp, p, normalize(vec2(-0.61, -0.79)), 8.3, 0.44 * (0.3 + 0.7 * fMid), 0.82, t);
-    addWave(h, g, amp, p, normalize(vec2(0.27, 0.96)), 5.1, 0.30 * fNear, 1.15, t);
-    addWave(h, g, amp, p, normalize(vec2(-0.87, 0.49)), 3.2, 0.21 * fNear, 1.55, t);
-    addWave(h, g, amp, p, normalize(vec2(0.59, -0.81)), 2.1, 0.14 * fNear, 2.05, t);
+    addWave(h, g, amp, p, normalize(vec2(0.82, 0.57)), 31.0, 0.52, 0.34, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.38, 0.92)), 21.0, 0.50, 0.46, t);
+    addWave(h, g, amp, p, normalize(vec2(0.95, -0.31)), 13.4, 0.62, 0.62, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.61, -0.79)), 9.1, 0.56 * (0.35 + 0.65 * fMid), 0.82, t);
+    addWave(h, g, amp, p, normalize(vec2(0.27, 0.96)), 5.7, 0.42 * (0.35 + 0.65 * fNear), 1.15, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.87, 0.49)), 3.6, 0.30 * fNear, 1.55, t);
+    addWave(h, g, amp, p, normalize(vec2(0.59, -0.81)), 2.3, 0.20 * fNear, 2.05, t);
 
     float hn = h / max(amp, 0.001);              // -1 .. 1 로 정규화한 파고
     vec2 gn = g / max(amp, 0.001);               // 무차원 기울기
@@ -78,14 +79,14 @@ const SURFACE_FRAG = /* glsl */ `
     float win = smoothstep(edge - 0.05, edge + 0.05, upness);
 
     /* 창 안쪽 — 잔물결에 부서진 하늘빛 (밝은 마루 + 어두운 골) */
-    float crest = smoothstep(-0.35, 0.85, hn);
-    vec3 inCol = uSurfaceColor * (0.34 + 0.62 * crest);
-    inCol += uSurfaceColor * pow(crest, 3.0) * 0.55;          // 마루의 밝은 세포
-    inCol *= 0.86 + 0.30 * smoothstep(-0.9, 0.9, hn);
+    float crest = smoothstep(-0.42, 0.78, hn);
+    vec3 inCol = uSurfaceColor * (0.30 + 0.52 * crest);
+    inCol += uSurfaceColor * pow(crest, 2.2) * 0.42;          // 마루의 밝은 세포
+    inCol *= 0.85 + 0.26 * smoothstep(-0.9, 0.9, hn);
 
     /* 창 가장자리 — 프레넬로 밝아지는 테두리 (여기가 '수면'으로 읽히는 경계) */
-    float rim = smoothstep(edge - 0.13, edge - 0.01, upness) * (1.0 - smoothstep(edge + 0.01, edge + 0.09, upness));
-    inCol += uSurfaceColor * rim * 0.42;
+    float rim = exp(-pow((upness - edge) / 0.075, 2.0));
+    inCol += uSurfaceColor * rim * 0.30;
 
     /* 창 바깥 — 전반사: 물속이 거울에 비친 어두운 청록, 잔물결에 깨진 반사광 */
     float mir = smoothstep(-0.75, 0.75, hn);
@@ -109,7 +110,7 @@ const SURFACE_FRAG = /* glsl */ `
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.78, 2.0));
     col = mix(col, uFogColor * 0.96, clamp(fogF, 0.0, 1.0));
-    float alpha = 1.0 - smoothstep(150.0, 400.0, dist);
+    float alpha = 1.0 - smoothstep(260.0, 660.0, dist);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -259,7 +260,7 @@ export class Atmosphere {
 
   /* ---------- 수면 ---------- */
   _buildSurface() {
-    const geo = new THREE.PlaneGeometry(1000, 1000, 1, 1);
+    const geo = new THREE.PlaneGeometry(1600, 1600, 1, 1);
     geo.rotateX(-Math.PI / 2);
     this.surfaceUni = {
       uTime: { value: 0 },
