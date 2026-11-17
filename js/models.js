@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117b3';
+import { getTextures } from './textures.js?v=20261117b4';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2714,11 +2714,12 @@ export function makeFishSchool(count) {
   if (!_schoolMat) {
     _schoolMat = swimMaterial({
       vertexColors: true, shininess: 30, specular: 0x556677,
+      emissive: 0x1b2326,   // 물속 산란광 — 원거리에서 검은 점으로 죽지 않게
     }, SCHOOL_BEND, 'school');
   }
   const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const palette = [0xd6dedc, 0xc9d4d2, 0xe0dccd, 0xbccccc, 0xd0cbb8, 0xc4d2d4, 0xdad6c6];
+  const palette = [0xf2f5f0, 0xe8eeea, 0xf6f0e2, 0xdfe8e6, 0xeee7d4, 0xe4eeea, 0xf0ead8];
   const c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     c.setHex(palette[i % palette.length]);

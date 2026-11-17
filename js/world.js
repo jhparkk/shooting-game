@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b3';
-import { getTextures } from './textures.js?v=20261117b3';
-import { Atmosphere } from './atmosphere.js?v=20261117b3';
+} from './models.js?v=20261117b4';
+import { getTextures } from './textures.js?v=20261117b4';
+import { Atmosphere } from './atmosphere.js?v=20261117b4';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -45,7 +45,7 @@ export const ZONES = [
     sun: 0xfffbf0, sunI: 1.35, glow: 0.72,
     // 실제 수심 20~40m 산호는 대부분 갈색·올리브·테라코타, 일부만 옅은 분홍·보라
     // (형광 원색은 수중에서 이렇게 보이지 않는다)
-    coral: [0x9a7057, 0x8a7a5c, 0xa8876a, 0x7c6a55, 0x96897a, 0x7e7a66, 0xa0776b, 0x8a6f78, 0xb09a7c],
+    coral: [0x9a7057, 0x8a7a5c, 0xa8876a, 0x7c6a55, 0x96897a, 0x8b7261, 0xa0776b, 0x8a6f78, 0xb09a7c],
   },
   {
     name: '중층 해저 협곡',
@@ -628,7 +628,7 @@ export class World {
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
-          detail *= mix( vec3( 0.84 ), vec3( 0.60, 0.55, 0.46 ), flatK );
+          detail *= mix( vec3( 0.80 ), vec3( 0.52, 0.475, 0.395 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 
@@ -836,7 +836,7 @@ export class World {
         const bowl = clamp01((avgN - y) / (d * 0.75));
         const ridge = clamp01((y - avgN) / (d * 0.75));
         const ao = clamp01(1.0 - bowl * 0.62 + ridge * 0.08);
-        const lit = (0.74 - dk * 0.30) * (0.90 + flatness * 0.10) * ao;
+        const lit = (0.66 - dk * 0.28) * (0.90 + flatness * 0.10) * ao;
         fc.setHSL(0.10, 0.015 + (1 - flatness) * 0.02, clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
