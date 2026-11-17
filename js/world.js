@@ -14,7 +14,8 @@ import {
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
 } from './models.js?v=20261116p';
-import { getTextures } from './textures.js?v=20261116p';
+import { getTextures } from './textures.js?v=20261117a';
+import { Atmosphere } from './atmosphere.js?v=20261117a';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -31,51 +32,53 @@ export const HADAL_FLOOR = -1985; // 극심해 해구 바닥 (수심 약 2,730m 
 /** 수심(m) 환산 계수 — 월드 1단위 = 1.35m */
 export const DEPTH_SCALE = 1.35;
 
-/* 수심 구간별 물빛 — 표층 산호대 → 중층 협곡 → 심해 해구 → 초심해 심연 → 극심해 해구 */
+/* 수심 구간별 물빛 — 표층 산호대 → 중층 협곡 → 심해 해구 → 초심해 심연 → 극심해 해구
+   실제 수중 촬영처럼 '가까운 것은 진하고, 먼 것은 물빛 안개에 잠기는' 톤으로 맞춘다.
+   skyBottom 은 안개색과 같게 두어 지평선이 자연스럽게 이어진다. */
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x1f9fdc, density: 0.0034,
-    skyTop: 0xa9f4ff, skyMid: 0x2f9fe2, skyBottom: 0x0a5aa8,
-    hemiSky: 0xd8fbff, hemiGround: 0x2c86b6, hemi: 1.0,
-    ambient: 0xa8e4ff, ambientI: 0.55,
-    sun: 0xfffdf2, sunI: 1.6,
+    fog: 0x1a86a8, density: 0.0064,
+    skyTop: 0xb4f6f2, skyMid: 0x2aa6dc, skyBottom: 0x1a86a8,
+    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 1.05,
+    ambient: 0xa8e4ff, ambientI: 0.5,
+    sun: 0xfffdf2, sunI: 1.85, glow: 1.0,
     coral: [0xff5f8a, 0xff8a3c, 0xffc247, 0xe86ee0, 0xb07bff, 0x35e0c8, 0xff8fb8, 0xffe07a],
   },
   {
     name: '중층 해저 협곡',
-    fog: 0x0d74c4, density: 0.0052,
-    skyTop: 0x6cc8f4, skyMid: 0x0d74c4, skyBottom: 0x073a76,
-    hemiSky: 0xc2ecff, hemiGround: 0x1a6a94, hemi: 0.74,
-    ambient: 0x7fd0f0, ambientI: 0.42,
-    sun: 0xfdf8ec, sunI: 0.95,
+    fog: 0x0a5586, density: 0.0098,
+    skyTop: 0x5cc2ea, skyMid: 0x0a5586, skyBottom: 0x053a63,
+    hemiSky: 0xc2ecff, hemiGround: 0x14505f, hemi: 0.78,
+    ambient: 0x7fd0f0, ambientI: 0.4,
+    sun: 0xfdf8ec, sunI: 1.05, glow: 0.6,
     coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
   },
   {
     name: '심해 해구',
-    fog: 0x071d4e, density: 0.0068,
-    skyTop: 0x1d4a96, skyMid: 0x07204f, skyBottom: 0x01060f,
-    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.46,
-    ambient: 0x30508f, ambientI: 0.36,
-    sun: 0xc8d8ff, sunI: 0.32,
+    fog: 0x062a55, density: 0.0135,
+    skyTop: 0x164a8e, skyMid: 0x061c40, skyBottom: 0x01060f,
+    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.44,
+    ambient: 0x30508f, ambientI: 0.3,
+    sun: 0xc8d8ff, sunI: 0.34, glow: 0.3,
     coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
   },
   {
     name: '초심해 심연',
-    fog: 0x040a1e, density: 0.0078,
-    skyTop: 0x0b1f4a, skyMid: 0x030a20, skyBottom: 0x000206,
-    hemiSky: 0x2a4a90, hemiGround: 0x03060e, hemi: 0.48,
-    ambient: 0x22386f, ambientI: 0.4,
-    sun: 0x9db8e8, sunI: 0.24,
+    fog: 0x031430, density: 0.0165,
+    skyTop: 0x08204a, skyMid: 0x020a1e, skyBottom: 0x000306,
+    hemiSky: 0x2a4a90, hemiGround: 0x03060e, hemi: 0.4,
+    ambient: 0x1d3163, ambientI: 0.3,
+    sun: 0x9db8e8, sunI: 0.2, glow: 0.15,
     coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
   },
   {
     name: '극심해 해구',
-    fog: 0x01030b, density: 0.0092,
+    fog: 0x010815, density: 0.0205,
     skyTop: 0x03102b, skyMid: 0x010413, skyBottom: 0x000103,
-    hemiSky: 0x1a3570, hemiGround: 0x02030a, hemi: 0.42,
-    ambient: 0x1a2a58, ambientI: 0.4,
-    sun: 0x8aa8dd, sunI: 0.16,
+    hemiSky: 0x1a3570, hemiGround: 0x02030a, hemi: 0.36,
+    ambient: 0x16244c, ambientI: 0.3,
+    sun: 0x8aa8dd, sunI: 0.12, glow: 0.08,
     coral: [0x2e5aa8, 0x4f74c8, 0x6a4fc0, 0x2d9d9d, 0x46628f],
   },
 ];
@@ -381,8 +384,8 @@ export class World {
     this._buildSky();
     this._buildLights();
     this._buildFarFloor();
-    this._buildRays();
-    this._buildParticles();
+    this._buildBubbles();
+    this.atmo = new Atmosphere(scene);
     this._buildVents();
     this._buildSchools();
     this._buildCreatures();
@@ -397,6 +400,9 @@ export class World {
       top: { value: new THREE.Color(z.skyTop) },
       mid: { value: new THREE.Color(z.skyMid) },
       bottom: { value: new THREE.Color(z.skyBottom) },
+      uSunDir: { value: new THREE.Vector3(-0.31, 0.93, 0.23).normalize() },
+      uSunColor: { value: new THREE.Color(1.0, 0.98, 0.88) },
+      uGlow: { value: 1.0 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.skyUniforms,
@@ -405,8 +411,10 @@ export class World {
       fog: false,
       vertexShader: `
         varying float vY;
+        varying vec3 vDir;
         void main() {
-          vY = normalize(position).y;
+          vDir = normalize(position);
+          vY = vDir.y;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
@@ -414,11 +422,19 @@ export class World {
         uniform vec3 top;
         uniform vec3 mid;
         uniform vec3 bottom;
+        uniform vec3 uSunDir;
+        uniform vec3 uSunColor;
+        uniform float uGlow;
         varying float vY;
+        varying vec3 vDir;
         void main() {
           float t = clamp(vY * 0.5 + 0.5, 0.0, 1.0);
           vec3 c = mix(bottom, mid, smoothstep(0.24, 0.55, t));
           c = mix(c, top, smoothstep(0.54, 1.0, t));
+          // 표면 위 태양 — 수중에서 보면 퍼진 빛덩어리로 보인다
+          float sd = max(0.0, dot(vDir, uSunDir));
+          c += uSunColor * pow(sd, 7.0) * 0.10 * uGlow;
+          c += uSunColor * pow(sd, 60.0) * 0.55 * uGlow;
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }
@@ -1053,41 +1069,11 @@ export class World {
     };
   }
 
-  /* ---------------- 빛줄기 ---------------- */
-  _buildRays() {
-    this.rayTex = streakTexture();
-    this.rays = [];
-    for (let i = 0; i < 22; i++) {
-      const tall = 150 + Math.random() * 150;
-      const wide = 20 + Math.random() * 44;
-      const mat = new THREE.MeshBasicMaterial({
-        map: this.rayTex,
-        transparent: true,
-        opacity: 0.3,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        fog: false,
-        color: 0xe8fffb,
-      });
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), mat);
-      m.position.set(
-        (Math.random() - 0.5) * 340,
-        SURFACE_Y - tall * 0.42 + Math.random() * 18,
-        (Math.random() - 0.5) * 340
-      );
-      m.rotation.z = (Math.random() - 0.5) * 0.3;
-      m.rotation.y = Math.random() * Math.PI;
-      m.userData.phase = Math.random() * 6.28;
-      m.userData.base = 0.18 + Math.random() * 0.22;
-      this.scene.add(m);
-      this.rays.push(m);
-    }
-  }
-
-  /* ---------------- 부유물 ---------------- */
-  _buildParticles() {
-    const bubbleCount = 320;
+  /* ---------------- 기포 ---------------- */
+  /* 위로 솟는 잔기포 — 수면까지 올라가면 아래에서 다시 시작한다.
+     (빛줄기·부유물·생물발광은 atmosphere.js 가 맡는다) */
+  _buildBubbles() {
+    const bubbleCount = 260;
     const bGeo = new THREE.BufferGeometry();
     const bp = new Float32Array(bubbleCount * 3);
     this.bubbleData = [];
@@ -1101,61 +1087,14 @@ export class World {
     this.bubbles = new THREE.Points(
       bGeo,
       new THREE.PointsMaterial({
-        map: bubbleTexture(), size: 0.9, transparent: true, opacity: 0.6,
+        map: bubbleTexture(), size: 0.55, transparent: true, opacity: 0.5,
         depthWrite: false, sizeAttenuation: true, color: 0xeaffff,
-        blending: THREE.NormalBlending,
+        blending: THREE.AdditiveBlending,
       })
     );
     this.bubbles.frustumCulled = false;
+    this.bubbles.renderOrder = 6;
     this.scene.add(this.bubbles);
-
-    const snowCount = 520;
-    const sGeo = new THREE.BufferGeometry();
-    const sp = new Float32Array(snowCount * 3);
-    for (let i = 0; i < snowCount; i++) {
-      sp[i * 3] = (Math.random() - 0.5) * 320;
-      sp[i * 3 + 1] = SURFACE_Y - 4 - Math.random() * 300;
-      sp[i * 3 + 2] = (Math.random() - 0.5) * 320;
-    }
-    sGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-    this.snow = new THREE.Points(
-      sGeo,
-      new THREE.PointsMaterial({
-        map: glowTexture(), size: 0.7, transparent: true, opacity: 0.5,
-        depthWrite: false, sizeAttenuation: true, color: 0xf2ffff,
-        blending: THREE.AdditiveBlending,
-      })
-    );
-    this.snow.frustumCulled = false;
-    this.scene.add(this.snow);
-
-    // 관상 플랑크톤 (수심에 따라 반짝임)
-    const PLAN_N = 190;
-    const plGeo = new THREE.BufferGeometry();
-    const plp = new Float32Array(PLAN_N * 3);
-    const plc = new Float32Array(PLAN_N * 3);
-    const col = new THREE.Color();
-    for (let i = 0; i < PLAN_N; i++) {
-      plp[i * 3] = (Math.random() - 0.5) * 320;
-      plp[i * 3 + 1] = SURFACE_Y - 4 - Math.random() * 300;
-      plp[i * 3 + 2] = (Math.random() - 0.5) * 320;
-      col.setHSL(0.47 + Math.random() * 0.16, 0.9, 0.68);
-      plc[i * 3] = col.r;
-      plc[i * 3 + 1] = col.g;
-      plc[i * 3 + 2] = col.b;
-    }
-    plGeo.setAttribute('position', new THREE.BufferAttribute(plp, 3));
-    plGeo.setAttribute('color', new THREE.BufferAttribute(plc, 3));
-    this.plankton = new THREE.Points(
-      plGeo,
-      new THREE.PointsMaterial({
-        map: glowTexture(), size: 1.6, transparent: true, opacity: 0.7,
-        depthWrite: false, sizeAttenuation: true, vertexColors: true,
-        blending: THREE.AdditiveBlending,
-      })
-    );
-    this.plankton.frustumCulled = false;
-    this.scene.add(this.plankton);
   }
 
   /* ---------------- 극심해 열수구 불빛 (2,000m+ 분위기) ---------------- */
@@ -1382,6 +1321,17 @@ export class World {
   }
 
   /* ---------------- 업데이트 ---------------- */
+  /** 대기 연출(atmosphere)이 카메라 시점을 알아야 해서 한 번 넘겨둔다 */
+  setCamera(cam) {
+    this._cameraForAtmo = cam;
+    if (this.atmo) this.atmo.camera = cam;
+  }
+
+  /** 화질 프리셋을 대기 연출에도 전달 */
+  setQuality(preset) {
+    if (this.atmo) this.atmo.setQuality(preset);
+  }
+
   update(dt, playerPos) {
     this.time += dt;
     this.kelpUniform.value = this.time;
@@ -1419,23 +1369,16 @@ export class World {
     this.skyUniforms.top.value.lerp(tc.copy(c0.skyTop).lerp(c1.skyTop, u), k);
     this.skyUniforms.mid.value.lerp(tc.copy(c0.skyMid).lerp(c1.skyMid, u), k);
     this.skyUniforms.bottom.value.lerp(tc.copy(c0.skyBottom).lerp(c1.skyBottom, u), k);
+    this.skyUniforms.uGlow.value += (mix(z0.glow === undefined ? 0.5 : z0.glow, z1.glow === undefined ? 0.5 : z1.glow, u) - this.skyUniforms.uGlow.value) * k;
 
-    // 빛줄기 살랑임 + 플레이어 주변으로 재배치 (수심이 깊으면, 지형을 끊지 않는 곳에서만)
-    const rayFade = clamp01(1 - depth / 320);
-    for (const r of this.rays) {
-      const base = r.userData.base === undefined ? 0.26 : r.userData.base;
-      // 바닥이 솟아 있는 곳에서는 줄기가 지형을 가로질러 밝은 띠를 만들어 — 거기선 끄다
-      const gy = getTerrainHeight(r.position.x, r.position.z);
-      const clearK = clamp01((r.position.y - 74 - gy) / 60);
-      r.material.opacity = (base + Math.sin(this.time * 0.7 + r.userData.phase) * 0.08) * rayFade * clearK;
-      r.visible = rayFade > 0.02 && clearK > 0.02;
-      r.rotation.z = Math.sin(this.time * 0.12 + r.userData.phase) * 0.08;
-      const dx = r.position.x - playerPos.x;
-      const dz = r.position.z - playerPos.z;
-      if (dx * dx + dz * dz > 340 * 340) {
-        r.position.x = playerPos.x + (Math.random() - 0.5) * 320;
-        r.position.z = playerPos.z + (Math.random() - 0.5) * 320;
-      }
+    // 수면·빛줄기·부유물·생물발광 (atmosphere.js)
+    if (this.atmo && this._cameraForAtmo) {
+      this.atmo.update(
+        dt, playerPos, this._cameraForAtmo, depth,
+        this.scene.fog.color, this.scene.fog.density,
+        this.skyUniforms.uSunDir.value,
+        this.sun.intensity
+      );
     }
 
     // 실시간 수중 빛무늬 시간·세기
@@ -1462,38 +1405,7 @@ export class World {
     }
     bpos.needsUpdate = true;
 
-    // 부유물은 플레이어 주변으로 재배치
-    const spos = this.snow.geometry.attributes.position;
-    const sa = spos.array;
-    for (let i = 0; i < sa.length; i += 3) {
-      sa[i + 1] -= dt * 0.25;
-      sa[i] += Math.sin(this.time * 0.4 + i) * dt * 0.2;
-      if (sa[i + 1] < playerPos.y - 170) sa[i + 1] = playerPos.y + 110;
-      const dx = sa[i] - playerPos.x;
-      const dz = sa[i + 2] - playerPos.z;
-      if (dx * dx + dz * dz > 240 * 240) {
-        sa[i] = playerPos.x + (Math.random() - 0.5) * 260;
-        sa[i + 1] = playerPos.y + (Math.random() - 0.5) * 60;
-        sa[i + 2] = playerPos.z + (Math.random() - 0.5) * 260;
-      }
-    }
-    spos.needsUpdate = true;
-
-    const ppos = this.plankton.geometry.attributes.position;
-    const pa = ppos.array;
-    for (let i = 0; i < pa.length; i += 3) {
-      pa[i] += Math.sin(this.time * 0.5 + i) * dt * 0.5;
-      pa[i + 1] += Math.cos(this.time * 0.4 + i * 0.5) * dt * 0.4;
-      const dx = pa[i] - playerPos.x;
-      const dy = pa[i + 1] - playerPos.y;
-      const dz = pa[i + 2] - playerPos.z;
-      if (dx * dx + dy * dy + dz * dz > 200 * 200) {
-        pa[i] = playerPos.x + (Math.random() - 0.5) * 220;
-        pa[i + 1] = playerPos.y + (Math.random() - 0.5) * 50;
-        pa[i + 2] = playerPos.z + (Math.random() - 0.5) * 220;
-      }
-    }
-    ppos.needsUpdate = true;
+    // 부유물은 atmosphere.js 가 GPU 로 처리한다 (CPU 순회 없음)
 
     // 물고기 떼 (원형 유영) — 무한 바다이므로 플레이어를 따라 새로 자리잡는다
     const m = new THREE.Matrix4();

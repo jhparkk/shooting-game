@@ -561,17 +561,66 @@ export function makeSubmarine() {
   const lampR = mesh(lampGeo, MET.eyeYellow, 0.46, 0.22, -1.72);
   g.add(lampL, lampR);
 
-  // 전조등 빛 원뿔(가짜 볼륨)
-  const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xbdf4ff, transparent: true, opacity: 0.05,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  // 전조등 빛 원뿔 — 껍질이 아니라 '빛의 부피'처럼 보이게 셰이더로 그린다
+  //  · 실루엣(법선이 시선과 수직)에서는 투명, 중심으로 갈수록 밝다
+  //  · 끝으로 갈수록 옅어지고, 물결 따라 미세하게 일렁인다
+  const coneMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uI: { value: 0.06 },
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(0.62, 0.93, 1.0) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vLocal;
+      varying vec3 vNrmV;
+      varying vec3 vViewDir;
+      void main() {
+        vUv = uv;
+        vLocal = position;
+        vNrmV = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vViewDir = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform float uI;
+      uniform float uTime;
+      uniform vec3 uColor;
+      varying vec2 vUv;
+      varying vec3 vLocal;
+      varying vec3 vNrmV;
+      varying vec3 vViewDir;
+      void main() {
+        float ndv = abs(dot(normalize(vNrmV), normalize(vViewDir)));
+        float core = smoothstep(0.0, 0.62, ndv);
+        // 램프(원뿔 꼭대기)에서 멀어질수록 옅어진다
+        float axial = clamp((-vLocal.z - 0.4) / 20.0, 0.0, 1.0);
+        float fade = pow(1.0 - axial, 1.35) * smoothstep(0.0, 0.10, axial);
+        float ripple = 0.78 + 0.22 * sin(axial * 26.0 - uTime * 2.4 + vUv.x * 9.0);
+        float a = core * fade * ripple * uI;
+        if (a < 0.002) discard;
+        gl_FragColor = vec4(uColor * a, a);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: false,
   });
-  const coneGeo = new THREE.ConeGeometry(1.9, 20, 16, 1, true);
+  const coneGeo = new THREE.ConeGeometry(1.9, 20, 20, 1, true);
   coneGeo.rotateX(Math.PI / 2);
   coneGeo.translate(0, 0, -10.4);
   const beam = new THREE.Mesh(coneGeo, coneMat);
   beam.position.set(0, 0.18, -1.8);
+  beam.frustumCulled = false;
   g.add(beam);
+
+  // 전조등 렌즈의 빛무리
+  g.add(spriteGlow(0xd8f8ff, 0.9, 1.15).translateX(-0.46).translateY(0.22).translateZ(-1.85));
+  g.add(spriteGlow(0xd8f8ff, 0.9, 1.15).translateX(0.46).translateY(0.22).translateZ(-1.85));
 
   // 안테나
   const ant = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 5), MET.metalDark, 0, 0.85, -0.1);

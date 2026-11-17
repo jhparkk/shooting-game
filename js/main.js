@@ -3,15 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261116p';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261116p';
+import { Sound } from './audio.js?v=20261117a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117a';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261116p';
-import { FX } from './fx.js?v=20261116p';
+} from './models.js?v=20261117a';
+import { FX } from './fx.js?v=20261117a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -96,6 +97,8 @@ const el = {
   ribbon: $('compass-ribbon'),
   heading: $('hud-heading'),
   bearing: $('hud-bearing'),
+  qualityBtns: $('quality-btns'),
+  qualityNote: $('quality-note'),
 };
 
 const sound = new Sound();
@@ -139,7 +142,12 @@ try {
 }
 
 /* ---------------- 렌더러 ---------------- */
-let renderer, scene, camera, world, fx, player;
+let renderer, scene, camera, world, fx, player, pipeline;
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const QUALITY_KEY = 'abyss.quality';          // 'auto' | 'high' | 'medium' | 'low'
+let qualityMode = 'auto';
+let autoPreset = IS_IOS ? 'medium' : 'high';
 let pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 const clock = new THREE.Clock();
 
@@ -259,22 +267,25 @@ let mouseFiring = false;
 function initThree() {
   renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    // 아이폰은 MSAA 비용이 커서 픽셀비율로 대신한다 (후처리 파이프라인이 가장자리를 부드럽게)
+    antialias: !IS_IOS,
     powerPreference: 'high-performance',
     alpha: false,
     stencil: false,
   });
+  if (IS_IOS) pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  // 톤매핑은 후처리 합성 패스에서 한 번만 한다 (HDR 로 그린 뒤 ACES)
+  renderer.toneMapping = THREE.NoToneMapping;
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.2, 520);
   camera.position.set(0, 9, 78);
 
   world = new World(scene);
+  world.setCamera(camera);
   fx = new FX(scene);
 
   const sub = makeSubmarine();
@@ -290,6 +301,11 @@ function initThree() {
   };
   P.pos.copy(START_POS);
   updateSubTransform(0);
+
+  // 후처리 파이프라인 (블룸·빛줄기·색보정·비네트)
+  pipeline = new RenderPipeline(renderer, scene, camera);
+  loadQuality();
+  applyQuality(currentPreset());
 
   buildPools();
   bindTouchGuards();
@@ -1440,13 +1456,34 @@ function updateHeadlight(dt, instant) {
 
   // 전방 빛줄기(원뿔) — 심해에서 또렷해진다
   const beam = player.beam;
-  if (beam) {
-    beam.material.opacity += ((0.03 + deep * 0.12) - beam.material.opacity) * k;
-    const widen = 1 + deep * 0.5;
-    const stretch = 1 + deep * 1.15;
+  if (beam && beam.material.uniforms) {
+    const u = beam.material.uniforms;
+    u.uI.value += ((0.05 + deep * 0.38) - u.uI.value) * k;
+    u.uTime.value += dt;
+    const widen = 1 + deep * 0.55;
+    const stretch = 1 + deep * 1.2;
     beam.scale.set(widen, widen, stretch);
   }
+
+  // 부유물이 탐조등 안에서 반짝이도록 (atmosphere.js)
+  if (world && world.atmo) {
+    player.spot.getWorldPosition(_beamPos);
+    if (player.spot.target) {
+      player.spot.target.getWorldPosition(_beamTarget);
+      _beamDir.subVectors(_beamTarget, _beamPos).normalize();
+    }
+    world.atmo.setBeam(
+      _beamPos, _beamDir,
+      Math.cos(Math.min(1.4, player.spot.angle) * 0.85),
+      Math.min(260, player.spot.distance * 0.9),
+      0.25 + deep * 1.05
+    );
+  }
 }
+
+const _beamPos = new THREE.Vector3();
+const _beamTarget = new THREE.Vector3();
+const _beamDir = new THREE.Vector3(0, 0, -1);
 
 function clampToWorld(pos, vel) {
   // 무한 바다 — 수평 경계는 없고 해저·수면만 막는다
@@ -1611,7 +1648,22 @@ function updateCamera(dt) {
     setSubVisible(!close);
   }
 
+  /* 미세 흔들림 — 물속 부력에 떠 있는 느낌 (아주 작게) */
+  applyCameraSway(dt);
+
   G.shake = Math.max(0, G.shake - dt * 2.2);
+}
+
+/* 카메라가 물에 떠 있는 듯한 아주 미세한 흔들림 */
+const _swayT = { v: 0 };
+function applyCameraSway(dt) {
+  _swayT.v += dt;
+  const t = _swayT.v;
+  const amp = 1 + Math.min(0.6, G.shake);
+  camera.position.x += (Math.sin(t * 0.37) * 0.055 + Math.sin(t * 0.91 + 1.7) * 0.025) * amp;
+  camera.position.y += (Math.cos(t * 0.29) * 0.045 + Math.sin(t * 1.13 + 0.6) * 0.018) * amp;
+  camera.position.z += (Math.sin(t * 0.33 + 2.2) * 0.04 + Math.cos(t * 0.77) * 0.02) * amp;
+  camera.rotation.z += Math.sin(t * 0.23) * 0.0035;
 }
 
 /* ---------------- 적 갱신 ---------------- */
@@ -2087,6 +2139,96 @@ function updateItems(dt, t) {
   }
 }
 
+/* ---------------- 화질 프리셋 ---------------- */
+function currentPreset() {
+  if (qualityMode !== 'auto' && QUALITY[qualityMode]) return qualityMode;
+  return autoPreset;
+}
+
+function loadQuality() {
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    if (v === 'auto' || QUALITY[v]) qualityMode = v;
+  } catch (e) { /* noop */ }
+}
+
+function applyQuality(name) {
+  const preset = QUALITY[name] || QUALITY.high;
+  pixelRatio = Math.min(window.devicePixelRatio || 1, preset.pixelRatio);
+  renderer.setPixelRatio(pixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  camera.userData.viewHeight = Math.round(window.innerHeight * pixelRatio);
+  if (pipeline) {
+    pipeline.setQuality(name);
+    pipeline.resize(true);
+  }
+  if (world) world.setQuality(preset);
+  updateQualityUI();
+}
+
+function setQualityMode(mode) {
+  qualityMode = QUALITY[mode] ? mode : 'auto';
+  if (qualityMode !== 'auto') autoPreset = qualityMode;
+  try { localStorage.setItem(QUALITY_KEY, qualityMode); } catch (e) { /* noop */ }
+  applyQuality(currentPreset());
+}
+
+function updateQualityUI() {
+  if (!el.qualityBtns) return;
+  const cur = qualityMode === 'auto' ? 'auto' : qualityMode;
+  Array.prototype.forEach.call(el.qualityBtns.children, (b) => {
+    b.classList.toggle('on', b.dataset.q === cur);
+  });
+  if (el.qualityNote) {
+    el.qualityNote.textContent = qualityMode === 'auto'
+      ? '자동 · 현재 ' + (QUALITY[currentPreset()] || QUALITY.high).name
+      : (QUALITY[cur] || QUALITY.high).name;
+  }
+}
+
+/** 프레임이 무너지면 자동 모드에서 한 단계씩 내린다 */
+function autoTune(fps) {
+  if (qualityMode !== 'auto' || G.runTime < 6) return;
+  if (fps < 46) {
+    G.lowWindows = (G.lowWindows || 0) + 1;
+    if (G.lowWindows >= 2) {
+      G.lowWindows = 0;
+      if (autoPreset === 'high') { autoPreset = 'medium'; applyQuality('medium'); }
+      else if (autoPreset === 'medium') { autoPreset = 'low'; applyQuality('low'); }
+    }
+  } else if (fps > 54) {
+    G.lowWindows = 0;
+  }
+}
+
+/* ---------------- 프레임 렌더 ---------------- */
+const _sunDir = new THREE.Vector3(-0.31, 0.93, 0.23).normalize();
+const _sunWorld = new THREE.Vector3();
+const _camDirV = new THREE.Vector3();
+
+function renderFrame(dt) {
+  if (pipeline) {
+    if (pipeline.ok) {
+      const depth = Math.max(0, G.depth || 0);
+      const u = pipeline.uni;
+      u.uDepth.value = Math.min(1, depth / 900);
+      /* 표층에서만 위에서 내려오는 밝은 물빛
+   — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
+      u.uTopGlow.value = 0.055 * Math.max(0, 1 - depth / 620);
+      u.uSat.value = 1.13 + 0.1 * Math.min(1, depth / 1200);
+      /* 태양 빛줄기는 바라보는 방향과 수심에 따라 세기가 달라진다 */
+      _sunWorld.copy(camera.position).addScaledVector(_sunDir, 420);
+      camera.getWorldDirection(_camDirV);
+      const toward = Math.max(0, _camDirV.dot(_sunDir));
+      const k = Math.max(0, 1 - depth / 420);
+      pipeline.setSun(_sunWorld, camera, 0.85 * k * k * (0.15 + 0.85 * toward * toward));
+    }
+    pipeline.render(dt);
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+
 /* ---------------- 루프 ---------------- */
 let acc = 0;
 let frames = 0;
@@ -2095,6 +2237,7 @@ function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
   ANIM.time.value += dt;
+  G.runTime = (G.runTime || 0) + dt;
 
   frames++;
   acc += dt;
@@ -2103,11 +2246,7 @@ function loop() {
     frames = 0;
     acc = 0;
     G.fps = Math.round(fps);
-    if (fps < 45 && pixelRatio > 1 && G.lowFpsChecks < 2) {
-      pixelRatio = Math.max(1, pixelRatio - 0.5);
-      renderer.setPixelRatio(pixelRatio);
-      G.lowFpsChecks++;
-    }
+    autoTune(fps);
   }
 
   if (G.state === 'playing') {
@@ -2118,7 +2257,7 @@ function loop() {
     fx.update(0, camera);
   }
 
-  renderer.render(scene, camera);
+  renderFrame(dt);
 }
 
 function updateIdle(dt) {
@@ -2283,8 +2422,10 @@ function onResize() {
   const h = window.innerHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
   renderer.setPixelRatio(pixelRatio);
+  renderer.setSize(w, h, false);
+  camera.userData.viewHeight = Math.round(h * pixelRatio);
+  if (pipeline) pipeline.resize(true);
 }
 
 /* ---------------- 검증용: 생물 모델 미리보기 ---------------- */
@@ -2329,6 +2470,15 @@ function updatePreviews() {
 }
 
 function bindButtons() {
+  if (el.qualityBtns) {
+    el.qualityBtns.addEventListener('click', (e) => {
+      const b = e.target && e.target.closest ? e.target.closest('.qbtn') : null;
+      if (!b) return;
+      e.preventDefault();
+      setQualityMode(b.dataset.q);
+    });
+  }
+
   $('btn-start').addEventListener('click', startGame);
   $('btn-again').addEventListener('click', startGame);
   $('btn-menu').addEventListener('click', () => {
@@ -2638,7 +2788,7 @@ function boot() {
   G.depth = (SURFACE_Y - P.pos.y) * DEPTH_SCALE;
   G.maxDepth = G.depth;
   world.update(0, P.pos);
-  renderer.render(scene, camera);
+  renderFrame(0);
 
   setTimeout(() => el.loading.classList.add('done'), 180);
   setTimeout(() => { el.loading.style.display = 'none'; }, 800);
@@ -2663,7 +2813,7 @@ function boot() {
       light: () => ({
         intensity: player.spot.intensity, angle: player.spot.angle,
         distance: player.spot.distance,
-        beamOpacity: player.beam ? player.beam.material.opacity : null,
+        beamOpacity: player.beam && player.beam.material.uniforms ? player.beam.material.uniforms.uI.value : null,
         beamScale: player.beam ? player.beam.scale.z : null,
       }),
       cam: () => ({

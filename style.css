@@ -814,6 +814,53 @@ body { touch-action: none; }
 .panel-stats span { font-size: 10px; color: rgba(150, 225, 232, 0.72); letter-spacing: 0.08em; }
 .panel-stats b { font-size: 15px; color: #f0ffff; font-variant-numeric: tabular-nums; }
 
+/* 화질 프리셋 (일시정지 화면) */
+.quality-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(3, 26, 36, 0.6);
+  border: 1px solid rgba(70, 190, 200, 0.16);
+}
+.quality-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(150, 225, 232, 0.78);
+  flex: 0 0 auto;
+}
+.quality-btns { display: flex; gap: 4px; flex: 1 1 auto; }
+.qbtn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(190, 245, 250, 0.8);
+  background: rgba(10, 60, 74, 0.55);
+  border: 1px solid rgba(80, 200, 210, 0.22);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.qbtn.on {
+  color: #06202a;
+  background: linear-gradient(180deg, #7cf0e4, #34c8cf);
+  border-color: rgba(160, 255, 250, 0.7);
+  box-shadow: 0 0 14px rgba(70, 230, 225, 0.35);
+}
+.quality-note {
+  flex: 0 0 auto;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(140, 210, 220, 0.6);
+  min-width: 58px;
+  text-align: right;
+}
+
 .panel-over { gap: 10px; }
 .over-label {
   font-size: 10px;
