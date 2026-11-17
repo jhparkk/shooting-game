@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b6';
-import { getTextures } from './textures.js?v=20261117b6';
-import { Atmosphere } from './atmosphere.js?v=20261117b6';
+} from './models.js?v=20261117b7';
+import { getTextures } from './textures.js?v=20261117b7';
+import { Atmosphere } from './atmosphere.js?v=20261117b7';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -58,19 +58,19 @@ export const ZONES = [
   },
   {
     name: '심해 해구',
-    fog: 0x071f34, density: 0.0085,
+    fog: 0x082338, density: 0.0080,
     skyTop: 0x123a63, skyMid: 0x04152a, skyBottom: 0x01040a,
-    hemiSky: 0x557fb0, hemiGround: 0x050e22, hemi: 0.38,
-    ambient: 0x36526f, ambientI: 0.32,
-    sun: 0xc8d8ff, sunI: 0.46, glow: 0.26,
+    hemiSky: 0x6289b8, hemiGround: 0x061123, hemi: 0.54,
+    ambient: 0x3f5c7c, ambientI: 0.44,
+    sun: 0xc8d8ff, sunI: 0.52, glow: 0.26,
     coral: [0x4d5761, 0x59605f, 0x455055, 0x525862, 0x4a5258],
   },
   {
     name: '초심해 심연',
     fog: 0x051a2e, density: 0.0152,
     skyTop: 0x0a2547, skyMid: 0x030b1c, skyBottom: 0x010305,
-    hemiSky: 0x2a4878, hemiGround: 0x03050c, hemi: 0.40,
-    ambient: 0x1c2e50, ambientI: 0.32,
+    hemiSky: 0x33548a, hemiGround: 0x03050c, hemi: 0.50,
+    ambient: 0x24395c, ambientI: 0.40,
     sun: 0x9db8e8, sunI: 0.20, glow: 0.13,
     coral: [0x3c4652, 0x47505c, 0x384250, 0x434a54, 0x3a4450],
   },
@@ -627,7 +627,7 @@ export class World {
           detail = mix( detail, basaltC, deepK * 0.88 );
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
-          detail *= mix( 1.0, 0.62, deepK );
+          detail *= mix( 1.0, 0.78, deepK );
           detail *= mix( vec3( 0.80 ), vec3( 0.52, 0.475, 0.395 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
@@ -836,7 +836,7 @@ export class World {
         const bowl = clamp01((avgN - y) / (d * 0.75));
         const ridge = clamp01((y - avgN) / (d * 0.75));
         const ao = clamp01(1.0 - bowl * 0.62 + ridge * 0.08);
-        const lit = (0.66 - dk * 0.28) * (0.90 + flatness * 0.10) * ao;
+        const lit = (0.70 - dk * 0.14) * (0.90 + flatness * 0.10) * ao;
         fc.setHSL(0.10, 0.015 + (1 - flatness) * 0.02, clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
