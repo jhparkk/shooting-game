@@ -191,7 +191,7 @@ function bakeSand(size) {
       + (patch - 0.5) * 0.10
       + (fine - 0.5) * 0.19
       + (grain - 0.5) * 0.15
-      + ripA * 0.022 + ripB * 0.016;
+      + ripA * 0.016 + ripB * 0.012;
     shade *= 1 - chipK * 0.20 - shellK * 0.14;
     // 조개 부스러기는 살짝 더 하얗고, 잔자갈은 살짝 어둡다
     shade += shellK * 0.06;
@@ -200,7 +200,7 @@ function bakeSand(size) {
     o[1] = clamp01(shade * 0.972) * 255;
     o[2] = clamp01(shade * 0.915) * 255;
     o[3] = clamp01(0.5 + (fine - 0.5) * 0.30 + (grain - 0.5) * 0.30
-      + ripA * 0.14 + ripB * 0.10 - chipK * 0.34 - shellK * 0.22) * 255;
+      + ripA * 0.10 + ripB * 0.08 - chipK * 0.34 - shellK * 0.22) * 255;
   });
 }
 
