@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117f';
-import { getTextures } from './textures.js?v=20261117f';
-import { Atmosphere } from './atmosphere.js?v=20261117f';
+} from './models.js?v=20261117g';
+import { getTextures } from './textures.js?v=20261117g';
+import { Atmosphere } from './atmosphere.js?v=20261117g';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -597,8 +597,12 @@ export class World {
         ).replace(
           'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
           `
+          // 물에 젖은 표면의 비스듬한 광택 — 가장자리로 갈수록 물빛이 얇게 덮인다
+          vec3 vdir = normalize( cameraPosition - vWPosV );
+          float fres = pow( 1.0 - clamp( dot( normalize( vWNrmV ), vdir ), 0.0, 1.0 ), 3.0 );
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic * 0.03;
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * ( 0.045 + 0.05 * upK )
+            + vec3( 0.36, 0.72, 0.92 ) * fres * ( 0.10 + 0.16 * upK );
           `
         );
     };

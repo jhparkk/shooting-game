@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117f';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117f';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117f';
+import { Sound } from './audio.js?v=20261117g';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117g';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117g';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117f';
-import { FX } from './fx.js?v=20261117f';
+} from './models.js?v=20261117g';
+import { FX } from './fx.js?v=20261117g';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2168,7 +2168,12 @@ function applyQuality(name) {
 
 function setQualityMode(mode) {
   qualityMode = QUALITY[mode] ? mode : 'auto';
-  if (qualityMode !== 'auto') autoPreset = qualityMode;
+  // 자동으로 돌아오면 기기 기준값에서 다시 시작한다 (자동 하향은 그 뒤에 판단)
+  if (qualityMode === 'auto') {
+    autoPreset = IS_IOS ? 'medium' : 'high';
+    G.lowWindows = 0;
+    G.runTime = 0;
+  }
   try { localStorage.setItem(QUALITY_KEY, qualityMode); } catch (e) { /* noop */ }
   applyQuality(currentPreset());
 }
