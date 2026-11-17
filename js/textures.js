@@ -167,30 +167,28 @@ function normalize(img, data, target, maxK) {
    ========================================================= */
 function bakeSand(size) {
   return bakePair(size, (u, v, o) => {
-    /* 실제 모래는 '줄무늬 종이'가 아니다 — 덩어리진 젖은/마른 패치 + 입자 +
-       군데군데 남은 물결. 물결은 위상을 크게 흔들어 긴 줄로 이어지지 않게 한다. */
-    const warp = fbm(u, v, 2, 4, 11);
-    const warp2 = fbm(u, v, 5, 3, 47);
-    const dir = v * 4.2 + u * 2.6 + warp * 9.0 + warp2 * 5.0;
-    const rip = Math.sin(dir * TAU) * 0.5 + 0.5;
-    const ripS = rip * rip * (3 - 2 * rip);
+    /* 실제 모래는 방향성 '줄'이 아니라 등방성 입자 + 자갈·조개 부스러기다.
+       (줄무늬를 넣으면 원경에서 빗질한 듯한 자국으로 보인다) */
     const patch = fbm(u, v, 3, 4, 131);
-    const grain = noise2(u * 230, v * 230, 230, 3);
-    const grain2 = noise2(u * 54, v * 54, 54, 91);
-    const pebble = worley(u, v, 26, 971);
+    const patch2 = fbm(u, v, 7, 3, 733);
+    const grain = noise2(u * 240, v * 240, 240, 3);
+    const grain2 = noise2(u * 70, v * 70, 70, 91);
+    const pebble = worley(u, v, 30, 971);
     const bit = 1 - smooth(0.0, 0.13, pebble.f1);
+    const shell = worley(u, v, 9, 313);
+    const shellBit = 1 - smooth(0.0, 0.06, shell.f1);
 
     let shade = 0.80
-      + (ripS - 0.5) * 0.05
-      + (patch - 0.5) * 0.14
-      + (grain - 0.5) * 0.13
-      + (grain2 - 0.5) * 0.10;
-    shade *= 1 - bit * 0.16;
+      + (patch - 0.5) * 0.13
+      + (patch2 - 0.5) * 0.07
+      + (grain - 0.5) * 0.16
+      + (grain2 - 0.5) * 0.12;
+    shade *= 1 - bit * 0.13 - shellBit * 0.10;
 
     o[0] = clamp01(shade * 1.0) * 255;
     o[1] = clamp01(shade * 0.965) * 255;
     o[2] = clamp01(shade * 0.905) * 255;
-    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.22 + (patch - 0.5) * 0.24 + (grain - 0.5) * 0.30 - bit * 0.26) * 255;
+    o[3] = clamp01(0.52 + (patch - 0.5) * 0.16 + (grain - 0.5) * 0.34 + (grain2 - 0.5) * 0.22 - bit * 0.24 - shellBit * 0.18) * 255;
   });
 }
 

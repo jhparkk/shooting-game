@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117a6';
+import { getTextures } from './textures.js?v=20261117a7';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2834,7 +2834,7 @@ export function fanCoralGeometry(color, seed) {
   for (let i = 0; i < n; i++) {
     const a = (i / (n - 1) - 0.5) * 1.6 + (rnd() - 0.5) * 0.06;
     const h = R * (0.62 + Math.cos(a * 1.02) * 0.68) * (0.72 + rnd() * 0.45);
-    const r0 = 0.028 + rnd() * 0.016;
+    const r0 = 0.055 + rnd() * 0.030;
     const g = new THREE.CylinderGeometry(r0 * 0.45, r0, h, 4, 4);
     g.translate(0, h / 2, 0);
     // 가지가 바깥으로 완만하게 휘도록

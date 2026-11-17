@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a6';
-import { getTextures } from './textures.js?v=20261117a6';
-import { Atmosphere } from './atmosphere.js?v=20261117a6';
+} from './models.js?v=20261117a7';
+import { getTextures } from './textures.js?v=20261117a7';
+import { Atmosphere } from './atmosphere.js?v=20261117a7';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -478,6 +478,7 @@ export class World {
       bumpScale: 0.34,
       specular: 0x2a3a3a,
       shininess: 14,
+      emissive: 0x0e0c0a,   // 완전히 검게 죽지 않도록 아주 옅은 산란광
     });
     /* 산호·해초는 얇은 가지라 태양을 정면으로 받지 못해 새까맣게 죽는다.
        실제 수중에서는 산란광이 안쪽까지 스며들므로 간접광을 조금 올려 준다. */
@@ -979,10 +980,10 @@ export class World {
         const color = coralPick();
         const kind = rnd();
         let tpl;
-        if (kind < 0.26) tpl = this.tpl.branch[Math.floor(rnd() * this.tpl.branch.length)];
-        else if (kind < 0.46) tpl = this.tpl.fan[Math.floor(rnd() * this.tpl.fan.length)];
-        else if (kind < 0.64) tpl = this.tpl.brain[Math.floor(rnd() * this.tpl.brain.length)];
-        else if (kind < 0.82) tpl = this.tpl.blob[Math.floor(rnd() * this.tpl.blob.length)];
+        if (kind < 0.30) tpl = this.tpl.branch[Math.floor(rnd() * this.tpl.branch.length)];
+        else if (kind < 0.40) tpl = this.tpl.fan[Math.floor(rnd() * this.tpl.fan.length)];
+        else if (kind < 0.62) tpl = this.tpl.brain[Math.floor(rnd() * this.tpl.brain.length)];
+        else if (kind < 0.84) tpl = this.tpl.blob[Math.floor(rnd() * this.tpl.blob.length)];
         else tpl = this.tpl.tube[Math.floor(rnd() * this.tpl.tube.length)];
 
         // 산호 군락 — 한 자리에 1~3 개를 모아 심어 밀도를 높인다
