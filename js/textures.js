@@ -490,6 +490,11 @@ export function getTextures() {
     basaltBump: toTexture(bakeScaled(basH, 128), { aniso: 4 }),
     caustics: toTexture(causticCv, { aniso: 4 }),
     macro: toTexture(macroCv, { aniso: 4 }),
+    /* 노멀맵 — 높이맵에서 한 번만 굽는다 (프래그먼트 미분 범프는
+       원거리에서 빗질한 줄무늬를 만들어 실사감을 망쳤다) */
+    sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 2.2), { aniso: 8 }),
+    rockNormal: toTexture(heightToNormal(bakeScaled(rockH, 128), 2.6), { aniso: 8 }),
+    basaltNormal: toTexture(heightToNormal(bakeScaled(basH, 128), 2.2), { aniso: 8 }),
     /* 산호 · 암초 */
     coral: toTexture(coralCv, { srgb: true }),
     coralBump: toTexture(bakeScaled(coralH, 128)),
@@ -502,6 +507,33 @@ export function getTextures() {
     ms: Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : 0) - t0),
   };
   return SET;
+}
+
+/** 높이(height) 캔버스 → 탄젠트 공간 노멀맵 (타일 이음새 유지) */
+function heightToNormal(cv, strength) {
+  const size = cv.width;
+  const src = cv.getContext('2d').getImageData(0, 0, size, size).data;
+  const out = canvasOf(size);
+  const ctx = out.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const D = img.data;
+  const H = (x, y) => src[((((y % size) + size) % size) * size + (((x % size) + size) % size)) * 4] / 255;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (H(x + 1, y) - H(x - 1, y)) * strength;
+      const dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+      const nx = -dx;
+      const ny = -dy;
+      const l = Math.hypot(nx, ny, 1) || 1;
+      const i = (y * size + x) * 4;
+      D[i] = ((nx / l) * 0.5 + 0.5) * 255;
+      D[i + 1] = ((ny / l) * 0.5 + 0.5) * 255;
+      D[i + 2] = ((1 / l) * 0.5 + 0.5) * 255;
+      D[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
 }
 
 /** 만든 캔버스를 더 작은 해상도로 다시 굽는다 (bump 용) */

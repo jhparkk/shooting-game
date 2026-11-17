@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b2';
-import { getTextures } from './textures.js?v=20261117b2';
-import { Atmosphere } from './atmosphere.js?v=20261117b2';
+} from './models.js?v=20261117b3';
+import { getTextures } from './textures.js?v=20261117b3';
+import { Atmosphere } from './atmosphere.js?v=20261117b3';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -541,6 +541,9 @@ export class World {
       uBasalt: { value: t.basalt },
       uCaustics: { value: t.caustics },
       uMacro: { value: t.macro },
+      uSandN: { value: t.sandNormal },
+      uRockN: { value: t.rockNormal },
+      uBasaltN: { value: t.basaltNormal },
       uTime: { value: 0 },
       uCausticI: { value: 1 },
       uDetail: { value: 1 },
@@ -562,6 +565,7 @@ export class World {
         'uniform sampler2D uSand;\nuniform sampler2D uCoralSand;\nuniform sampler2D uRock;\n' +
         'uniform sampler2D uAlgae;\nuniform sampler2D uBasalt;\n' +
         'uniform sampler2D uCaustics;\nuniform sampler2D uMacro;\nuniform float uTime;\nuniform float uCausticI;\n' +
+        'uniform sampler2D uSandN;\nuniform sampler2D uRockN;\nuniform sampler2D uBasaltN;\n' +
         'uniform float uDetail;\nuniform float uBump;\n' +
         // 값 노이즈 — 월드 좌표 기반이라 어디서도 반복되지 않는다
         'float abyssHash(vec2 p){ p = fract(p * vec2(127.13, 311.7)); p += dot(p, p + 34.53); return fract(p.x * p.y); }\n' +
@@ -596,7 +600,6 @@ export class World {
           sandyC = mix( sandyC, sandyC * vec3( 0.90, 0.88, 0.84 ), smoothstep( 0.52, 0.88, m3 ) );
           // 젖은 모래 — 큰 패치마다 밝기가 조금씩 다르다
           sandyC *= 0.86 + 0.24 * m2;
-          float sandH = texture2D( uSand, suv, 2.0 ).g * 0.8 + mcB.b * 0.2;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
           /* 벽면 투영 — 노멀에 수직인 '수평 방향'을 축으로 삼는다.
@@ -609,7 +612,6 @@ export class World {
           vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
           vec4 rA = texture2D( uRock, ruv );
           vec3 rockyC = rA.rgb;
-          float rockH = rA.g;
           // 암반 위 이끼·해조류 — 큰 패치에만 옅게
           vec3 algaeC = texture2D( uAlgae, ruv * 0.62 + 7.0 ).rgb;
           float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
@@ -620,11 +622,9 @@ export class World {
           float deepK = smoothstep( -110.0, -420.0, wp.y );
           vec4 bA = texture2D( uBasalt, vec2( wp.y * 0.09, ( wp.x + wp.z ) * 0.07 ) );
           vec3 basaltC = bA.rgb * ( 0.82 + 0.36 * m2 );
-          float basaltH = bA.g;
 
           vec3 detail = mix( rockyC, sandyC, flatK );
           detail = mix( detail, basaltC, deepK * 0.88 );
-          float hMicro = mix( mix( rockH, sandH, flatK ), basaltH, deepK * 0.88 );
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
@@ -643,27 +643,29 @@ export class World {
           float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * up * up * up ) * uCausticI;
           detail *= 1.0 + caustic * 0.09;
 
+          /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
+          vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
+          vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
+          vec3 nB = texture2D( uBasaltN, vec2( wp.y * 0.09, ( wp.x + wp.z ) * 0.07 ) ).xyz * 2.0 - 1.0;
+          vec3 nTan = mix( nR, nS, flatK );
+          nTan = mix( nTan, nB, deepK * 0.88 );
+          // 모래는 (X,Z) 축, 벽면은 (수평방향, Y) 축
+          vec3 tngS = vec3( 1.0, 0.0, 0.0 );
+          vec3 bitS = vec3( 0.0, 0.0, 1.0 );
+          vec3 tngR = vec3( hdir.x, 0.0, hdir.y );
+          vec3 bitR = vec3( 0.0, 1.0, 0.0 );
+          vec3 tng = normalize( mix( tngR, tngS, flatK ) );
+          vec3 bit = normalize( mix( bitR, bitS, flatK ) );
+          vec3 nPerturb = normalize( nw + ( tng * nTan.x + bit * nTan.y ) * uBump );
+
           diffuseColor.rgb *= detail;
           `
         )
         .replace(
           '#include <normal_fragment_begin>',
           `#include <normal_fragment_begin>
-          /* 텍스처 높이값의 화면 미분으로 미세 요철 노멀을 만든다.
-             (별도 노멀맵 파일 없이, 확대해도 모래알·암석 입자가 살아난다) */
-          {
-            vec3 nW = normalize( vWNrmV );
-            vec3 dpx = dFdx( vWPosV );
-            vec3 dpy = dFdy( vWPosV );
-            float dhx = dFdx( hMicro ) * ( 0.12 + 1.15 * ( 1.0 - flatK ) );
-            float dhy = dFdy( hMicro ) * ( 0.12 + 1.15 * ( 1.0 - flatK ) );
-            vec3 r1 = cross( dpy, nW );
-            vec3 r2 = cross( nW, dpx );
-            float det = dot( dpx, r1 );
-            vec3 grad = sign( det ) * ( dhx * r1 + dhy * r2 );
-            vec3 nP = normalize( abs( det ) * nW - uBump * grad );
-            normal = normalize( mat3( viewMatrix ) * nP );
-          }
+          /* 노멀맵(굽어 둔 요철)을 월드 공간에서 적용하고 뷰 공간으로 넘긴다 */
+          normal = normalize( mat3( viewMatrix ) * nPerturb );
           `
         )
         .replace(
