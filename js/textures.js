@@ -338,6 +338,25 @@ function bakeCaustics(size) {
       D[i + 3] = 255;
     }
   }
+  /* 부드럽게 두 번 흐리게 — 세포 경계의 얇은 선이 모래에 '금 간' 무늬로 보이지 않게 */
+  for (let pass = 0; pass < 2; pass++) {
+    const tmp = new Uint8ClampedArray(D);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        let sum = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const xx = (x + dx + size) % size;
+            const yy = (y + dy + size) % size;
+            sum += tmp[(yy * size + xx) * 4];
+          }
+        }
+        const v = sum / 25;
+        const i = (y * size + x) * 4;
+        D[i] = v; D[i + 1] = v; D[i + 2] = v;
+      }
+    }
+  }
   ctx.putImageData(img, 0, 0);
   return cv;
 }

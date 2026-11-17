@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117r';
-import { getTextures } from './textures.js?v=20261117r';
-import { Atmosphere } from './atmosphere.js?v=20261117r';
+} from './models.js?v=20261117s';
+import { getTextures } from './textures.js?v=20261117s';
+import { Atmosphere } from './atmosphere.js?v=20261117s';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -591,7 +591,7 @@ export class World {
           cshape = cshape * cshape;
           float cpatch = smoothstep( 0.30, 0.82, abyssFbm( vWPosV.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * upK * upK * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.10;
+          detail *= 1.0 + caustic * 0.12;
           diffuseColor.rgb *= detail;
           `
         ).replace(
