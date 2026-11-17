@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a9';
-import { getTextures } from './textures.js?v=20261117a9';
-import { Atmosphere } from './atmosphere.js?v=20261117a9';
+} from './models.js?v=20261117b1';
+import { getTextures } from './textures.js?v=20261117b1';
+import { Atmosphere } from './atmosphere.js?v=20261117b1';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -576,7 +576,7 @@ export class World {
           vec3 nw = normalize( vWNrmV );
           float up = clamp( nw.y, 0.0, 1.0 );
           // 완만한 바닥 ↔ 급한 벽면 — 경사에 따라 모래와 암반이 저절로 갈린다
-          float flatK = smoothstep( 0.58, 0.93, up );
+          float flatK = smoothstep( 0.34, 0.66, up );
 
           /* ---- 월드 좌표 큰 변화 (타일 반복을 지운다) ---- */
           float m1 = abyssFbm( wp.xz * 0.016 );                 // ~60 유닛 패치
@@ -599,23 +599,19 @@ export class World {
           float sandH = texture2D( uSand, suv, 2.0 ).g * 0.8 + mcB.b * 0.2;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
-          vec2 ruvA = vec2( wp.z * 0.115, wp.y * 0.15 ) + warp * 0.6;
-          vec2 ruvB = vec2( wp.x * 0.115, wp.y * 0.15 ) + warp * 0.6;
-          vec4 rA = texture2D( uRock, ruvA );
-          vec4 rB = texture2D( uRock, ruvB );
-          /* 두 수직 투영을 노멀에 맞게 섞는다.
-             rA=(z,y) 는 X 를 향한 면에, rB=(x,y) 는 Z 를 향한 면에 맞는다.
-             (예전엔 가중치가 뒤집혀 있어 늘어난 축의 투영이 쓰였다 —
-              벽과 경사면에 빗질한 듯한 긴 줄무늬가 생긴 원인) */
-          float wax = abs( nw.x );
-          float waz = abs( nw.z );
-          float wrsum = max( 1e-3, wax + waz );
-          float wA = wax / wrsum;
-          float wB = waz / wrsum;
-          vec3 rockyC = rA.rgb * wA + rB.rgb * wB;
-          float rockH = rA.g * wA + rB.g * wB;
+          /* 벽면 투영 — 노멀에 수직인 '수평 방향'을 축으로 삼는다.
+             두 축(x,y)/(z,y)을 섞으면 대각선 벽에서 한 축이 늘어나
+             빗질한 듯한 줄무늬가 생겼다. 이렇게 하면 어떤 방향의 벽이든
+             늘어나지 않고, 텍스처 조회도 한 번으로 끝난다. */
+          vec2 hdir = vec2( -nw.z, nw.x );
+          float hlen = length( hdir );
+          hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
+          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
+          vec4 rA = texture2D( uRock, ruv );
+          vec3 rockyC = rA.rgb;
+          float rockH = rA.g;
           // 암반 위 이끼·해조류 — 큰 패치에만 옅게
-          vec3 algaeC = texture2D( uAlgae, ruvA * 0.62 + 7.0 ).rgb;
+          vec3 algaeC = texture2D( uAlgae, ruv * 0.62 + 7.0 ).rgb;
           float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
           rockyC = mix( rockyC, algaeC * vec3( 0.82, 0.86, 0.78 ), algaeK * 0.22 );
           rockyC *= 0.84 + 0.34 * mcB.r;

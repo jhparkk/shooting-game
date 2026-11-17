@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117a9';
+import { getTextures } from './textures.js?v=20261117b1';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2674,7 +2674,7 @@ export function makeFishGeometry() {
     [0.06, 0.19], [0.22, 0.145], [0.33, 0.09], [0.40, 0.05],
   ];
   const body = bodyGeometry(profile, { radial: 12, sx: 0.62, sy: 1.0 });
-  paintSkin(body, { back: 0x9a9a9a, belly: id, halfHeight: 0.2, blend: [-0.36, 0.2] });
+  paintSkin(body, { back: 0xc4c8c6, belly: id, halfHeight: 0.2, blend: [-0.36, 0.2] });
 
   const parts = [body];
   // 꼬리 — 갈라진 부채
