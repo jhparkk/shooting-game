@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117y';
+import { getTextures } from './textures.js?v=20261117z';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2767,7 +2767,8 @@ export function rockGeometry(radius, seed, detail) {
     );
   }
   geo.computeVertexNormals();
-  return geo;
+  // 병합 대상(지형 격자)이 비인덱스이므로 정점을 풀어 둔다 — 노멀은 이미 매끄럽게 계산됨
+  return geo.toNonIndexed();
 }
 
 /** 가지형 산호 */
