@@ -55,14 +55,18 @@ const SURFACE_FRAG = /* glsl */ `
     vec3 col = mix(uDeepColor, uSurfaceColor, win);
 
     /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
-    float c1 = sin(p.x * 1.13 + t * 0.72 + n.x * 2.1) * sin(p.y * 1.05 - t * 0.61 + n.y * 2.3);
-    float c2 = sin((p.x + p.y) * 1.71 - t * 1.05) * sin((p.x - p.y) * 1.37 + t * 0.87);
-    float c3 = sin(p.x * 3.3 - p.y * 2.8 + t * 1.9) * sin(p.y * 3.0 + p.x * 2.4 - t * 1.5);
-    float sparkle = pow(max(c1 * 0.55 + c2 * 0.45, 0.0), 6.5) * 1.9
-                  + pow(max(c3, 0.0), 9.0) * 0.9;
+    float c1 = sin(p.x * 0.41 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.37 - t * 0.27 + n.y * 1.6);
+    float c2 = sin((p.x + p.y) * 0.63 - t * 0.44) * sin((p.x - p.y) * 0.55 + t * 0.38);
+    float c3 = sin(p.x * 1.31 - p.y * 1.12 + t * 0.82) * sin(p.y * 1.19 + p.x * 0.94 - t * 0.67);
+    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 4.5) * 0.55
+                  + pow(max(c3, 0.0), 7.0) * 0.28;
     /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
-    sparkle *= 0.45 + 0.55 * (sin(p.x * 0.11 + t * 0.05) * sin(p.y * 0.13 - t * 0.04) * 0.5 + 0.5);
-    col += uSurfaceColor * sparkle * (0.38 + win * 0.75);
+    sparkle *= 0.32 + 0.68 * (sin(p.x * 0.043 + t * 0.03) * sin(p.y * 0.051 - t * 0.024) * 0.5 + 0.5);
+    col += uSurfaceColor * sparkle * (0.30 + win * 0.55);
+
+    /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
+    float swell = sin(p.x * 0.032 + t * 0.16) * sin(p.y * 0.028 - t * 0.13);
+    col *= 0.94 + 0.09 * swell;
 
     /* 태양 반사 — 잔물결 노멀이 태양 쪽을 향할 때만 강하게 */
     vec3 nrm = normalize(vec3(n.x * 0.55, 1.0, n.y * 0.55));
@@ -226,7 +230,7 @@ export class Atmosphere {
 
   /* ---------- 수면 ---------- */
   _buildSurface() {
-    const geo = new THREE.PlaneGeometry(1600, 1600, 1, 1);
+    const geo = new THREE.PlaneGeometry(6000, 6000, 1, 1);
     geo.rotateX(-Math.PI / 2);
     this.surfaceUni = {
       uTime: { value: 0 },

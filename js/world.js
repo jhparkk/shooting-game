@@ -38,11 +38,11 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x157a99, density: 0.0056,
+    fog: 0x157a99, density: 0.0045,
     skyTop: 0xb4f6f2, skyMid: 0x2aa6dc, skyBottom: 0x157a99,
-    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 0.82,
-    ambient: 0x9cdef6, ambientI: 0.38,
-    sun: 0xfffdf2, sunI: 1.85, glow: 1.0,
+    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 0.68,
+    ambient: 0x9cdef6, ambientI: 0.28,
+    sun: 0xfffdf2, sunI: 2.25, glow: 1.0,
     coral: [0xff5f8a, 0xff8a3c, 0xffc247, 0xe86ee0, 0xb07bff, 0x35e0c8, 0xff8fb8, 0xffe07a],
   },
   {
@@ -576,7 +576,7 @@ export class World {
           float reefK = smoothstep( -40.0, 6.0, vWPosV.y ) * smoothstep( 0.34, 0.86, pFine ) * ( 0.35 + 0.65 * ( 1.0 - flatK ) );
           detail = mix( detail, detail * vec3( 1.26, 0.88, 1.04 ), reefK * 0.5 );
           detail = mix( detail, cBasalt, deepK );
-          detail *= 1.18;
+          detail *= 1.02;
           // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
           detail *= mix( vec3( 1.0 ), vec3( 1.10, 1.08, 1.04 ), sandW );
 

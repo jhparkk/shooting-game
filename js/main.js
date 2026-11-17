@@ -2215,12 +2215,12 @@ function renderFrame(dt) {
       u.uDepth.value = Math.min(1, depth / 900);
       /* 표층에서만 위에서 내려오는 밝은 물빛
    — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
-      u.uTopGlow.value = 0.05 * Math.max(0, 1 - depth / 620);
+      u.uTopGlow.value = 0.03 * Math.max(0, 1 - depth / 620);
       /* 하늘(위쪽) 방향을 화면 좌표로 — 물빛 돔의 중심 */
       _upWorld.copy(camera.position).addScaledVector(UP, 80).project(camera);
       if (_upWorld.z < 1) {
         u.uUpUV.value.set(_upWorld.x * 0.5 + 0.5, _upWorld.y * 0.5 + 0.5);
-        u.uUpI.value = 0.11 * Math.max(0.18, 1 - depth / 1400);
+        u.uUpI.value = 0.07 * Math.max(0.16, 1 - depth / 1400);
       } else {
         u.uUpI.value = 0.02;
       }
