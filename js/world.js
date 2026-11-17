@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117cd';
-import { getTextures } from './textures.js?v=20261117cd';
-import { Atmosphere } from './atmosphere.js?v=20261117cd';
+} from './models.js?v=20261117ce';
+import { getTextures } from './textures.js?v=20261117ce';
+import { Atmosphere } from './atmosphere.js?v=20261117ce';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -623,14 +623,23 @@ export class World {
           flatC *= 0.90 + 0.20 * m2;
 
           /* ---- 자갈 · 조약돌 지대 — 굵은 자갈이 드러난 바닥 ---- */
-          vec3 pebC = texture2D( uPebble, suv * 0.66 + 8.1 ).rgb * ( 0.86 + 0.26 * mc.r );
+          vec3 pebC = texture2D( uPebble, wp.xz * 0.075 / clamp( up, 0.62, 1.0 ) + 8.1 ).rgb * ( 0.84 + 0.26 * mc.r );
           float pebK = smoothstep( 0.44, 0.68, pPebble + ( m2 - 0.5 ) * 0.2 ) * ( 0.55 + 0.45 * m3 );
           flatC = mix( flatC, pebC, pebK * 0.94 );
 
           /* ---- 밝은 석회암 바닥 — 마모된 판이 넓게 깔린 곳 ---- */
-          vec3 limeC = texture2D( uLimestone, suv * 0.72 + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
+          vec3 limeC = texture2D( uLimestone, wp.xz * 0.042 / clamp( up, 0.62, 1.0 ) + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
           float limeK = smoothstep( 0.52, 0.78, pLime + ( m1 - 0.5 ) * 0.2 );
           flatC = mix( flatC, limeC, limeK * 0.88 );
+
+          /* ---- 큰 모래 물결 — 월드 좌표 사인파로 만드는 잔물결과 모래 언덕 ----
+             텍스처는 가까이서만 보이므로, 먼 거리에서도 바닥이 '모래'로 읽히게
+             저주파 요철을 알베도에 직접 섞는다. */
+          vec2 rd = vec2( 2.35, 1.65 );
+          float ripA2 = sin( dot( wp.xz, rd ) + m2 * 6.0 ) * 0.5 + 0.5;
+          float ripB2 = sin( dot( wp.xz, vec2( -3.7, 4.9 ) ) + m3 * 5.0 ) * 0.5 + 0.5;
+          float ripK = flatK * smoothstep( -90.0, -10.0, wp.y );
+          flatC *= 1.0 + ( ripA2 * ripA2 * 0.09 + ripB2 * 0.035 - 0.06 ) * ripK;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
           /* 벽면 투영 — 노멀에 수직인 '수평 방향'을 축으로 삼는다.
@@ -672,18 +681,18 @@ export class World {
 
           /* ---- 수중 빛무늬(caustics) : 얕은 평지에만, 넓게 번지는 빛 덩어리 ---- */
           float cFade = smoothstep( -340.0, -20.0, wp.y );
-          vec2 cuv = wp.xz * 0.038;
+          vec2 cuv = wp.xz * 0.028;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.019, uTime * 0.013 ) ).r;
           float cb = texture2D( uCaustics, cuv * 1.33 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
           float cshape = smoothstep( 0.18, 0.95, ca * 0.55 + cb * 0.65 );
           cshape = cshape * cshape;
           float cpatch = smoothstep( 0.30, 0.82, abyssFbm( wp.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * up * up * up ) * uCausticI;
-          detail *= 1.0 + caustic * 0.20;
+          detail *= 1.0 + caustic * 0.28;
 
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
-          vec3 nPB = texture2D( uPebbleN, suv * 0.66 + 8.1 ).xyz * 2.0 - 1.0;
+          vec3 nPB = texture2D( uPebbleN, wp.xz * 0.075 / clamp( up, 0.62, 1.0 ) + 8.1 ).xyz * 2.0 - 1.0;
           vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
           vec3 nB = texture2D( uBasaltN, buv ).xyz * 2.0 - 1.0;
           // 평평한 바닥의 요철은 '그 바닥이 실제로 무엇인지'를 따라간다
