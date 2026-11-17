@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117c3';
+import { getTextures } from './textures.js?v=20261117c4';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -107,8 +107,16 @@ const smoothstep = (a, b, x) => {
 };
 
 const MET = {
-  hull: addMetal(new THREE.MeshPhongMaterial({ color: 0x9d7a38, shininess: 34, specular: 0x5a636a }), 0.18),
-  hullDark: addMetal(new THREE.MeshPhongMaterial({ color: 0x6b5228, shininess: 22, specular: 0x3a4247 }), 0.18),
+  /* 밝은 노란 선체 — 어두운 심해에서도 잠수정이 한눈에 보이도록
+     옅은 자체 발광을 섞는다(금속 패널 텍스처는 그대로) */
+  hull: addMetal(new THREE.MeshPhongMaterial({
+    color: 0xf7c400, shininess: 44, specular: 0x8a9096,
+    emissive: 0x2a1f00, emissiveIntensity: 1,
+  }), 0.18),
+  hullDark: addMetal(new THREE.MeshPhongMaterial({
+    color: 0xd9a400, shininess: 30, specular: 0x6b7176,
+    emissive: 0x1e1500, emissiveIntensity: 1,
+  }), 0.18),
   accent: new THREE.MeshPhongMaterial({ color: 0x2e3438, shininess: 40, specular: 0x66707a }),
   glass: new THREE.MeshPhongMaterial({
     color: 0x9fc3c8, emissive: 0x123033, emissiveIntensity: 0.55,
@@ -2660,66 +2668,108 @@ export function makeTurtle() {
 /* =========================================================
    관상 물고기 떼 (InstancedMesh)
    ========================================================= */
-const SCHOOL_BEND = { amp: 0.1, freq: 4.0, speed: 6.0, wag: 0.0 };
-let _schoolGeo = null;
-let _schoolMat = null;
+const SCHOOL_BEND = { amp: 0.13, freq: 4.2, speed: 6.0, wag: 0.0 };
+const _schoolGeo = Object.create(null);
+const _schoolMat = Object.create(null);
 
-export function makeFishGeometry() {
-  if (_schoolGeo) return _schoolGeo;
-  const GRAY_BACK = 0.60;
-  const id = 0xffffff;
+/* 산호초를 헤엄치는 어종 — 몸통·지느러미 색과 무늬가 다르다.
+   은빛 몸통 + 주황 지느러미(참고 사진)를 기본으로, 열대 산호초의
+   파랑·노랑·코랄·줄무늬 어종을 더한다. */
+export const FISH_KINDS = {
+  silver: {
+    back: 0xd6e0e2, belly: 0xfcfdff, blend: [-0.42, 0.16],
+    fin: 0xff8f3a, tail: 0xff7d2a, dorsal: 0xffa650,
+    emissive: 0x1f2628,
+  },
+  tang: {
+    back: 0x1f79b8, belly: 0x6ab8e2, blend: [-0.44, 0.08],
+    fin: 0xffd447, tail: 0xffcf36, dorsal: 0x2a86c4,
+    stripe: { color: 0x123a63, freq: 5.5, phase: 0.1, soft: 0.55, mix: 0.35 },
+    emissive: 0x0d2230,
+  },
+  yellow: {
+    back: 0xf7c222, belly: 0xffe487, blend: [-0.42, 0.18],
+    fin: 0xffe066, tail: 0xffdf5c, dorsal: 0xffd23c,
+    emissive: 0x2a1f00,
+  },
+  coral: {
+    back: 0xe4643f, belly: 0xf8bd97, blend: [-0.44, 0.14],
+    fin: 0xd9568f, tail: 0xe06898, dorsal: 0xe4643f,
+    emissive: 0x2a1208,
+  },
+  striped: {
+    back: 0xf2e7c2, belly: 0xfffbf0, blend: [-0.42, 0.18],
+    fin: 0xffd75e, tail: 0xffd75e, dorsal: 0xffd75e,
+    stripe: { color: 0x27366b, freq: 15, phase: 0.02, soft: 0.12, mix: 0.72 },
+    emissive: 0x2a2718,
+  },
+};
+
+export function makeFishGeometry(variant) {
+  const key = FISH_KINDS[variant] ? variant : 'silver';
+  if (_schoolGeo[key]) return _schoolGeo[key];
+  const v = FISH_KINDS[key];
 
   const profile = [
     [-0.50, 0.02], [-0.40, 0.09], [-0.28, 0.155], [-0.12, 0.195],
     [0.06, 0.19], [0.22, 0.145], [0.33, 0.09], [0.40, 0.05],
   ];
   const body = bodyGeometry(profile, { radial: 12, sx: 0.62, sy: 1.0 });
-  paintSkin(body, { back: 0xc4c8c6, belly: id, halfHeight: 0.2, blend: [-0.36, 0.2] });
+  paintSkin(body, {
+    back: v.back, belly: v.belly, halfHeight: 0.2, blend: v.blend,
+    stripe: v.stripe,
+  });
 
   const parts = [body];
   // 꼬리 — 갈라진 부채
   const tail = vfin([
     [0.00, 0.05], [0.13, 0.20], [0.20, 0.24], [0.16, 0.02],
     [0.21, -0.22], [0.12, -0.19], [0.00, -0.05],
-  ], 0.03, 0xb8b8b8, { smooth: true });
+  ], 0.03, v.tail, { smooth: true });
   parts.push(xf(tail, [0, 0, 0.38], [0, 0, 0], [1, 1, 1]));
   // 등지느러미
   const dorsal = vfin([
     [-0.10, 0.17], [0.02, 0.30], [0.12, 0.31], [0.12, 0.17],
-  ], 0.022, 0xa8a8a8);
+  ], 0.022, v.dorsal);
   parts.push(xf(dorsal, [0, 0, 0.0], [0, 0, 0], [1, 1, 1]));
   // 배지느러미
   const pelvic = vfin([
     [-0.04, -0.14], [0.04, -0.22], [0.10, -0.22], [0.08, -0.14],
-  ], 0.018, 0xa8a8a8);
+  ], 0.018, v.fin);
   parts.push(xf(pelvic, [0, 0, 0.14], [0, 0, 0], [1, 1, 1]));
   // 눈
   for (const s of [-1, 1]) {
-    const eye = new THREE.SphereGeometry(0.045, 6, 5);
-    parts.push(xf(paint(eye, 0x101418), [0.095 * s, 0.06, -0.34], [0, 0, 0], [1, 1, 1]));
+    const eye = new THREE.SphereGeometry(0.05, 6, 5);
+    parts.push(xf(paint(eye, 0x0d1114), [0.095 * s, 0.06, -0.34], [0, 0, 0], [1, 1, 1]));
+    // 눈테의 밝은 고리 — 작은 점이지만 얼굴이 살아 보인다
+    const rim = new THREE.SphereGeometry(0.062, 6, 5);
+    parts.push(xf(paint(rim, 0xf2f6f4), [0.093 * s, 0.06, -0.335], [0, 0, 0], [1, 1, 1]));
   }
   // 가슴지느러미
   for (const s of [-1, 1]) {
     const fin = hfin([
       [0, 0.06], [0.10, 0.02], [0.13, -0.05], [0.04, -0.05],
-    ].map(([x, y]) => [x * s, y]), 0.014, 0xa8a8a8);
+    ].map(([x, y]) => [x * s, y]), 0.014, v.fin);
     parts.push(xf(fin, [0.10 * s, -0.04, -0.18], [0, 0, 0], [1, 1, 1]));
   }
-  _schoolGeo = assemble(parts, -0.4, 0.55);
-  return _schoolGeo;
+  _schoolGeo[key] = assemble(parts, -0.4, 0.58);
+  return _schoolGeo[key];
 }
 
-export function makeFishSchool(count) {
-  const geo = makeFishGeometry();
-  if (!_schoolMat) {
-    _schoolMat = swimMaterial({
-      vertexColors: true, shininess: 30, specular: 0x556677,
-      emissive: 0x1b2326,   // 물속 산란광 — 원거리에서 검은 점으로 죽지 않게
+/** 떼 하나 = 한 어종(InstancedMesh). 개체별로 아주 옅은 색 차이만 둔다 */
+export function makeFishSchool(count, variant) {
+  const key = FISH_KINDS[variant] ? variant : 'silver';
+  const v = FISH_KINDS[key];
+  const geo = makeFishGeometry(key);
+  if (!_schoolMat[key]) {
+    _schoolMat[key] = swimMaterial({
+      vertexColors: true, shininess: 46, specular: 0x7f8f96,
+      emissive: v.emissive,   // 물속 산란광 — 원거리에서 검은 점으로 죽지 않게
     }, SCHOOL_BEND, 'school');
   }
-  const inst = new THREE.InstancedMesh(geo, _schoolMat, count);
+  const inst = new THREE.InstancedMesh(geo, _schoolMat[key], count);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const palette = [0xf2f5f0, 0xe8eeea, 0xf6f0e2, 0xdfe8e6, 0xeee7d4, 0xe4eeea, 0xf0ead8];
+  const palette = [0xffffff, 0xf2f6f4, 0xfff8ea, 0xe8f2f4, 0xfaeee0, 0xf6f2ff];
   const c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     c.setHex(palette[i % palette.length]);
@@ -2909,6 +2959,252 @@ export function tubeCoralGeometry(color, seed) {
   return mergeGeometries(parts, false);
 }
 
+/** 아래→위 색 그라데이션 (산호 가지 끝·조약돌 윗면·잎사귀 끝을 밝게) */
+export function paintGradient(geo, colorA, colorB, yMin, yMax) {
+  const pos = geo.attributes.position;
+  const n = pos.count;
+  const a = new THREE.Color(colorA);
+  const b = new THREE.Color(colorB);
+  const c = new THREE.Color();
+  let lo = yMin;
+  let hi = yMax;
+  if (lo === undefined || hi === undefined) {
+    geo.computeBoundingBox();
+    lo = geo.boundingBox.min.y;
+    hi = geo.boundingBox.max.y;
+  }
+  const span = Math.max(1e-3, hi - lo);
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const t = Math.min(1, Math.max(0, (pos.getY(i) - lo) / span));
+    c.copy(a).lerp(b, t * t * (3 - 2 * t));
+    arr[i * 3] = c.r;
+    arr[i * 3 + 1] = c.g;
+    arr[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+
+/** 판상형 석회암 선반 — 납작한 바위 판이 층층이 겹쳐 쌓인 바위 */
+export function slabRockGeometry(radius, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const layers = 2 + Math.floor(rnd() * 3);
+  let y = -radius * 0.08;
+  for (let i = 0; i < layers; i++) {
+    const r = radius * (1 - i * 0.17) * (0.78 + rnd() * 0.34);
+    const g = rockGeometry(r, seed + i * 37, 2);
+    // 눌러서 판처럼 — 위로 갈수록 조금씩 작아진다
+    g.scale(1 + rnd() * 0.24, 0.15 + rnd() * 0.13, 0.76 + rnd() * 0.34);
+    g.rotateY(rnd() * Math.PI * 2);
+    g.translate((rnd() - 0.5) * radius * 0.32, y + r * 0.1, (rnd() - 0.5) * radius * 0.32);
+    y += r * 0.2;
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
+
+/** 주상 절리 현무암 기둥 — 각이 살아 있는 돌기둥 무리 (심해 지대) */
+export function columnRockGeometry(radius, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const n = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const h = radius * (1.15 + rnd() * 1.9);
+    const rr = radius * (0.26 + rnd() * 0.22);
+    const g = new THREE.CylinderGeometry(rr * (0.84 + rnd() * 0.22), rr, h, 6, 3);
+    const p = g.attributes.position;
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k);
+      const y = p.getY(k);
+      const z = p.getZ(k);
+      const a = Math.atan2(z, x);
+      const wob = Math.sin(a * 3 + y * 0.8 + i * 1.7) * 0.08 * rr;
+      p.setXYZ(k, x + Math.cos(a) * wob, y, z + Math.sin(a) * wob);
+    }
+    g.computeVertexNormals();
+    g.rotateY(rnd() * Math.PI * 2);
+    g.rotateZ((rnd() - 0.5) * 0.22);
+    g.translate((rnd() - 0.5) * radius * 1.0, h / 2 - radius * 0.18, (rnd() - 0.5) * radius * 1.0);
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
+
+/** 조약돌 무리 — 모래 위에 굴러다니는 둥근 자갈 군집 */
+export function pebbleClusterGeometry(radius, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const n = 7 + Math.floor(rnd() * 7);
+  for (let i = 0; i < n; i++) {
+    const r = radius * (0.14 + rnd() * 0.24);
+    const g = rockGeometry(r, seed + i * 13, 1);
+    g.scale(1 + rnd() * 0.3, 0.4 + rnd() * 0.26, 1 + rnd() * 0.3);
+    g.rotateY(rnd() * Math.PI * 2);
+    const a = rnd() * Math.PI * 2;
+    const d = radius * Math.sqrt(rnd()) * 0.95;
+    g.translate(Math.cos(a) * d, r * (0.1 + rnd() * 0.22), Math.sin(a) * d);
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
+
+/** 테이블(판) 산호 — 짧은 줄기 위로 펼쳐진 얇은 판, 가장자리가 물결친다 */
+export function tableCoralGeometry(color, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const R = 0.72 + rnd() * 0.72;
+  const stalkH = 0.32 + rnd() * 0.5;
+  const stalk = new THREE.CylinderGeometry(R * 0.16, R * 0.26, stalkH, 7, 1);
+  stalk.translate(0, stalkH / 2, 0);
+  parts.push(paint(stalk, color));
+
+  const plate = new THREE.CylinderGeometry(R, R * 0.84, R * 0.12, 18, 3);
+  const p = plate.attributes.position;
+  const wob = new Float32Array(6);
+  for (let i = 0; i < 6; i++) wob[i] = rnd();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    const a = Math.atan2(z, x);
+    const rim = Math.hypot(x, z) / R;
+    // 판 가장자리를 물결치게 하고, 가운데를 살짝 들어 올린다
+    const k = 1 + (Math.sin(a * 5 + wob[0] * 6.3) * 0.07 + Math.sin(a * 3 + wob[1] * 6.3) * 0.05) * rim;
+    p.setXYZ(i, x * k, y + (1 - rim) * R * 0.1 + Math.sin(a * 4 + wob[2] * 6.3) * 0.03 * rim, z * k);
+  }
+  plate.computeVertexNormals();
+  plate.translate(0, stalkH, 0);
+  parts.push(paint(plate, color));
+  return mergeGeometries(parts, false);
+}
+
+/** 말미잘 · 폴립 군락 — 둥근 몸체에서 뻗은 촉수가 물결에 흔들린다 */
+export function anemoneCoralGeometry(color, seed) {
+  const rnd = mulberry(seed);
+  const parts = [];
+  const R = 0.3 + rnd() * 0.22;
+  const base = new THREE.SphereGeometry(R, 9, 6);
+  base.scale(1, 0.62, 1);
+  base.translate(0, R * 0.4, 0);
+  parts.push(paint(base, color));
+  const c0 = new THREE.Color(color);
+  const tip = c0.clone().offsetHSL(0, 0.06, 0.14);
+  const n = 12 + Math.floor(rnd() * 8);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rnd() * 0.35;
+    const d = R * (0.45 + rnd() * 0.5);
+    const h = R * (1.0 + rnd() * 1.3);
+    const t = new THREE.CylinderGeometry(R * 0.045, R * 0.09, h, 5, 2);
+    const p = t.attributes.position;
+    const bend = 0.16 + rnd() * 0.14;
+    for (let k = 0; k < p.count; k++) {
+      const y = p.getY(k);
+      const tt = (y + h / 2) / h;
+      p.setX(k, p.getX(k) + Math.cos(a) * tt * tt * h * bend);
+      p.setZ(k, p.getZ(k) + Math.sin(a) * tt * tt * h * bend);
+    }
+    t.computeVertexNormals();
+    t.translate(Math.cos(a) * d, h / 2 + R * 0.32, Math.sin(a) * d);
+    parts.push(paintGradient(t, color, tip));
+  }
+  return mergeGeometries(parts, false);
+}
+
+/* ---- 잎 모양 띠(blade) — 수초·해초가 함께 쓰는 기본 조각 ---- */
+function ribbonBlade(h, w, segs, lean, leanZ, twist, baseC, tipC, wide) {
+  const pos = [];
+  const nor = [];
+  const uv = [];
+  const sway = [];
+  const col = [];
+  const idx = [];
+  const c = new THREE.Color();
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const y = t * h;
+    const cx = lean * t * t * h * 0.3;
+    const cz = leanZ * t * t * h * 0.3;
+    const profile = wide
+      ? 0.32 + Math.sin(Math.min(1, t * 1.12) * Math.PI * 0.94) * 0.95 - t * 0.30
+      : 0.40 + Math.sin(Math.min(1, t * 1.42) * Math.PI * 0.78) * 0.85 - t * 0.45;
+    const ww = Math.max(0.02, w * profile);
+    const a = twist * t;
+    const dx = Math.cos(a) * ww * 0.5;
+    const dz = Math.sin(a) * ww * 0.5;
+    pos.push(cx - dx, y, cz - dz, cx + dx, y, cz + dz);
+    nor.push(0, 0, 1, 0, 0, 1);
+    uv.push(0, t, 1, t);
+    sway.push(t, t);
+    c.copy(baseC).lerp(tipC, Math.min(1, t * 1.1));
+    col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    if (i < segs) {
+      const o = i * 2;
+      idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aSway', new THREE.Float32BufferAttribute(sway, 1));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+/** 넓은 잎 수초 — 로제트처럼 사방으로 뻗은 잎이 부챗살로 흔들린다 */
+export function leafyPlantGeometry(height, width, seed) {
+  const rnd = mulberry(seed);
+  const leaves = 5 + Math.floor(rnd() * 5);
+  const parts = [];
+  const base = new THREE.Color();
+  const tipC = new THREE.Color();
+  for (let b = 0; b < leaves; b++) {
+    const h = height * (0.5 + rnd() * 0.62);
+    const w = width * (0.9 + rnd() * 0.9);
+    const dir = (b / leaves) * Math.PI * 2 + rnd() * 0.6;
+    const lean = 0.5 + rnd() * 0.85;
+    base.setHSL(0.235 + rnd() * 0.05, 0.52, 0.20 + rnd() * 0.07);
+    tipC.setHSL(0.205 + rnd() * 0.05, 0.62, 0.36 + rnd() * 0.10);
+    const g = ribbonBlade(
+      h, w, 5,
+      lean, (rnd() - 0.5) * 0.5, (rnd() - 0.5) * 0.8,
+      base, tipC, true
+    );
+    g.rotateY(dir);
+    g.translate(0, -0.05, 0);
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
+
+/** 가는 잎 해초 군락 — 촘촘히 솟은 가는 잎이 물결 따라 살랑인다 */
+export function grassTuftGeometry(height, width, seed) {
+  const rnd = mulberry(seed);
+  const blades = 12 + Math.floor(rnd() * 9);
+  const parts = [];
+  const base = new THREE.Color();
+  const tipC = new THREE.Color();
+  for (let b = 0; b < blades; b++) {
+    const h = height * (0.45 + rnd() * 0.75);
+    const w = width * (0.16 + rnd() * 0.16);
+    const lean = (rnd() - 0.5) * 1.5;
+    const leanZ = (rnd() - 0.5) * 1.5;
+    base.setHSL(0.245 + rnd() * 0.055, 0.55, 0.19 + rnd() * 0.08);
+    tipC.setHSL(0.215 + rnd() * 0.05, 0.66, 0.38 + rnd() * 0.12);
+    const g = ribbonBlade(
+      h, w, 4,
+      lean, leanZ, (rnd() - 0.5) * 1.6,
+      base, tipC, false
+    );
+    g.translate((rnd() - 0.5) * width * 1.6, -0.04, (rnd() - 0.5) * width * 1.6);
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
+
 /** 해초 잎 — 여러 가닥이 모인 다시마 군락 (병합 + 정점 셰이더 흔들림) */
 export function kelpGeometry(height, width, seed) {
   const rnd = mulberry(seed);
@@ -2932,8 +3228,9 @@ export function kelpGeometry(height, width, seed) {
     const sway = [];
     const col = [];
     const idx = [];
-    base.setHSL(0.185 + rnd() * 0.055, 0.34, 0.095 + rnd() * 0.05);
-    tipC.setHSL(0.165 + rnd() * 0.05, 0.42, 0.20 + rnd() * 0.08);
+    // 햇빛을 받아 싱그러운 초록 — 예전엔 너무 어두워 거의 검게 보였다
+    base.setHSL(0.215 + rnd() * 0.05, 0.52, 0.20 + rnd() * 0.07);
+    tipC.setHSL(0.19 + rnd() * 0.055, 0.60, 0.36 + rnd() * 0.11);
     for (let i = 0; i <= segs; i++) {
       const t = i / segs;
       const y = t * h;

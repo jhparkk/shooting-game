@@ -270,6 +270,55 @@ function bakeReef(size) {
 }
 
 /* =========================================================
+   자갈 · 조약돌 지대 — 둥근 돌이 촘촘히 깔린 바닥
+   (굵은 자갈·조약돌이 모래 사이로 드러난 얕은 바닥)
+   ========================================================= */
+function bakePebble(size) {
+  return bakePair(size, (u, v, o) => {
+    const w = worley(u, v, 11, 3413);            // 큰 조약돌
+    const w2 = worley(u, v, 27, 3419);           // 잔자갈
+    const dome = 1 - smooth(0.0, 0.80, w.f1);    // 돌의 둥근 윗면
+    const gap = smooth(0.52, 1.0, w.f2 - w.f1);  // 돌 사이 틈(그늘)
+    const dome2 = 1 - smooth(0.0, 0.72, w2.f1);
+    const grain = noise2(u * 170, v * 170, 170, 3427);
+    const tone = fbm(u, v, 6, 3, 3433);          // 돌마다 다른 색
+    let shade = 0.80 + (tone - 0.5) * 0.30 + (grain - 0.5) * 0.10
+      + dome * 0.13 + dome2 * 0.05;
+    shade *= 1 - gap * 0.40;
+    // 자갈 색 — 회청 · 베이지 · 옅은 분홍이 섞인다
+    const warm = smooth(0.52, 0.86, tone);
+    const cool = smooth(0.46, 0.18, tone);
+    o[0] = clamp01(shade * 1.0 + warm * 0.05) * 255;
+    o[1] = clamp01(shade * 0.975 + warm * 0.01 - cool * 0.01) * 255;
+    o[2] = clamp01(shade * 0.935 - warm * 0.03 + cool * 0.06) * 255;
+    o[3] = clamp01(0.46 + dome * 0.34 + dome2 * 0.10 - gap * 0.34) * 255;
+  });
+}
+
+/* =========================================================
+   밝은 석회암 — 수평으로 이어지는 얕은 층리와 마모된 면
+   ========================================================= */
+function bakeLimestone(size) {
+  return bakePair(size, (u, v, o) => {
+    const warp = fbm(u, v, 3, 3, 3503) * 0.9;
+    const layer = Math.sin((v * 5.0 + warp) * TAU);        // 수평 층리
+    const strata = fbm(u * 0.7, v * 4.2, 6, 3, 3509);
+    const lump = fbm(u, v, 5, 4, 3511);                    // 넓은 마모
+    const fine = noise2(u * 150, v * 150, 150, 3517);
+    const pit = worley(u, v, 19, 3523);
+    const hole = 1 - smooth(0.0, 0.18, pit.f1);             // 드문 작은 구멍
+    let shade = 0.90 + layer * 0.035 + (strata - 0.5) * 0.14
+      + (lump - 0.5) * 0.12 + (fine - 0.5) * 0.07;
+    shade *= 1 - hole * 0.10;
+    o[0] = clamp01(shade * 1.0) * 255;
+    o[1] = clamp01(shade * 0.985) * 255;
+    o[2] = clamp01(shade * 0.94) * 255;
+    o[3] = clamp01(0.54 + layer * 0.12 + (lump - 0.5) * 0.26
+      + (fine - 0.5) * 0.18 - hole * 0.2) * 255;
+  });
+}
+
+/* =========================================================
    이끼 · 해조류가 낀 암반 — 녹청색 조류가 흐르는 바위
    ========================================================= */
 function bakeAlgaeRock(size) {
@@ -468,6 +517,8 @@ export function getTextures() {
   const [algaeCv, algaeH] = bakeAlgaeRock(256);
   const [rockCv, rockH] = bakeRock(256);
   const [basCv, basH] = bakeBasalt(256);
+  const [pebCv, pebH] = bakePebble(256);
+  const [limCv, limH] = bakeLimestone(256);
   const [coralCv, coralH] = bakeCoral(128);
   const [metalCv, metalH] = bakeMetal(256);
   const [orgCv, orgH] = bakeOrganic(128);
@@ -488,6 +539,10 @@ export function getTextures() {
     rockBump: toTexture(bakeScaled(rockH, 128), { aniso: 4 }),
     basalt: toTexture(basCv, { srgb: true, aniso: 8 }),
     basaltBump: toTexture(bakeScaled(basH, 128), { aniso: 4 }),
+    pebble: toTexture(pebCv, { srgb: true, aniso: 8 }),
+    pebbleBump: toTexture(bakeScaled(pebH, 128), { aniso: 4 }),
+    limestone: toTexture(limCv, { srgb: true, aniso: 8 }),
+    limestoneBump: toTexture(bakeScaled(limH, 128), { aniso: 4 }),
     caustics: toTexture(causticCv, { aniso: 4 }),
     macro: toTexture(macroCv, { aniso: 4 }),
     /* 노멀맵 — 높이맵에서 한 번만 굽는다 (프래그먼트 미분 범프는
@@ -495,6 +550,9 @@ export function getTextures() {
     sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 1.4), { aniso: 8 }),
     rockNormal: toTexture(heightToNormal(bakeScaled(rockH, 128), 1.1), { aniso: 8 }),
     basaltNormal: toTexture(heightToNormal(bakeScaled(basH, 128), 0.9), { aniso: 8 }),
+    pebbleNormal: toTexture(heightToNormal(bakeScaled(pebH, 128), 1.9), { aniso: 8 }),
+    limestoneNormal: toTexture(heightToNormal(bakeScaled(limH, 128), 1.0), { aniso: 8 }),
+    coralSandNormal: toTexture(heightToNormal(bakeScaled(cSandH, 128), 1.5), { aniso: 8 }),
     /* 산호 · 암초 */
     coral: toTexture(coralCv, { srgb: true }),
     coralBump: toTexture(bakeScaled(coralH, 128)),

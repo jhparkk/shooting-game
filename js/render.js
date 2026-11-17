@@ -59,12 +59,12 @@ export class RenderPipeline {
       uResolution: { value: new THREE.Vector2(1, 1) },
       uTime: { value: 0 },
       uExposure: { value: 1.02 },
-      uBloom: { value: 0.34 },
+      uBloom: { value: 0.36 },
       uBloomTint: { value: new THREE.Color(0.70, 0.87, 0.94) },
       uRayI: { value: 0.0 },
       uSunUV: { value: new THREE.Vector2(0.5, 0.9) },
       uSat: { value: 0.95 },
-      uVig: { value: 0.5 },
+      uVig: { value: 0.40 },
       uGrain: { value: 0.012 },
       uWobble: { value: 1.0 },
       uCA: { value: 1.0 },
@@ -72,7 +72,7 @@ export class RenderPipeline {
       uUpUV: { value: new THREE.Vector2(0.5, 1.6) },
       uUpI: { value: 0.0 },
       uSurfaceTint: { value: new THREE.Color(0.45, 0.95, 1.0) },
-      uShadowTint: { value: new THREE.Color(0.90, 0.98, 1.06) },
+      uShadowTint: { value: new THREE.Color(0.96, 1.01, 1.05) },
       uHighTint: { value: new THREE.Color(1.04, 1.0, 0.95) },
       uDepth: { value: 0 },
       uFade: { value: 1 },
@@ -278,10 +278,10 @@ export class RenderPipeline {
           mapped *= mix(uShadowTint, uHighTint, smoothstep(0.1, 0.72, lum));
           mapped = mix(vec3(lum), mapped, uSat);
           /* 살짝 눌러주는 S자 — 물속의 또렷한 명암 */
-          mapped = mix(mapped, mapped * mapped * (3.0 - 2.0 * mapped), 0.22);
+          mapped = mix(mapped, mapped * mapped * (3.0 - 2.0 * mapped), 0.14);
           /* 부드러운 S 커브 — 물속 특유의 또렷한 대비 */
           mapped = clamp(mapped, 0.0, 1.0);
-          mapped = mapped * mapped * (3.0 - 2.0 * mapped) * 0.34 + mapped * 0.66;
+          mapped = mapped * mapped * (3.0 - 2.0 * mapped) * 0.22 + mapped * 0.78;
           /* 깊은 곳은 검정을 살짝 띄워 물빛이 남게 */
           mapped += uSurfaceTint * 0.012 * smoothstep(0.2, 1.0, uDepth);
 
@@ -320,7 +320,7 @@ export class RenderPipeline {
     this.uni.uCA.value = p.chromatic ? 1.0 : 0.0;
     this.uni.uGrain.value = p.grain;
     this.uni.uWobble.value = p.wobble;
-    this.uni.uBloom.value = p.bloom ? 0.34 : 0.0;
+    this.uni.uBloom.value = p.bloom ? 0.36 : 0.0;
     this.rayMat.uniforms.uSteps.value = p.raySteps;
     this.resize(true);
   }

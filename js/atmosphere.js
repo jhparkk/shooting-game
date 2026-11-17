@@ -87,8 +87,8 @@ const SURFACE_FRAG = /* glsl */ `
 
     /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
-    col += uSunColor * pow(sd, 160.0) * 1.4 * (1.0 - uDeep * 0.85);
-    col += uSunColor * pow(sd, 8.0) * 0.07 * (1.0 - uDeep * 0.7);
+    col += uSunColor * pow(sd, 160.0) * 1.9 * (1.0 - uDeep * 0.85);
+    col += uSunColor * pow(sd, 8.0) * 0.10 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
@@ -474,7 +474,7 @@ export class Atmosphere {
     /* 빛줄기 — 표층에서만. 수심 320m 아래로는 사라진다 */
     const shaftK = Math.max(0, 1 - depth / 320);
     this.shaftUni.uTime.value = t;
-    this.shaftUni.uIntensity.value = 0.26 * shaftK * shaftK;
+    this.shaftUni.uIntensity.value = 0.42 * shaftK * shaftK;
     this.shafts.visible = shaftK > 0.02;
     if (this.shafts.visible) {
       for (let i = 0; i < this.shaftCount; i++) {
