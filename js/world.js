@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d8';
-import { getTextures } from './textures.js?v=20261117d8';
-import { Atmosphere } from './atmosphere.js?v=20261117d8';
+} from './models.js?v=20261117d9';
+import { getTextures } from './textures.js?v=20261117d9';
+import { Atmosphere } from './atmosphere.js?v=20261117d9';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -63,29 +63,29 @@ export const ZONES = [
   },
   {
     name: '심해 해구',
-    fog: 0x082c46, density: 0.0076,
-    skyTop: 0x16466f, skyMid: 0x061d33, skyBottom: 0x020810,
-    hemiSky: 0x6d95c2, hemiGround: 0x08182b, hemi: 0.54,
-    ambient: 0x4a6a8c, ambientI: 0.46,
-    sun: 0xc8d8ff, sunI: 0.50, glow: 0.30,
+    fog: 0x06203a, density: 0.0092,
+    skyTop: 0x0e3358, skyMid: 0x03101f, skyBottom: 0x010306,
+    hemiSky: 0x5b83b4, hemiGround: 0x061423, hemi: 0.44,
+    ambient: 0x3b587a, ambientI: 0.38,
+    sun: 0xc8d8ff, sunI: 0.42, glow: 0.20,
     coral: [0x5a6470, 0x646b6c, 0x4f5a60, 0x5e6570, 0x566067],
   },
   {
     name: '초심해 심연',
-    fog: 0x051a2e, density: 0.0132,
-    skyTop: 0x0b2749, skyMid: 0x030c1d, skyBottom: 0x010306,
-    hemiSky: 0x38598f, hemiGround: 0x04060e, hemi: 0.56,
-    ambient: 0x273c60, ambientI: 0.48,
-    sun: 0x9db8e8, sunI: 0.24, glow: 0.15,
+    fog: 0x04162a, density: 0.0148,
+    skyTop: 0x071f3d, skyMid: 0x020a18, skyBottom: 0x000204,
+    hemiSky: 0x2f4d80, hemiGround: 0x03050c, hemi: 0.46,
+    ambient: 0x22355a, ambientI: 0.42,
+    sun: 0x9db8e8, sunI: 0.20, glow: 0.11,
     coral: [0x3c4652, 0x47505c, 0x384250, 0x434a54, 0x3a4450],
   },
   {
     name: '극심해 해구',
-    fog: 0x020d1c, density: 0.0175,
-    skyTop: 0x041230, skyMid: 0x010414, skyBottom: 0x000103,
-    hemiSky: 0x1c3478, hemiGround: 0x02030a, hemi: 0.42,
-    ambient: 0x1a2a54, ambientI: 0.40,
-    sun: 0x8aa8dd, sunI: 0.14, glow: 0.08,
+    fog: 0x020b18, density: 0.0190,
+    skyTop: 0x03102a, skyMid: 0x01040f, skyBottom: 0x000102,
+    hemiSky: 0x1a3270, hemiGround: 0x02030a, hemi: 0.38,
+    ambient: 0x17264c, ambientI: 0.36,
+    sun: 0x8aa8dd, sunI: 0.12, glow: 0.06,
     coral: [0x333d47, 0x3b4551, 0x2f3742, 0x40444a, 0x36404c],
   },
 ];

@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117d8';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117d8';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117d8';
+import { Sound } from './audio.js?v=20261117d9';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117d9';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117d9';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117d8';
-import { FX } from './fx.js?v=20261117d8';
+} from './models.js?v=20261117d9';
+import { FX } from './fx.js?v=20261117d9';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2227,7 +2227,7 @@ function renderFrame(dt) {
       _upWorld.copy(camera.position).addScaledVector(UP, 80).project(camera);
       if (_upWorld.z < 1) {
         u.uUpUV.value.set(_upWorld.x * 0.5 + 0.5, _upWorld.y * 0.5 + 0.5);
-        u.uUpI.value = 0.058 * Math.max(0.28, 1 - depth / 1400);
+        u.uUpI.value = 0.058 * Math.max(0.16, 1 - depth / 1400);
       } else {
         u.uUpI.value = 0.035;
       }
