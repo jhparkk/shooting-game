@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c9';
-import { getTextures } from './textures.js?v=20261117c9';
-import { Atmosphere } from './atmosphere.js?v=20261117c9';
+} from './models.js?v=20261117ca';
+import { getTextures } from './textures.js?v=20261117ca';
+import { Atmosphere } from './atmosphere.js?v=20261117ca';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -42,9 +42,9 @@ export const ZONES = [
     name: '표층 산호대',
     fog: 0x16737f, density: 0.0050,
     skyTop: 0x9ee0dc, skyMid: 0x389cab, skyBottom: 0x16737f,
-    hemiSky: 0xd0f0ef, hemiGround: 0x2b6f6a, hemi: 0.72,
-    ambient: 0x9edcde, ambientI: 0.38,
-    sun: 0xfffdf0, sunI: 1.75, glow: 1.0,
+    hemiSky: 0xd0f0ef, hemiGround: 0x2b6f6a, hemi: 0.58,
+    ambient: 0x9edcde, ambientI: 0.30,
+    sun: 0xfffdf0, sunI: 1.28, glow: 1.0,
     // 밝은 산호초 팔레트 — 자연스러운 코랄 핑크·오렌지·연보라·에메랄드·황금빛.
     // 형광 원색이 아니라 햇빛 아래 실제 산호가 띠는 색으로, 개체마다 조금씩 다르다.
     coral: [
@@ -56,18 +56,18 @@ export const ZONES = [
     name: '중층 해저 협곡',
     fog: 0x0f5d7d, density: 0.0062,
     skyTop: 0x67b8c9, skyMid: 0x1a7d9c, skyBottom: 0x0f5d7d,
-    hemiSky: 0xc4e6ee, hemiGround: 0x155a63, hemi: 0.76,
-    ambient: 0x86c8d8, ambientI: 0.42,
-    sun: 0xfdf8ea, sunI: 1.05, glow: 0.58,
+    hemiSky: 0xc4e6ee, hemiGround: 0x155a63, hemi: 0.62,
+    ambient: 0x86c8d8, ambientI: 0.34,
+    sun: 0xfdf8ea, sunI: 0.80, glow: 0.58,
     coral: [0xc08a74, 0xa9848f, 0xb59a72, 0x8fa89c, 0xbb8f79, 0xa5968f],
   },
   {
     name: '심해 해구',
     fog: 0x082c46, density: 0.0076,
     skyTop: 0x16466f, skyMid: 0x061d33, skyBottom: 0x020810,
-    hemiSky: 0x6d95c2, hemiGround: 0x08182b, hemi: 0.62,
-    ambient: 0x4a6a8c, ambientI: 0.54,
-    sun: 0xc8d8ff, sunI: 0.62, glow: 0.30,
+    hemiSky: 0x6d95c2, hemiGround: 0x08182b, hemi: 0.54,
+    ambient: 0x4a6a8c, ambientI: 0.46,
+    sun: 0xc8d8ff, sunI: 0.50, glow: 0.30,
     coral: [0x5a6470, 0x646b6c, 0x4f5a60, 0x5e6570, 0x566067],
   },
   {
@@ -484,7 +484,7 @@ export class World {
       side: THREE.DoubleSide,
       map: this.tex.coral,
       bumpMap: this.tex.coralBump,
-      bumpScale: 0.34,
+      bumpScale: 0.22,
       specular: 0x2a3a3a,
       shininess: 14,
       emissive: 0x0e0c0a,   // 완전히 검게 죽지 않도록 아주 옅은 산란광
@@ -611,10 +611,11 @@ export class World {
           float pLime = mc.b;     // 석회암 선반
 
           /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
-          vec2 suv = wp.xz * 0.17 / clamp( up, 0.55, 1.0 ) + warp;
+          vec2 suv = wp.xz * 0.22 / clamp( up, 0.62, 1.0 ) + warp;
           // 백사장 — 햇빛을 받아 밝다
-          vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.88 + 0.26 * mc.g );
-          sandyC = mix( sandyC, sandyC * vec3( 0.94, 0.92, 0.88 ), smoothstep( 0.52, 0.88, m3 ) );
+          vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.82 + 0.30 * mc.g );
+          sandyC = mix( sandyC, sandyC * vec3( 0.92, 0.90, 0.86 ), smoothstep( 0.52, 0.88, m3 ) );
+          sandyC *= mix( vec3( 0.96, 0.97, 1.0 ), vec3( 1.06, 1.0, 0.90 ), mc.b );
           // 옅은 분홍빛 산호 모래 — 산호 부스러기가 섞인 밝은 패치
           vec3 coralSandC = texture2D( uCoralSand, suv * 0.86 + 3.4 ).rgb * ( 1.00 + 0.24 * mc.b );
           float coralK = smoothstep( 0.46, 0.72, pCoral + ( m2 - 0.5 ) * 0.28 ) * 0.92;
@@ -662,8 +663,8 @@ export class World {
           detail = mix( detail, basaltC, deepK * 0.88 );
 
           // 알베도 — 햇빛 받는 모래·석회암은 밝고, 암반은 중간, 현무암은 어둡다
-          detail *= mix( 1.0, 1.02, flatK );
-          detail *= mix( vec3( 1.0 ), vec3( 1.03, 1.0, 0.94 ), flatK );   // 따뜻한 모래빛
+          detail *= mix( 1.0, 0.96, flatK );
+          detail *= mix( vec3( 1.0 ), vec3( 1.05, 1.0, 0.92 ), flatK );   // 따뜻한 모래빛
           detail *= mix( 1.0, 0.82, deepK );                              // 깊은 곳은 가라앉은 톤
           detail *= mix( vec3( 1.0 ), vec3( 0.76, 0.82, 0.92 ), deepK );  // 현무암은 푸르게
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
@@ -678,7 +679,7 @@ export class World {
           cshape = cshape * cshape;
           float cpatch = smoothstep( 0.30, 0.82, abyssFbm( wp.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * up * up * up ) * uCausticI;
-          detail *= 1.0 + caustic * 0.14;
+          detail *= 1.0 + caustic * 0.20;
 
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
@@ -1144,7 +1145,7 @@ export class World {
           const big = this.tpl.blob.indexOf(tpl) >= 0 || this.tpl.brain.indexOf(tpl) >= 0 ||
             this.tpl.table.indexOf(tpl) >= 0;
           const tall = this.tpl.fan.indexOf(tpl) >= 0;   // 부채산호는 키가 커서 줄인다
-          const sc = (1.9 + rnd() * 2.2) * (steep ? 0.78 : 1.0) * (big ? 0.7 : 1.0) * (tall ? 0.55 : 1.0);
+          const sc = (1.6 + rnd() * 1.8) * (steep ? 0.78 : 1.0) * (big ? 0.7 : 1.0) * (tall ? 0.55 : 1.0);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
@@ -1431,7 +1432,7 @@ export class World {
   _seedSchool(school, rnd, px, pz) {
     const ang = rnd() * Math.PI * 2;
     // 산호초를 따라 가까이 헤엄치게 — 너무 멀면 작은 점으로만 보인다
-    const dist = 38 + rnd() * 88;
+    const dist = 22 + rnd() * 62;
     const cx = px + Math.cos(ang) * dist;
     const cz = pz + Math.sin(ang) * dist;
     const gy = getTerrainHeight(cx, cz);
@@ -1704,7 +1705,7 @@ export class World {
     let speedSum = 0;
     let speedN = 0;
     for (const s of this.schools) {
-      const far = Math.hypot(s.center.x - playerPos.x, s.center.z - playerPos.z) > 250;
+      const far = Math.hypot(s.center.x - playerPos.x, s.center.z - playerPos.z) > 170;
       if (far) this._seedSchool(s, s.rnd, playerPos.x, playerPos.z);
       s.angle += s.angular * dt;
       const cx = s.center.x + Math.cos(s.angle) * s.radius;

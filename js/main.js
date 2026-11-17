@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117c9';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117c9';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117c9';
+import { Sound } from './audio.js?v=20261117ca';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117ca';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117ca';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117c9';
-import { FX } from './fx.js?v=20261117c9';
+} from './models.js?v=20261117ca';
+import { FX } from './fx.js?v=20261117ca';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1437,7 +1437,7 @@ function updateHeadlight(dt, instant) {
   const k = instant ? 1 : damp(2.6, dt);
   const spot = player.spot;
 
-  const targetIntensity = 17 + deep * 420;
+  const targetIntensity = 17 + deep * 280;
   spot.intensity += (targetIntensity - spot.intensity) * k;
   spot.angle = 0.42 + deep * 0.24;
   spot.distance = 74 + deep * 260;
@@ -1445,12 +1445,12 @@ function updateHeadlight(dt, instant) {
 
   // 바로 앞을 밝히는 보조광 (심해에서 확실히 비친다)
   if (player.frontLight) {
-    player.frontLight.intensity += (deep * 110 - player.frontLight.intensity) * k;
+    player.frontLight.intensity += (deep * 70 - player.frontLight.intensity) * k;
     player.frontLight.distance = 20 + deep * 82;
   }
   // 잠수정 아래를 밝히는 빛무리 — 급한 사면을 따라 내려갈 때 발밑이 보이게
   if (player.under) {
-    player.under.intensity += ((6 + deep * 320) - player.under.intensity) * k;
+    player.under.intensity += ((6 + deep * 190) - player.under.intensity) * k;
     player.under.distance = 20 + deep * 150;
   }
 
@@ -2219,7 +2219,7 @@ function renderFrame(dt) {
       const u = pipeline.uni;
       u.uDepth.value = Math.min(1, depth / 900);
       // 깊어질수록 노출을 조금 올려 심해가 완전히 검게 죽지 않게
-      u.uExposure.value = 1.00 + 0.30 * Math.min(1, depth / 1400);
+      u.uExposure.value = 0.94 + 0.30 * Math.min(1, depth / 1400);
       /* 표층에서만 위에서 내려오는 밝은 물빛
    — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
       u.uTopGlow.value = 0.026 * Math.max(0, 1 - depth / 700);

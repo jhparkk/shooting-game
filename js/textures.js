@@ -227,14 +227,14 @@ function bakeRock(size) {
 function bakeCoralSand(size) {
   return bakePair(size, (u, v, o) => {
     const warp = fbm(u, v, 4, 3, 1213);
-    const rip = Math.sin((v * 9 + u * 1.6 + warp * 1.7) * TAU);
-    const rip2 = Math.sin((v * 23 - u * 2.2 + warp * 2.4) * TAU);
+    const rip = Math.sin((v * 14 + u * 2.4 + warp * 2.6) * TAU);
+    const rip2 = Math.sin((v * 31 - u * 3.1 + warp * 3.2) * TAU);
     const grain = noise2(u * 260, v * 260, 260, 1201);
     // 산호 부스러기 — 작은 조각이 흩어져 있다
     const bits = worley(u, v, 34, 1217);
     const piece = 1 - smooth(0.0, 0.24, bits.f1);
     const warm = fbm(u, v, 11, 2, 1223);
-    let shade = 0.90 + rip * 0.03 + rip2 * 0.018 + (grain - 0.5) * 0.08;
+    let shade = 0.90 + rip * 0.018 + rip2 * 0.012 + (grain - 0.5) * 0.08;
     shade *= 1 - piece * 0.09;
     const pink = smooth(0.66, 0.94, warm) * piece;
     o[0] = clamp01(shade * 1.0 + pink * 0.05) * 255;
@@ -443,15 +443,15 @@ function bakeCaustics(size) {
    ========================================================= */
 function bakeCoral(size) {
   return bakePair(size, (u, v, o) => {
-    const cell = worley(u, v, 11, 613);
-    const pore = 1 - smooth(0.0, 0.26, cell.f1);          // 작은 구멍
+    const cell = worley(u, v, 13, 613);
+    const pore = 1 - smooth(0.0, 0.22, cell.f1);          // 작은 구멍
     const lump = fbm(u, v, 9, 3, 777);
-    let shade = 0.86 + (lump - 0.5) * 0.22;
-    shade *= 1 - pore * 0.42;
+    let shade = 0.88 + (lump - 0.5) * 0.18;
+    shade *= 1 - pore * 0.22;   // 구멍 대비를 낮춰 '물방울 무늬'처럼 보이지 않게
     o[0] = clamp01(shade) * 255;
     o[1] = clamp01(shade * 0.99) * 255;
     o[2] = clamp01(shade * 0.96) * 255;
-    o[3] = clamp01(0.6 + (lump - 0.5) * 0.5 - pore * 0.5) * 255;
+    o[3] = clamp01(0.6 + (lump - 0.5) * 0.5 - pore * 0.3) * 255;
   });
 }
 
