@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117dd';
-import { getTextures } from './textures.js?v=20261117dd';
-import { Atmosphere } from './atmosphere.js?v=20261117dd';
+} from './models.js?v=20261117de';
+import { getTextures } from './textures.js?v=20261117de';
+import { Atmosphere } from './atmosphere.js?v=20261117de';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -617,7 +617,7 @@ export class World {
           vec2 hdir = vec2( -nw.z, nw.x );
           float hlen = length( hdir );
           hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
-          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.075, wp.y * 0.085 ) + warp * 0.6;
+          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.048, wp.y * 0.052 ) + warp * 0.6;
 
           /* ---- 모래 : 평지 XZ 투영 ↔ 경사면 투영을 섞는다 ---- */
           vec2 suvFlat = wp.xz * 0.72 / clamp( up, 0.62, 1.0 ) + warp;
@@ -674,6 +674,10 @@ export class World {
           // 성긴 석회암 선반 — 층이 진 밝은 판이 벽을 가로지른다
           rockyC = mix( rockyC, limeC, smoothstep( 0.56, 0.82, pLime ) * 0.62 );
           rockyC *= 0.88 + 0.24 * mc.r;
+          // 수직에 가까운 큰 벽면 — 비스듬히 볼 때 텍스처가 늘어나 '천'처럼 보인다.
+          // 저주파 노이즈로 부드럽게 덮어 넓은 명암 변화만 남긴다.
+          float steepK = 1.0 - smoothstep( 0.10, 0.42, up );
+          rockyC = mix( rockyC, rockyC * vec3( 0.88, 0.94, 1.02 ) * ( 0.80 + 0.45 * m1 ), steepK * 0.7 );
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
