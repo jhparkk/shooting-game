@@ -141,7 +141,7 @@ function bakePair(size, fn) {
   ctxB.putImageData(imgB, 0, 0);
   // 평균 밝기를 0.80 근처로 정규화 — 깊은 바다의 어두운 현무암 텍스처가
   // 지형을 "까맣게" 만들지 않도록, 대비는 남기고 밝기만 맞춘다.
-  normalize(imgA, A, 0.80, 2.2);
+  normalize(imgA, A, 0.78, 3.0);
   ctxA.putImageData(imgA, 0, 0);
   return [cvA, cvB];
 }
@@ -154,7 +154,9 @@ function normalize(img, data, target, maxK) {
   const mean = sum / n / 255;
   if (mean < 0.02) return;
   // 대비를 너무 깎지 않는다 — 밝은 모래 텍스처가 '민무늬 회색'이 되던 원인
-  const k = Math.min(maxK, Math.max(0.92, 0.55 / mean));
+  // 평균만 0.80 으로 맞추고, 대비는 오히려 키운다 — 정규화가 대비를 깎아
+  // 모든 바닥 텍스처가 '민무늬 회색'이 되던 문제를 없앤다
+  const k = Math.min(maxK, Math.max(1.35, (0.55 / mean) * 1.8));
   for (let i = 0; i < data.length; i += 4) {
     for (let c = 0; c < 3; c++) {
       const v = target + (data[i + c] / 255 - mean) * k;
