@@ -172,24 +172,27 @@ function bakeSand(size) {
        매크로 변화는 셰이더의 월드 좌표 노이즈가 맡는다(타일 반복 제거). */
     const warp = fbm(u, v, 2, 3, 11);
     const warp2 = fbm(u, v, 5, 2, 47);
-    const dir = v * 5.0 + u * 1.1 + warp * 2.4 + warp2 * 1.6;
+    const dir = v * 6.0 + u * 1.1 + warp * 2.4 + warp2 * 1.6;
     const rip = Math.sin(dir * TAU) * 0.5 + 0.5;
     const ripS = rip * rip * (3 - 2 * rip);          // 둥근 마루
+    const dir2 = v * 17.0 - u * 3.2 + warp * 5.0;
+    const rip2 = Math.sin(dir2 * TAU) * 0.5 + 0.5;
     const grain = noise2(u * 220, v * 220, 220, 3);
     const grain2 = noise2(u * 58, v * 58, 58, 91);
     const pebble = worley(u, v, 24, 971);
     const bit = 1 - smooth(0.0, 0.14, pebble.f1);     // 작은 자갈·조개 부스러기
 
-    let shade = 0.87
-      + (ripS - 0.5) * 0.05
-      + (grain - 0.5) * 0.075
-      + (grain2 - 0.5) * 0.075;
-    shade *= 1 - bit * 0.11;
+    let shade = 0.82
+      + (ripS - 0.5) * 0.085
+      + (rip2 - 0.5) * 0.035
+      + (grain - 0.5) * 0.10
+      + (grain2 - 0.5) * 0.085;
+    shade *= 1 - bit * 0.13;
 
     o[0] = clamp01(shade * 1.0) * 255;
     o[1] = clamp01(shade * 0.972) * 255;
     o[2] = clamp01(shade * 0.918) * 255;
-    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.26 + (grain - 0.5) * 0.22 - bit * 0.2) * 255;
+    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.40 + (rip2 - 0.5) * 0.16 + (grain - 0.5) * 0.26 - bit * 0.22) * 255;
   });
 }
 

@@ -55,16 +55,16 @@ const SURFACE_FRAG = /* glsl */ `
     vec3 col = mix(uDeepColor * 0.62, uSurfaceColor, win);
 
     /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
-    float c1 = sin(p.x * 0.26 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.23 - t * 0.27 + n.y * 1.6);
-    float c2 = sin((p.x + p.y) * 0.41 - t * 0.44) * sin((p.x - p.y) * 0.35 + t * 0.38);
-    float c3 = sin(p.x * 0.87 - p.y * 0.74 + t * 0.82) * sin(p.y * 0.79 + p.x * 0.62 - t * 0.67);
-    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 4.5) * 0.30
-                  + pow(max(c3, 0.0), 7.0) * 0.14;
-    /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
-    sparkle *= 0.32 + 0.68 * (sin(p.x * 0.043 + t * 0.03) * sin(p.y * 0.051 - t * 0.024) * 0.5 + 0.5);
-    /* 멀리 있는 물결은 뭉개서 타일·모아레가 보이지 않게 */
-    sparkle *= 1.0 - smoothstep(35.0, 150.0, dist);
-    col += uSurfaceColor * sparkle * (0.30 + win * 0.55);
+    /* 잔물결 반짝임 — 좌표를 크게 휘게(warp) 두어 격자·타일이 보이지 않게.
+       실제 수면은 '규칙적인 구름무늬'가 아니라 불규칙하게 흩어진 빛이다. */
+    vec2 wq = p * 0.062 + vec2(
+      sin(p.y * 0.021 + t * 0.06), cos(p.x * 0.019 - t * 0.05)
+    ) * 2.4;
+    float c1 = sin(wq.x + n.x * 2.0 + t * 0.21) * cos(wq.y * 0.9 - t * 0.18 + n.y * 2.0);
+    float c2 = sin((wq.x + wq.y) * 1.7 - t * 0.33 + n.x) * cos((wq.x - wq.y) * 1.4 + t * 0.27);
+    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 6.0) * 0.20;
+    sparkle *= 1.0 - smoothstep(18.0, 90.0, dist);
+    col += uSurfaceColor * sparkle * (0.22 + win * 0.40);
 
     /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
     float swell = sin(p.x * 0.032 + t * 0.16) * sin(p.y * 0.028 - t * 0.13);
