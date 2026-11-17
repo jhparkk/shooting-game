@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c6';
-import { getTextures } from './textures.js?v=20261117c6';
-import { Atmosphere } from './atmosphere.js?v=20261117c6';
+} from './models.js?v=20261117c7';
+import { getTextures } from './textures.js?v=20261117c7';
+import { Atmosphere } from './atmosphere.js?v=20261117c7';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1034,7 +1034,8 @@ export class World {
         r = 1.0 + rnd() * 2.8; hue = 0.09; sat = 0.05; lig = 0.16 + rnd() * 0.09;
       }
       // 회갈색 현무암 ~ 이끼 낀 암반 ~ 밝은 석회암 — 원색 없이 낮은 채도로
-      const geo = this._clonePainted(tpl, rockCol.setHSL(hue, sat, lig).getHex());
+      let geo = this._clonePainted(tpl, rockCol.setHSL(hue, sat, lig).getHex());
+      if (geo.index) geo = geo.toNonIndexed();   // 바닥 격자(비인덱스)와 섞어 병합하려면 통일
       const m = new THREE.Matrix4();
       m.makeRotationFromEuler(new THREE.Euler(
         (rnd() - 0.5) * 0.22, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.22
@@ -1056,7 +1057,8 @@ export class World {
         const sc = 0.35 + rnd() * 0.75;
         const light = gy < -60 ? 0.13 + rnd() * 0.07 : 0.18 + rnd() * 0.11;
         const hue2 = gy < -60 ? 0.58 : 0.09;
-        const geo = this._clonePainted(pebble, rockCol.setHSL(hue2, 0.07, light).getHex());
+        let geo = this._clonePainted(pebble, rockCol.setHSL(hue2, 0.07, light).getHex());
+        if (geo.index) geo = geo.toNonIndexed();
         const m = new THREE.Matrix4();
         m.makeRotationY(rnd() * Math.PI * 2);
         m.scale(new THREE.Vector3(sc, sc * (0.6 + rnd() * 0.5), sc));
@@ -1095,8 +1097,8 @@ export class World {
     }
 
     const terrainGeo = mergeGeometries(geos, false);
-    rec.terrain.geometry = terrainGeo;
-    terrainGeo.computeBoundingSphere();
+    rec.terrain.geometry = terrainGeo || flatFloor;
+    rec.terrain.geometry.computeBoundingSphere();
 
     /* --- 산호초 --- */
     if (detail) {
