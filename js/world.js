@@ -38,10 +38,10 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x1a86a8, density: 0.0064,
-    skyTop: 0xb4f6f2, skyMid: 0x2aa6dc, skyBottom: 0x1a86a8,
-    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 1.05,
-    ambient: 0xa8e4ff, ambientI: 0.5,
+    fog: 0x157a99, density: 0.0056,
+    skyTop: 0xb4f6f2, skyMid: 0x2aa6dc, skyBottom: 0x157a99,
+    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 0.82,
+    ambient: 0x9cdef6, ambientI: 0.38,
     sun: 0xfffdf2, sunI: 1.85, glow: 1.0,
     coral: [0xff5f8a, 0xff8a3c, 0xffc247, 0xe86ee0, 0xb07bff, 0x35e0c8, 0xff8fb8, 0xffe07a],
   },

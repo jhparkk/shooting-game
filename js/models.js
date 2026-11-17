@@ -566,7 +566,7 @@ export function makeSubmarine() {
   //  · 끝으로 갈수록 옅어지고, 물결 따라 미세하게 일렁인다
   const coneMat = new THREE.ShaderMaterial({
     uniforms: {
-      uI: { value: 0.06 },
+      uI: { value: 0.045 },
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(0.62, 0.93, 1.0) },
     },
@@ -596,7 +596,7 @@ export function makeSubmarine() {
         float ndv = abs(dot(normalize(vNrmV), normalize(vViewDir)));
         float core = smoothstep(0.0, 0.62, ndv);
         // 램프(원뿔 꼭대기)에서 멀어질수록 옅어진다
-        float axial = clamp((-vLocal.z - 0.4) / 20.0, 0.0, 1.0);
+        float axial = clamp((-vLocal.z - 0.4) / 22.0, 0.0, 1.0);
         float fade = pow(1.0 - axial, 1.35) * smoothstep(0.0, 0.10, axial);
         float ripple = 0.78 + 0.22 * sin(axial * 26.0 - uTime * 2.4 + vUv.x * 9.0);
         float a = core * fade * ripple * uI;
@@ -610,17 +610,17 @@ export function makeSubmarine() {
     side: THREE.DoubleSide,
     fog: false,
   });
-  const coneGeo = new THREE.ConeGeometry(1.9, 20, 20, 1, true);
+  const coneGeo = new THREE.ConeGeometry(2.5, 22, 24, 1, true);
   coneGeo.rotateX(Math.PI / 2);
-  coneGeo.translate(0, 0, -10.4);
+  coneGeo.translate(0, 0, -11.2);
   const beam = new THREE.Mesh(coneGeo, coneMat);
   beam.position.set(0, 0.18, -1.8);
   beam.frustumCulled = false;
   g.add(beam);
 
   // 전조등 렌즈의 빛무리
-  g.add(spriteGlow(0xd8f8ff, 0.9, 1.15).translateX(-0.46).translateY(0.22).translateZ(-1.85));
-  g.add(spriteGlow(0xd8f8ff, 0.9, 1.15).translateX(0.46).translateY(0.22).translateZ(-1.85));
+  g.add(spriteGlow(0xd8f8ff, 0.62, 0.62).translateX(-0.46).translateY(0.22).translateZ(-1.85));
+  g.add(spriteGlow(0xd8f8ff, 0.62, 0.62).translateX(0.46).translateY(0.22).translateZ(-1.85));
 
   // 안테나
   const ant = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 5), MET.metalDark, 0, 0.85, -0.1);

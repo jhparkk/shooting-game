@@ -69,6 +69,8 @@ export class RenderPipeline {
       uWobble: { value: 1.0 },
       uCA: { value: 1.0 },
       uTopGlow: { value: 0.0 },
+      uUpUV: { value: new THREE.Vector2(0.5, 1.6) },
+      uUpI: { value: 0.0 },
       uSurfaceTint: { value: new THREE.Color(0.45, 0.95, 1.0) },
       uShadowTint: { value: new THREE.Color(0.86, 0.97, 1.12) },
       uHighTint: { value: new THREE.Color(1.04, 1.0, 0.95) },
@@ -217,7 +219,8 @@ export class RenderPipeline {
         uniform sampler2D tRays;
         uniform vec2 uResolution;
         uniform float uTime, uExposure, uBloom, uRayI, uSat, uVig, uGrain;
-        uniform float uWobble, uCA, uTopGlow, uDepth;
+        uniform float uWobble, uCA, uTopGlow, uDepth, uUpI;
+        uniform vec2 uUpUV;
         uniform vec2 uSunUV;
         uniform vec3 uBloomTint, uSurfaceTint, uShadowTint, uHighTint;
         varying vec2 vUv;
@@ -260,9 +263,12 @@ export class RenderPipeline {
             col += rays * vec3(0.62, 0.93, 1.0) * uRayI * (0.35 + 0.65 * near);
           }
 
-          /* 위에서 내려오는 밝은 물빛 — 아래로 갈수록 어두워진다 */
+          /* 위에서 내려오는 밝은 물빛 — 화면 어디를 보든 '위쪽'이 환하다 */
           float topK = pow(clamp(1.0 - uv.y, 0.0, 1.0), 2.3);
           col += uSurfaceTint * topK * uTopGlow;
+          float dUp = distance(uv, uUpUV);
+          float dome = pow(clamp(1.0 - dUp * 0.78, 0.0, 1.0), 2.6);
+          col += uSurfaceTint * dome * uUpI;
 
           /* HDR → ACES 톤매핑 */
           vec3 mapped = abyssAces(col * uExposure);
@@ -271,6 +277,8 @@ export class RenderPipeline {
           float lum = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
           mapped *= mix(uShadowTint, uHighTint, smoothstep(0.1, 0.72, lum));
           mapped = mix(vec3(lum), mapped, uSat);
+          /* 살짝 눌러주는 S자 — 물속의 또렷한 명암 */
+          mapped = mix(mapped, mapped * mapped * (3.0 - 2.0 * mapped), 0.22);
           /* 부드러운 S 커브 — 물속 특유의 또렷한 대비 */
           mapped = clamp(mapped, 0.0, 1.0);
           mapped = mapped * mapped * (3.0 - 2.0 * mapped) * 0.34 + mapped * 0.66;

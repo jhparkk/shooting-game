@@ -1458,7 +1458,7 @@ function updateHeadlight(dt, instant) {
   const beam = player.beam;
   if (beam && beam.material.uniforms) {
     const u = beam.material.uniforms;
-    u.uI.value += ((0.05 + deep * 0.38) - u.uI.value) * k;
+    u.uI.value += ((0.035 + deep * 0.24) - u.uI.value) * k;
     u.uTime.value += dt;
     const widen = 1 + deep * 0.55;
     const stretch = 1 + deep * 1.2;
@@ -2204,6 +2204,7 @@ function autoTune(fps) {
 /* ---------------- 프레임 렌더 ---------------- */
 const _sunDir = new THREE.Vector3(-0.31, 0.93, 0.23).normalize();
 const _sunWorld = new THREE.Vector3();
+const _upWorld = new THREE.Vector3();
 const _camDirV = new THREE.Vector3();
 
 function renderFrame(dt) {
@@ -2214,7 +2215,15 @@ function renderFrame(dt) {
       u.uDepth.value = Math.min(1, depth / 900);
       /* 표층에서만 위에서 내려오는 밝은 물빛
    — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
-      u.uTopGlow.value = 0.055 * Math.max(0, 1 - depth / 620);
+      u.uTopGlow.value = 0.05 * Math.max(0, 1 - depth / 620);
+      /* 하늘(위쪽) 방향을 화면 좌표로 — 물빛 돔의 중심 */
+      _upWorld.copy(camera.position).addScaledVector(UP, 80).project(camera);
+      if (_upWorld.z < 1) {
+        u.uUpUV.value.set(_upWorld.x * 0.5 + 0.5, _upWorld.y * 0.5 + 0.5);
+        u.uUpI.value = 0.11 * Math.max(0.18, 1 - depth / 1400);
+      } else {
+        u.uUpI.value = 0.02;
+      }
       u.uSat.value = 1.13 + 0.1 * Math.min(1, depth / 1200);
       /* 태양 빛줄기는 바라보는 방향과 수심에 따라 세기가 달라진다 */
       _sunWorld.copy(camera.position).addScaledVector(_sunDir, 420);

@@ -54,16 +54,25 @@ const SURFACE_FRAG = /* glsl */ `
 
     vec3 col = mix(uDeepColor, uSurfaceColor, win);
 
-    /* 물결 마루의 반짝임 — 하늘빛이 잔물결에 부서진 하이라이트 */
-    float s1 = sin(p.x * 1.55 + t * 0.9) * sin(p.y * 1.75 - t * 0.8);
-    float s2 = sin(p.x * 3.4 - p.y * 2.9 + t * 1.7) * sin(p.y * 3.1 + p.x * 2.2 - t * 1.4);
-    float sparkle = pow(max(s1, 0.0), 6.0) * 1.5 + pow(max(s2, 0.0), 8.0) * 1.1;
-    col += uSurfaceColor * sparkle * (0.55 + win * 0.9);
+    /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
+    float c1 = sin(p.x * 1.13 + t * 0.72 + n.x * 2.1) * sin(p.y * 1.05 - t * 0.61 + n.y * 2.3);
+    float c2 = sin((p.x + p.y) * 1.71 - t * 1.05) * sin((p.x - p.y) * 1.37 + t * 0.87);
+    float c3 = sin(p.x * 3.3 - p.y * 2.8 + t * 1.9) * sin(p.y * 3.0 + p.x * 2.4 - t * 1.5);
+    float sparkle = pow(max(c1 * 0.55 + c2 * 0.45, 0.0), 6.5) * 1.9
+                  + pow(max(c3, 0.0), 9.0) * 0.9;
+    /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
+    sparkle *= 0.45 + 0.55 * (sin(p.x * 0.11 + t * 0.05) * sin(p.y * 0.13 - t * 0.04) * 0.5 + 0.5);
+    col += uSurfaceColor * sparkle * (0.38 + win * 0.75);
 
-    /* 태양이 비치는 곳 — 아주 밝은 원반 */
+    /* 태양 반사 — 잔물결 노멀이 태양 쪽을 향할 때만 강하게 */
+    vec3 nrm = normalize(vec3(n.x * 0.55, 1.0, n.y * 0.55));
+    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 26.0);
+    col += uSunColor * sunSpec * 1.5 * (1.0 - uDeep * 0.8);
+
+    /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
-    col += uSunColor * pow(sd, 140.0) * 2.6 * (1.0 - uDeep * 0.85);
-    col += uSunColor * pow(sd, 9.0) * 0.22 * (1.0 - uDeep * 0.7);
+    col += uSunColor * pow(sd, 160.0) * 2.2 * (1.0 - uDeep * 0.85);
+    col += uSunColor * pow(sd, 8.0) * 0.16 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 수면도 물빛에 잠긴다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
@@ -222,8 +231,8 @@ export class Atmosphere {
     this.surfaceUni = {
       uTime: { value: 0 },
       uCamPos: { value: new THREE.Vector3() },
-      uSurfaceColor: { value: new THREE.Color(0.62, 0.98, 1.0) },
-      uDeepColor: { value: new THREE.Color(0.02, 0.16, 0.30) },
+      uSurfaceColor: { value: new THREE.Color(0.72, 1.05, 1.12) },
+      uDeepColor: { value: new THREE.Color(0.055, 0.30, 0.42) },
       uFogColor: { value: new THREE.Color(0x1f9fdc) },
       uSunDir: { value: new THREE.Vector3(-0.31, 0.93, 0.23).normalize() },
       uSunColor: { value: new THREE.Color(1.0, 0.98, 0.88) },
