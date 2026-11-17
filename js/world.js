@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117q';
-import { getTextures } from './textures.js?v=20261117q';
-import { Atmosphere } from './atmosphere.js?v=20261117q';
+} from './models.js?v=20261117r';
+import { getTextures } from './textures.js?v=20261117r';
+import { Atmosphere } from './atmosphere.js?v=20261117r';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -585,13 +585,13 @@ export class World {
           float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
           vec2 cuv = vWPosV.xz * 0.038;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.019, uTime * 0.013 ) ).r;
-          float cb = texture2D( uCaustics, cuv * 1.71 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
+          float cb = texture2D( uCaustics, cuv * 1.33 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
           // 얇은 셀 선이 아니라, 넓게 번지는 부드러운 빛 덩어리
           float cshape = smoothstep( 0.18, 0.95, ca * 0.55 + cb * 0.65 );
           cshape = cshape * cshape;
           float cpatch = smoothstep( 0.30, 0.82, abyssFbm( vWPosV.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * upK * upK * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.17;
+          detail *= 1.0 + caustic * 0.10;
           diffuseColor.rgb *= detail;
           `
         ).replace(
