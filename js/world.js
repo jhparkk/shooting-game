@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a7';
-import { getTextures } from './textures.js?v=20261117a7';
-import { Atmosphere } from './atmosphere.js?v=20261117a7';
+} from './models.js?v=20261117a8';
+import { getTextures } from './textures.js?v=20261117a8';
+import { Atmosphere } from './atmosphere.js?v=20261117a8';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -603,9 +603,17 @@ export class World {
           vec2 ruvB = vec2( wp.x * 0.115, wp.y * 0.15 ) + warp * 0.6;
           vec4 rA = texture2D( uRock, ruvA );
           vec4 rB = texture2D( uRock, ruvB );
-          float wzm = abs( nw.z ) / max( 1e-3, abs( nw.x ) + abs( nw.z ) );
-          vec3 rockyC = mix( rB.rgb, rA.rgb, wzm );
-          float rockH = mix( rB.g, rA.g, wzm );
+          /* 두 수직 투영을 노멀에 맞게 섞는다.
+             rA=(z,y) 는 X 를 향한 면에, rB=(x,y) 는 Z 를 향한 면에 맞는다.
+             (예전엔 가중치가 뒤집혀 있어 늘어난 축의 투영이 쓰였다 —
+              벽과 경사면에 빗질한 듯한 긴 줄무늬가 생긴 원인) */
+          float wax = abs( nw.x );
+          float waz = abs( nw.z );
+          float wrsum = max( 1e-3, wax + waz );
+          float wA = wax / wrsum;
+          float wB = waz / wrsum;
+          vec3 rockyC = rA.rgb * wA + rB.rgb * wB;
+          float rockH = rA.g * wA + rB.g * wB;
           // 암반 위 이끼·해조류 — 큰 패치에만 옅게
           vec3 algaeC = texture2D( uAlgae, ruvA * 0.62 + 7.0 ).rgb;
           float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
