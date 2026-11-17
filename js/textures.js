@@ -318,14 +318,16 @@ function bakeCaustics(size) {
       // 셀 경계를 휘게 만들어 곧은 선 대신 물결 모양으로
       const wu = u + (fbm(u, v, 3, 2, 7) - 0.5) * 0.26;
       const wv = v + (fbm(u, v, 3, 2, 23) - 0.5) * 0.26;
-      const a = worley(wu, wv, 5, 91);
-      const b = worley(wu + 0.31, wv + 0.17, 8, 457);
-      const ea = 1 - smooth(0.0, 0.058, a.f2 - a.f1);
-      const eb = 1 - smooth(0.0, 0.044, b.f2 - b.f1);
-      let c = Math.pow(ea * 0.82 + eb * 0.58, 1.35) * 1.3;
+      /* 세포 '경계선'이 아니라 세포 '안쪽'이 밝은 부드러운 빛 덩어리.
+         실제 수면 렌즈가 모래에 맺히는 무늬는 얇은 선이 아니라 넓은 빛무리다. */
+      const a = worley(wu, wv, 4, 91);
+      const b = worley(wu + 0.37, wv + 0.21, 7, 457);
+      const ca = Math.pow(1 - smooth(0.0, 0.85, a.f1), 2.1);
+      const cb = Math.pow(1 - smooth(0.0, 0.62, b.f1), 2.6);
+      let c = ca * 0.85 + cb * 0.5;
       // 큰 덩어리로 나타났다 사라지는 패치 (진짜 수중 빛무늬처럼)
       const patch = fbm(u, v, 3, 3, 1301);
-      c *= 0.30 + 0.95 * smooth(0.25, 0.75, patch);
+      c *= 0.22 + 1.05 * smooth(0.22, 0.78, patch);
       c = clamp01(c);
       const i = (y * size + x) * 4;
       D[i] = (c * 255) | 0;
