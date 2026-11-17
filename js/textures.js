@@ -492,9 +492,9 @@ export function getTextures() {
     macro: toTexture(macroCv, { aniso: 4 }),
     /* 노멀맵 — 높이맵에서 한 번만 굽는다 (프래그먼트 미분 범프는
        원거리에서 빗질한 줄무늬를 만들어 실사감을 망쳤다) */
-    sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 2.2), { aniso: 8 }),
-    rockNormal: toTexture(heightToNormal(bakeScaled(rockH, 128), 2.6), { aniso: 8 }),
-    basaltNormal: toTexture(heightToNormal(bakeScaled(basH, 128), 2.2), { aniso: 8 }),
+    sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 1.4), { aniso: 8 }),
+    rockNormal: toTexture(heightToNormal(bakeScaled(rockH, 128), 1.1), { aniso: 8 }),
+    basaltNormal: toTexture(heightToNormal(bakeScaled(basH, 128), 0.9), { aniso: 8 }),
     /* 산호 · 암초 */
     coral: toTexture(coralCv, { srgb: true }),
     coralBump: toTexture(bakeScaled(coralH, 128)),

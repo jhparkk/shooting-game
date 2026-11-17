@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b7';
-import { getTextures } from './textures.js?v=20261117b7';
-import { Atmosphere } from './atmosphere.js?v=20261117b7';
+} from './models.js?v=20261117b8';
+import { getTextures } from './textures.js?v=20261117b8';
+import { Atmosphere } from './atmosphere.js?v=20261117b8';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -547,7 +547,7 @@ export class World {
       uTime: { value: 0 },
       uCausticI: { value: 1 },
       uDetail: { value: 1 },
-      uBump: { value: 0.05 },
+      uBump: { value: 0.034 },
     };
     this.terrainUniforms = uni;
     mat.onBeforeCompile = (shader) => {
