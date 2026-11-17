@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117d7';
+import { getTextures } from './textures.js?v=20261117d8';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -354,7 +354,8 @@ export function setSwimRate(kind, factor) {
 /** 유영 셰이더 재질 — 몸통이 좌우로 S 자로 흔들린다 */
 function swimMaterial(params, bend, kind) {
   const mat = new THREE.MeshPhongMaterial(params);
-  if (params && params.vertexColors) addSkin(mat, 0.45);
+  // 물고기 떼는 피부 텍스처의 세포 무늬가 '점박이'처럼 보여서 쓰지 않는다
+  if (params && params.vertexColors && params.noSkin !== true) addSkin(mat, 0.45);
   const rate = bend.rateU || (bend.rateU = { value: bend.speed });
   if (kind) SWIM_RATE[kind] = { u: rate, base: bend.speed };
   mat.onBeforeCompile = (shader) => {
@@ -2677,7 +2678,7 @@ const _schoolMat = Object.create(null);
    파랑·노랑·코랄·줄무늬 어종을 더한다. */
 export const FISH_KINDS = {
   silver: {
-    back: 0xd6e0e2, belly: 0xfcfdff, blend: [-0.42, 0.16],
+    back: 0xa9bcc6, belly: 0xffffff, blend: [-0.40, 0.10],
     fin: 0xff8f3a, tail: 0xff7d2a, dorsal: 0xffa650,
     emissive: 0x1f2628,
   },
@@ -2763,8 +2764,9 @@ export function makeFishSchool(count, variant) {
   const geo = makeFishGeometry(key);
   if (!_schoolMat[key]) {
     _schoolMat[key] = swimMaterial({
-      vertexColors: true, shininess: 46, specular: 0x7f8f96,
+      vertexColors: true, shininess: 52, specular: 0x93a2aa,
       emissive: v.emissive,   // 물속 산란광 — 원거리에서 검은 점으로 죽지 않게
+      noSkin: true,
     }, SCHOOL_BEND, 'school');
   }
   const inst = new THREE.InstancedMesh(geo, _schoolMat[key], count);
