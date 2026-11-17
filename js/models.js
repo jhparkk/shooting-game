@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261118a6';
+import { getTextures } from './textures.js?v=20261118a7';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -3169,10 +3169,15 @@ export function rockCaveGeometry(seed, opts) {
   const col = new THREE.Color();
   const hue = o.hue === undefined ? 0.098 : o.hue;
   for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
     const y = p.getY(i);
     const upk = clamp01(nrm.getY(i) * 0.5 + 0.5);
-    const lig = 0.235 + 0.145 * upk + 0.03 * Math.sin(y * 0.7 + s1);
-    col.setHSL(hue, 0.055, clamp01(lig));
+    // 통로 안쪽 면은 빛이 덜 들어 어둡다 (법선이 축을 향한다)
+    const inner = nrm.getX(i) * x + nrm.getY(i) * y < 0 ? 1 : 0;
+    let lig = 0.235 + 0.145 * upk + 0.035 * Math.sin(y * 0.7 + s1)
+      + 0.022 * Math.sin(x * 0.9 + s4) + 0.018 * Math.sin((x + y) * 1.7 + s5);
+    lig *= 1 - 0.30 * inner;
+    col.setHSL(hue, 0.055 + 0.02 * inner, clamp01(lig));
     colors[i * 3] = col.r;
     colors[i * 3 + 1] = col.g;
     colors[i * 3 + 2] = col.b;
