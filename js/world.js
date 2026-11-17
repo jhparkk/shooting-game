@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117cb';
-import { getTextures } from './textures.js?v=20261117cb';
-import { Atmosphere } from './atmosphere.js?v=20261117cb';
+} from './models.js?v=20261117cc';
+import { getTextures } from './textures.js?v=20261117cc';
+import { Atmosphere } from './atmosphere.js?v=20261117cc';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -42,9 +42,9 @@ export const ZONES = [
     name: '표층 산호대',
     fog: 0x16737f, density: 0.0050,
     skyTop: 0x9ee0dc, skyMid: 0x389cab, skyBottom: 0x16737f,
-    hemiSky: 0xd0f0ef, hemiGround: 0x2b6f6a, hemi: 0.58,
-    ambient: 0x9edcde, ambientI: 0.30,
-    sun: 0xfffdf0, sunI: 1.28, glow: 1.0,
+    hemiSky: 0xdcefee, hemiGround: 0x3a5a55, hemi: 0.55,
+    ambient: 0xc2dcdb, ambientI: 0.30,
+    sun: 0xfff6e0, sunI: 1.45, glow: 1.0,
     // 밝은 산호초 팔레트 — 자연스러운 코랄 핑크·오렌지·연보라·에메랄드·황금빛.
     // 형광 원색이 아니라 햇빛 아래 실제 산호가 띠는 색으로, 개체마다 조금씩 다르다.
     coral: [
@@ -611,7 +611,7 @@ export class World {
           float pLime = mc.b;     // 석회암 선반
 
           /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
-          vec2 suv = wp.xz * 0.22 / clamp( up, 0.62, 1.0 ) + warp;
+          vec2 suv = wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + warp;
           // 백사장 — 햇빛을 받아 밝다
           vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.82 + 0.30 * mc.g );
           sandyC = mix( sandyC, sandyC * vec3( 0.92, 0.90, 0.86 ), smoothstep( 0.52, 0.88, m3 ) );
@@ -1103,7 +1103,8 @@ export class World {
       const coralPick = () => {
         const base = zone.coral[Math.floor(rnd() * zone.coral.length)];
         tmpCol.set(base).lerp(rockTone, 0.01 + rnd() * 0.04);
-        tmpCol.offsetHSL((rnd() - 0.5) * 0.035, (rnd() - 0.5) * 0.10, (rnd() - 0.5) * 0.06);
+        tmpCol.offsetHSL((rnd() - 0.5) * 0.035, (rnd() - 0.5) * 0.08, (rnd() - 0.5) * 0.05);
+        tmpCol.multiplyScalar(0.90);
         return tmpCol.getHex();
       };
       // 가지 끝·군체 위쪽은 햇빛을 받아 밝다 — 위로 갈수록 옅어지는 그라데이션

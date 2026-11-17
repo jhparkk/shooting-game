@@ -171,22 +171,32 @@ function bakeSand(size) {
        모아레로 '직조 무늬'가 생긴다(예전 8px 셀 × 2px 노이즈). */
     const blotch = fbm(u, v, 2, 4, 131);          // 큰 젖은/마른 패치
     const patch = fbm(u, v, 6, 3, 733);           // 중간 얼룩
+    const warp = fbm(u, v, 3, 2, 127);            // 잔물결을 휘게 하는 노이즈
     const fine = noise2(u * 110, v * 110, 110, 3);// 모래알
+    const grain = noise2(u * 240, v * 240, 240, 9);
     const pebble = worley(u, v, 11, 971);         // 자갈
     const bit = 1 - smooth(0.0, 0.18, pebble.f1);
     const shell = worley(u, v, 4, 313);           // 큰 조개 부스러기
     const shellBit = 1 - smooth(0.0, 0.045, shell.f1);
+    /* 잔물결 — 실제 모래바닥의 물결 무늬. 서로 다른 방향의 두 파를 겹쳐
+       한 방향으로 '빗질한' 줄무늬가 생기지 않게 한다. */
+    const ripA = Math.sin((v * 21 + u * 2.6 + warp * 3.2) * TAU);
+    const ripB = Math.sin((u * 27 - v * 3.4 + warp * 2.7) * TAU);
 
-    let shade = 0.80
-      + (blotch - 0.5) * 0.12
-      + (patch - 0.5) * 0.09
-      + (fine - 0.5) * 0.11;
-    shade *= 1 - bit * 0.12 - shellBit * 0.09;
+    let shade = 0.84
+      + (blotch - 0.5) * 0.14
+      + (patch - 0.5) * 0.10
+      + (fine - 0.5) * 0.13
+      + (grain - 0.5) * 0.08
+      + ripA * 0.032 + ripB * 0.02;
+    shade *= 1 - bit * 0.14 - shellBit * 0.10;
 
     o[0] = clamp01(shade * 1.0) * 255;
     o[1] = clamp01(shade * 0.965) * 255;
     o[2] = clamp01(shade * 0.905) * 255;
-    o[3] = clamp01(0.52 + (blotch - 0.5) * 0.14 + (patch - 0.5) * 0.12 + (fine - 0.5) * 0.30 - bit * 0.22 - shellBit * 0.2) * 255;
+    o[3] = clamp01(0.5 + (blotch - 0.5) * 0.16 + (patch - 0.5) * 0.14
+      + (fine - 0.5) * 0.34 + ripA * 0.20 + ripB * 0.12
+      - bit * 0.24 - shellBit * 0.22) * 255;
   });
 }
 
