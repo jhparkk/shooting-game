@@ -201,12 +201,14 @@ function bakeRock(size) {
     const strata = fbm(u * 0.6, v * 7.5, 6, 4, 21);
     const lump = fbm(u, v, 4, 4, 89);
     const fine = noise2(u * 200, v * 200, 200, 5);
-    // 능선 패턴으로 균열선
+    // 능선 패턴으로 균열선 — 다만 암벽 전체에 그물처럼 깔리지 않도록
+    // 큰 패치 안에서만 드문드문 나타나게 한다 (모래밭 위 '마른 진흙' 느낌 방지)
     const ridge = 1 - Math.abs(fbm(u * 1.4, v * 1.4, 5, 3, 133) * 2 - 1);
-    const crack = smooth(0.93, 0.998, ridge + fine * 0.03);
+    const crackMask = smooth(0.52, 0.92, fbm(u, v, 2, 2, 777));
+    const crack = smooth(0.95, 1.0, ridge + fine * 0.02) * crackMask;
 
     let shade = 0.46 + (strata - 0.5) * 0.34 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.10;
-    shade *= 1 - crack * 0.2;
+    shade *= 1 - crack * 0.14;
     // 이끼·규조가 붙은 듯한 녹회색
     const moss = smooth(0.55, 0.9, fbm(u, v, 5, 3, 201)) * 0.28;
     o[0] = clamp01(shade * 0.94 - moss * 0.14) * 255;

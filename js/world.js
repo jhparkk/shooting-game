@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117i';
-import { getTextures } from './textures.js?v=20261117i';
-import { Atmosphere } from './atmosphere.js?v=20261117i';
+} from './models.js?v=20261117j';
+import { getTextures } from './textures.js?v=20261117j';
+import { Atmosphere } from './atmosphere.js?v=20261117j';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -507,7 +507,7 @@ export class World {
       vertexColors: true,
       map: t.sand,              // USE_MAP 활성화 (vMapUv 사용) — 셰이더에서 직접 블렌딩
       bumpMap: t.sandBump,
-      bumpScale: 0.32,
+      bumpScale: 0.2,
       specular: 0x2c4145,
       shininess: 7,
     });
