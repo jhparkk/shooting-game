@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d1';
-import { getTextures } from './textures.js?v=20261117d1';
-import { Atmosphere } from './atmosphere.js?v=20261117d1';
+} from './models.js?v=20261117d2';
+import { getTextures } from './textures.js?v=20261117d2';
+import { Atmosphere } from './atmosphere.js?v=20261117d2';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -640,7 +640,7 @@ export class World {
           if ( nearK > 0.01 && flatK > 0.02 ) {
             float g1 = abyssNoise( wp.xz * 5.5 );                 // 모래알
             float g2 = abyssNoise( wp.xz * 1.9 + 17.0 );          // 잔자갈 결
-            float rp = sin( dot( wp.xz, vec2( 5.4, 3.7 ) ) + m2 * 4.0 ) * 0.5 + 0.5;
+            float rp = abyssNoise( wp.xz * 3.1 + 2.0 );
             float kk = flatK * nearK;
             flatC *= 1.0 + ( ( g1 - 0.5 ) * 0.26 + ( g2 - 0.5 ) * 0.16 + ( rp - 0.5 ) * 0.10 ) * kk;
           }
@@ -648,11 +648,12 @@ export class World {
           /* ---- 큰 모래 물결 — 월드 좌표 사인파로 만드는 잔물결과 모래 언덕 ----
              텍스처는 가까이서만 보이므로, 먼 거리에서도 바닥이 '모래'로 읽히게
              저주파 요철을 알베도에 직접 섞는다. */
-          vec2 rd = vec2( 2.35, 1.65 );
-          float ripA2 = sin( dot( wp.xz, rd ) + m2 * 6.0 ) * 0.5 + 0.5;
-          float ripB2 = sin( dot( wp.xz, vec2( -3.7, 4.9 ) ) + m3 * 5.0 ) * 0.5 + 0.5;
+          /* 방향성 사인파는 비스듬히 내려다볼 때 '빗질한 줄무늬'로 보였다.
+             등방성 노이즈 두 겹으로 바꿔 모래 언덕의 옅은 기복만 남긴다. */
           float ripK = flatK * smoothstep( -90.0, -10.0, wp.y );
-          flatC *= 1.0 + ( ripA2 * ripA2 * 0.09 + ripB2 * 0.035 - 0.06 ) * ripK;
+          float mot1 = abyssNoise( wp.xz * 0.55 );
+          float mot2 = abyssNoise( wp.xz * 1.35 + 5.0 );
+          flatC *= 1.0 + ( ( mot1 - 0.5 ) * 0.10 + ( mot2 - 0.5 ) * 0.06 ) * ripK;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
           /* 벽면 투영 — 노멀에 수직인 '수평 방향'을 축으로 삼는다.
