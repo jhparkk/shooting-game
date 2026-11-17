@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117cf';
-import { getTextures } from './textures.js?v=20261117cf';
-import { Atmosphere } from './atmosphere.js?v=20261117cf';
+} from './models.js?v=20261117d0';
+import { getTextures } from './textures.js?v=20261117d0';
+import { Atmosphere } from './atmosphere.js?v=20261117d0';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -611,24 +611,24 @@ export class World {
           float pLime = mc.b;     // 석회암 선반
 
           /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
-          vec2 suv = wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + warp;
+          vec2 suv = wp.xz * 0.72 / clamp( up, 0.62, 1.0 ) + warp;
           // 백사장 — 햇빛을 받아 밝다
           vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.82 + 0.30 * mc.g );
           sandyC = mix( sandyC, sandyC * vec3( 0.92, 0.90, 0.86 ), smoothstep( 0.52, 0.88, m3 ) );
           sandyC *= mix( vec3( 0.96, 0.97, 1.0 ), vec3( 1.06, 1.0, 0.90 ), mc.b );
           // 옅은 분홍빛 산호 모래 — 산호 부스러기가 섞인 밝은 패치
-          vec3 coralSandC = texture2D( uCoralSand, suv * 0.86 + 3.4 ).rgb * ( 1.00 + 0.24 * mc.b );
+          vec3 coralSandC = texture2D( uCoralSand, suv * 0.7 + 3.4 ).rgb * ( 1.00 + 0.24 * mc.b );
           float coralK = smoothstep( 0.46, 0.72, pCoral + ( m2 - 0.5 ) * 0.28 ) * 0.92;
           vec3 flatC = mix( sandyC, coralSandC, coralK );
           flatC *= 0.90 + 0.20 * m2;
 
           /* ---- 자갈 · 조약돌 지대 — 굵은 자갈이 드러난 바닥 ---- */
-          vec3 pebC = texture2D( uPebble, wp.xz * 0.075 / clamp( up, 0.62, 1.0 ) + 8.1 ).rgb * ( 0.84 + 0.26 * mc.r );
+          vec3 pebC = texture2D( uPebble, wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + 8.1 ).rgb * ( 0.84 + 0.26 * mc.r );
           float pebK = smoothstep( 0.44, 0.68, pPebble + ( m2 - 0.5 ) * 0.2 ) * ( 0.55 + 0.45 * m3 );
           flatC = mix( flatC, pebC, pebK * 0.94 );
 
           /* ---- 밝은 석회암 바닥 — 마모된 판이 넓게 깔린 곳 ---- */
-          vec3 limeC = texture2D( uLimestone, wp.xz * 0.042 / clamp( up, 0.62, 1.0 ) + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
+          vec3 limeC = texture2D( uLimestone, wp.xz * 0.20 / clamp( up, 0.62, 1.0 ) + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
           float limeK = smoothstep( 0.52, 0.78, pLime + ( m1 - 0.5 ) * 0.2 );
           flatC = mix( flatC, limeC, limeK * 0.88 );
 
@@ -642,7 +642,7 @@ export class World {
             float g2 = abyssNoise( wp.xz * 1.9 + 17.0 );          // 잔자갈 결
             float rp = sin( dot( wp.xz, vec2( 5.4, 3.7 ) ) + m2 * 4.0 ) * 0.5 + 0.5;
             float kk = flatK * nearK;
-            flatC *= 1.0 + ( ( g1 - 0.5 ) * 0.20 + ( g2 - 0.5 ) * 0.12 + ( rp - 0.5 ) * 0.09 ) * kk;
+            flatC *= 1.0 + ( ( g1 - 0.5 ) * 0.26 + ( g2 - 0.5 ) * 0.16 + ( rp - 0.5 ) * 0.10 ) * kk;
           }
 
           /* ---- 큰 모래 물결 — 월드 좌표 사인파로 만드는 잔물결과 모래 언덕 ----
@@ -705,7 +705,7 @@ export class World {
 
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
-          vec3 nPB = texture2D( uPebbleN, wp.xz * 0.075 / clamp( up, 0.62, 1.0 ) + 8.1 ).xyz * 2.0 - 1.0;
+          vec3 nPB = texture2D( uPebbleN, wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + 8.1 ).xyz * 2.0 - 1.0;
           vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
           vec3 nB = texture2D( uBasaltN, buv ).xyz * 2.0 - 1.0;
           // 평평한 바닥의 요철은 '그 바닥이 실제로 무엇인지'를 따라간다
@@ -917,7 +917,7 @@ export class World {
         const avgN = (hL + hR + hD + hU) * 0.25;
         const bowl = clamp01((avgN - y) / (d * 0.75));
         const ridge = clamp01((y - avgN) / (d * 0.75));
-        const ao = clamp01(1.0 - bowl * 0.62 + ridge * 0.08);
+        const ao = clamp01(1.0 - bowl * 0.42 + ridge * 0.06);
         // 알베도 배율 — 밝은 모래밭이 회색으로 죽지 않도록 바닥을 밝게 두고,
         // 깊어질수록·그늘질수록 조금씩 낮춘다
         const lit = (0.88 - dk * 0.13) * (0.94 + flatness * 0.06) * ao;
