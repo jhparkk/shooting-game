@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117u';
-import { getTextures } from './textures.js?v=20261117u';
-import { Atmosphere } from './atmosphere.js?v=20261117u';
+} from './models.js?v=20261117x';
+import { getTextures } from './textures.js?v=20261117x';
+import { Atmosphere } from './atmosphere.js?v=20261117x';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -58,8 +58,8 @@ export const ZONES = [
     name: '심해 해구',
     fog: 0x062a55, density: 0.0135,
     skyTop: 0x164a8e, skyMid: 0x061c40, skyBottom: 0x01060f,
-    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.44,
-    ambient: 0x30508f, ambientI: 0.3,
+    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.26,
+    ambient: 0x30508f, ambientI: 0.2,
     sun: 0xc8d8ff, sunI: 0.34, glow: 0.3,
     coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
   },
