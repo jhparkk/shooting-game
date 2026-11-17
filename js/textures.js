@@ -167,28 +167,26 @@ function normalize(img, data, target, maxK) {
    ========================================================= */
 function bakeSand(size) {
   return bakePair(size, (u, v, o) => {
-    /* 실제 모래는 방향성 '줄'이 아니라 등방성 입자 + 자갈·조개 부스러기다.
-       (줄무늬를 넣으면 원경에서 빗질한 듯한 자국으로 보인다) */
-    const patch = fbm(u, v, 3, 4, 131);
-    const patch2 = fbm(u, v, 7, 3, 733);
-    const grain = noise2(u * 240, v * 240, 240, 3);
-    const grain2 = noise2(u * 70, v * 70, 70, 91);
-    const pebble = worley(u, v, 30, 971);
-    const bit = 1 - smooth(0.0, 0.13, pebble.f1);
-    const shell = worley(u, v, 9, 313);
-    const shellBit = 1 - smooth(0.0, 0.06, shell.f1);
+    /* 스케일 간격을 넓게 벌린다 — 셀 크기가 텍셀 크기에 가까우면
+       모아레로 '직조 무늬'가 생긴다(예전 8px 셀 × 2px 노이즈). */
+    const blotch = fbm(u, v, 2, 4, 131);          // 큰 젖은/마른 패치
+    const patch = fbm(u, v, 6, 3, 733);           // 중간 얼룩
+    const fine = noise2(u * 110, v * 110, 110, 3);// 모래알
+    const pebble = worley(u, v, 11, 971);         // 자갈
+    const bit = 1 - smooth(0.0, 0.18, pebble.f1);
+    const shell = worley(u, v, 4, 313);           // 큰 조개 부스러기
+    const shellBit = 1 - smooth(0.0, 0.045, shell.f1);
 
     let shade = 0.80
-      + (patch - 0.5) * 0.13
-      + (patch2 - 0.5) * 0.07
-      + (grain - 0.5) * 0.16
-      + (grain2 - 0.5) * 0.12;
-    shade *= 1 - bit * 0.13 - shellBit * 0.10;
+      + (blotch - 0.5) * 0.12
+      + (patch - 0.5) * 0.09
+      + (fine - 0.5) * 0.11;
+    shade *= 1 - bit * 0.12 - shellBit * 0.09;
 
     o[0] = clamp01(shade * 1.0) * 255;
     o[1] = clamp01(shade * 0.965) * 255;
     o[2] = clamp01(shade * 0.905) * 255;
-    o[3] = clamp01(0.52 + (patch - 0.5) * 0.16 + (grain - 0.5) * 0.34 + (grain2 - 0.5) * 0.22 - bit * 0.24 - shellBit * 0.18) * 255;
+    o[3] = clamp01(0.52 + (blotch - 0.5) * 0.14 + (patch - 0.5) * 0.12 + (fine - 0.5) * 0.30 - bit * 0.22 - shellBit * 0.2) * 255;
   });
 }
 
@@ -201,8 +199,8 @@ function bakeRock(size) {
        예전엔 균열 '그물'이 바닥까지 덮여 만화처럼 보였다. */
     const strata = fbm(u * 0.6, v * 6.0, 6, 4, 21);
     const lump = fbm(u, v, 3, 4, 89);
-    const fine = noise2(u * 190, v * 190, 190, 5);
-    const grain = noise2(u * 40, v * 40, 40, 313);
+    const fine = noise2(u * 110, v * 110, 110, 5);
+    const grain = noise2(u * 22, v * 22, 22, 313);
     const ridge = 1 - Math.abs(fbm(u * 1.1, v * 1.1, 4, 3, 133) * 2 - 1);
     const crackMask = smooth(0.86, 1.0, fbm(u, v, 2, 2, 777));
     const crack = smooth(0.97, 1.0, ridge) * crackMask;
@@ -300,8 +298,8 @@ function bakeBasalt(size) {
     const w = worley(u, v, 5, 313);
     const edge = smooth(0.0, 0.42, w.f2 - w.f1);
     const lump = fbm(u, v, 7, 3, 401);
-    const fine = noise2(u * 200, v * 200, 200, 7);
-    const grain = noise2(u * 46, v * 46, 46, 719);
+    const fine = noise2(u * 110, v * 110, 110, 7);
+    const grain = noise2(u * 24, v * 24, 24, 719);
     let shade = 0.30 + (lump - 0.5) * 0.12 + (grain - 0.5) * 0.10 + (fine - 0.5) * 0.06;
     shade *= 0.84 + edge * 0.16;
     o[0] = clamp01(shade * 0.95) * 255;

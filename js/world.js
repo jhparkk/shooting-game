@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b1';
-import { getTextures } from './textures.js?v=20261117b1';
-import { Atmosphere } from './atmosphere.js?v=20261117b1';
+} from './models.js?v=20261117b2';
+import { getTextures } from './textures.js?v=20261117b2';
+import { Atmosphere } from './atmosphere.js?v=20261117b2';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -576,7 +576,7 @@ export class World {
           vec3 nw = normalize( vWNrmV );
           float up = clamp( nw.y, 0.0, 1.0 );
           // 완만한 바닥 ↔ 급한 벽면 — 경사에 따라 모래와 암반이 저절로 갈린다
-          float flatK = smoothstep( 0.34, 0.66, up );
+          float flatK = smoothstep( 0.62, 0.90, up );
 
           /* ---- 월드 좌표 큰 변화 (타일 반복을 지운다) ---- */
           float m1 = abyssFbm( wp.xz * 0.016 );                 // ~60 유닛 패치
@@ -589,7 +589,7 @@ export class World {
           vec2 warp = ( mcA.rg - 0.5 ) * 0.26;
 
           /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
-          vec2 suv = wp.xz * 0.30 / clamp( up, 0.45, 1.0 ) + warp;
+          vec2 suv = wp.xz * 0.17 / clamp( up, 0.55, 1.0 ) + warp;
           vec4 sA = texture2D( uSand, suv );
           vec3 sandyC = sA.rgb * ( 0.80 + 0.40 * mcB.b );
           // 굵은 자갈·조개 부스러기가 흩어진 패치
@@ -1532,7 +1532,7 @@ export class World {
           bank + Math.sin(this.time * 2 + o.p) * 0.12
         );
         q.setFromEuler(eul);
-        scl.setScalar(o.s * s.scale * 0.55);
+        scl.setScalar(o.s * s.scale * 0.85);
         m.compose(pos, q, scl);
         s.mesh.setMatrixAt(i, m);
       }
