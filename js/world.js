@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117c1';
-import { getTextures } from './textures.js?v=20261117c1';
-import { Atmosphere } from './atmosphere.js?v=20261117c1';
+} from './models.js?v=20261117c2';
+import { getTextures } from './textures.js?v=20261117c2';
+import { Atmosphere } from './atmosphere.js?v=20261117c2';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -582,7 +582,7 @@ export class World {
           vec3 nw = normalize( vWNrmV );
           float up = clamp( nw.y, 0.0, 1.0 );
           // 완만한 바닥 ↔ 급한 벽면 — 경사에 따라 모래와 암반이 저절로 갈린다
-          float flatK = smoothstep( 0.74, 0.94, up );
+          float flatK = smoothstep( 0.60, 0.88, up );
 
           /* ---- 월드 좌표 큰 변화 (타일 반복을 지운다) ---- */
           float m1 = abyssFbm( wp.xz * 0.016 );                 // ~60 유닛 패치
