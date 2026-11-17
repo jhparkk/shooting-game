@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261118a4';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118a4';
-import { RenderPipeline, QUALITY } from './render.js?v=20261118a4';
+import { Sound } from './audio.js?v=20261118a5';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118a5';
+import { RenderPipeline, QUALITY } from './render.js?v=20261118a5';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261118a4';
-import { FX } from './fx.js?v=20261118a4';
+} from './models.js?v=20261118a5';
+import { FX } from './fx.js?v=20261118a5';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2948,7 +2948,7 @@ function boot() {
         out.caveCols = cave ? cave.cols.length : 0;
 
         const probe = (s, label) => {
-          const pos = new THREE.Vector3(s.x + (s.r + SUB_R + 0.6), s.y, s.z);
+          const pos = new THREE.Vector3(s.x + (s.r + SUB_R - 0.9), s.y, s.z);
           const vel = new THREE.Vector3(-v0, 0, 0);
           const d0 = pos.clone().sub(new THREE.Vector3(s.x, s.y, s.z)).length();
           const pushed = world.resolveSolidCollisions(pos, SUB_R, vel, label === 'cave' ? { cavesOnly: true } : {});
@@ -2962,6 +2962,7 @@ function boot() {
             velAfterX: +vel.x.toFixed(2),
             velAfterLen: +vel.length().toFixed(2),
             bounced: vel.x > 0,       // 벽 쪽(-x)으로 가던 속도가 바깥(+x)으로 뒤집혔다
+            clear: d1 >= s.r + SUB_R - 0.05,   // 밀려난 뒤 구체 밖으로 나왔는가
           };
         };
         if (cave) out.caves.push(probe(cave.cols[Math.floor(cave.cols.length / 2)], 'cave'));

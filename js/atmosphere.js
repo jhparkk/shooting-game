@@ -81,9 +81,9 @@ const SURFACE_FRAG = /* glsl */ `
        매끈한 밝기 위에 '마루 등고선'을 얇게 올려 물결의 결을 또렷하게 만든다.
        (실제 수면을 아래에서 보면 밝은 선이 그물처럼 엉긴 모양이 보인다) */
     float crest = smoothstep(-0.42, 0.78, hn);
-    float line = smoothstep(0.06, 0.26, hn) * (1.0 - smoothstep(0.30, 0.52, hn));
-    vec3 inCol = uSurfaceColor * (0.26 + 0.30 * crest);
-    inCol += uSurfaceColor * line * 0.34;
+    float line = smoothstep(0.10, 0.23, hn) * (1.0 - smoothstep(0.27, 0.40, hn));
+    vec3 inCol = uSurfaceColor * (0.26 + 0.28 * crest);
+    inCol += mix(uSurfaceColor, vec3(0.92, 0.99, 1.0), 0.55) * line * 0.38;
     inCol *= 0.88 + 0.20 * smoothstep(-0.9, 0.9, hn);
 
     /* 창 가장자리 — 프레넬로 밝아지는 테두리 (여기가 '수면'으로 읽히는 경계) */

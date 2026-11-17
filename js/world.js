@@ -16,9 +16,9 @@ import {
   rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118a4';
-import { getTextures } from './textures.js?v=20261118a4';
-import { Atmosphere } from './atmosphere.js?v=20261118a4';
+} from './models.js?v=20261118a5';
+import { getTextures } from './textures.js?v=20261118a5';
+import { Atmosphere } from './atmosphere.js?v=20261118a5';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1658,36 +1658,7 @@ export class World {
    */
   resolveSolidCollisions(pos, radius, vel, opts) {
     const o = opts || {};
-    let pushed = 0;
-    const C = 1.55;                // 반발 계수 (1 = 완전 탄성)
-    const hit = (s) => {
-      const dx = pos.x - s.x;
-      const dy = pos.y - s.y;
-      const dz = pos.z - s.z;
-      const rr = s.r + radius;
-      const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 >= rr * rr) return false;
-      const d = Math.sqrt(d2) || 0.0001;
-      const nx = dx / d;
-      const ny = dy / d;
-      const nz = dz / d;
-      const over = rr - d;
-      pos.x += nx * over;
-      pos.y += ny * over;
-      pos.z += nz * over;
-      if (vel) {
-        const vn = vel.x * nx + vel.y * ny + vel.z * nz;
-        if (vn < 0) {
-          // 잠수정이 벽으로 들어가는 속도만큼 되튄다 + 약간의 마찰
-          vel.x -= nx * vn * C;
-          vel.y -= ny * vn * C;
-          vel.z -= nz * vn * C;
-          vel.multiplyScalar(0.92);
-        }
-      }
-      pushed += over;
-      return true;
-    };
+    const near = [];
 
     // 1) 청크 바위 — 가까운 청크만
     if (!o.cavesOnly) {
@@ -1697,7 +1668,7 @@ export class World {
         for (let dx = -1; dx <= 1; dx++) {
           const rec = this.chunks.get((ccx + dx) + ',' + (ccz + dz));
           if (!rec || !rec.cols) continue;
-          for (let i = 0; i < rec.cols.length; i++) hit(rec.cols[i]);
+          for (let i = 0; i < rec.cols.length; i++) near.push(rec.cols[i]);
         }
       }
     }
@@ -1710,9 +1681,49 @@ export class World {
       const dz = pos.z - c.center.z;
       const reach = c.radius + radius + 2;
       if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
-      for (let i = 0; i < c.cols.length; i++) hit(c.cols[i]);
+      for (let i = 0; i < c.cols.length; i++) near.push(c.cols[i]);
     }
+    if (!near.length) return 0;
 
+    const C = 1.55;              // 반발 계수 (1 = 완전 탄성)
+    let pushed = 0;
+    let bounced = false;
+    for (let pass = 0; pass < 4; pass++) {
+      // 가장 깊게 박힌 구체부터 하나씩 풀어 나간다
+      let deep = null;
+      let best = 0;
+      for (let i = 0; i < near.length; i++) {
+        const s = near[i];
+        const dx = pos.x - s.x;
+        const dy = pos.y - s.y;
+        const dz = pos.z - s.z;
+        const rr = s.r + radius;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= rr * rr) continue;
+        const d = Math.sqrt(d2) || 0.0001;
+        const over = rr - d;
+        if (over > best) {
+          best = over;
+          deep = { nx: dx / d, ny: dy / d, nz: dz / d, over };
+        }
+      }
+      if (!deep) break;
+      pos.x += deep.nx * deep.over;
+      pos.y += deep.ny * deep.over;
+      pos.z += deep.nz * deep.over;
+      pushed += deep.over;
+      if (vel && !bounced) {
+        const vn = vel.x * deep.nx + vel.y * deep.ny + vel.z * deep.nz;
+        if (vn < 0) {
+          // 벽으로 들어가던 속도만큼 되튄다 + 약간의 마찰
+          vel.x -= deep.nx * vn * C;
+          vel.y -= deep.ny * vn * C;
+          vel.z -= deep.nz * vn * C;
+          vel.multiplyScalar(0.92);
+          bounced = true;
+        }
+      }
+    }
     return pushed;
   }
 

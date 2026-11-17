@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261118a4';
+import { getTextures } from './textures.js?v=20261118a5';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -3171,7 +3171,7 @@ export function rockCaveGeometry(seed, opts) {
   for (let i = 0; i < p.count; i++) {
     const y = p.getY(i);
     const upk = clamp01(nrm.getY(i) * 0.5 + 0.5);
-    const lig = 0.135 + 0.105 * upk + 0.03 * Math.sin(y * 0.7 + s1);
+    const lig = 0.235 + 0.145 * upk + 0.03 * Math.sin(y * 0.7 + s1);
     col.setHSL(hue, 0.055, clamp01(lig));
     colors[i * 3] = col.r;
     colors[i * 3 + 1] = col.g;
