@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117c8';
+import { getTextures } from './textures.js?v=20261117c9';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2994,7 +2994,7 @@ export function slabRockGeometry(radius, seed) {
   let y = -radius * 0.08;
   for (let i = 0; i < layers; i++) {
     const r = radius * (1 - i * 0.17) * (0.78 + rnd() * 0.34);
-    const g = rockGeometry(r, seed + i * 37, 2);
+    const g = rockGeometry(r, seed + i * 37, 1);
     // 눌러서 판처럼 — 위로 갈수록 조금씩 작아진다
     g.scale(1 + rnd() * 0.24, 0.15 + rnd() * 0.13, 0.76 + rnd() * 0.34);
     g.rotateY(rnd() * Math.PI * 2);
@@ -3036,9 +3036,9 @@ export function columnRockGeometry(radius, seed) {
 export function pebbleClusterGeometry(radius, seed) {
   const rnd = mulberry(seed);
   const parts = [];
-  const n = 7 + Math.floor(rnd() * 7);
+  const n = 6 + Math.floor(rnd() * 4);
   for (let i = 0; i < n; i++) {
-    const r = radius * (0.14 + rnd() * 0.24);
+    const r = radius * (0.16 + rnd() * 0.26);
     const g = rockGeometry(r, seed + i * 13, 1);
     g.scale(1 + rnd() * 0.3, 0.4 + rnd() * 0.26, 1 + rnd() * 0.3);
     g.rotateY(rnd() * Math.PI * 2);

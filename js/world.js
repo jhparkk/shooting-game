@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c8';
-import { getTextures } from './textures.js?v=20261117c8';
-import { Atmosphere } from './atmosphere.js?v=20261117c8';
+} from './models.js?v=20261117c9';
+import { getTextures } from './textures.js?v=20261117c9';
+import { Atmosphere } from './atmosphere.js?v=20261117c9';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -363,6 +363,8 @@ export class World {
     this.creatures = [];
     this.schools = [];
     this.depthT = 0;
+    // ?flat — 지형 셰이더를 끄고 단순 재질로 시작 (성능 진단/저사양 폴백)
+    this._wantFlat = typeof location !== 'undefined' && /[?&]flat\b/.test(location.search);
 
     // 청크 스트리밍 상태
     this.chunks = new Map();     // "cx,cz" -> 레코드
@@ -474,7 +476,9 @@ export class World {
   /* ---------------- 청크용 재질 (공유) ---------------- */
   _buildMaterials() {
     this.tex = getTextures();
-    this.rockMat = this._terrainMaterial();
+    // ?flat — 지형 셰이더 없이 단순 재질로 (성능 진단용)
+    this.simpleRockMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: this.tex.sand });
+    this.rockMat = this._wantFlat ? this.simpleRockMat : this._terrainMaterial();
     this.coralMat = new THREE.MeshPhongMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
@@ -734,13 +738,15 @@ export class World {
   /* ---------------- 지형 소품 템플릿 (한 번만 만들어 재사용) ---------------- */
   _buildTemplates() {
     this.tpl = {
-      rock: [], rockLo: [], branch: [], blob: [], tube: [], fan: [], brain: [], tuft: [],
+      rock: [], rockLo: [], rockMid: [], branch: [], blob: [], tube: [], fan: [], brain: [], tuft: [],
       slab: [], column: [], pebble: [], table: [], anemone: [],
       kelp: [], leaf: [], grass: [],
     };
     // 가까운 바위는 고세그먼트(부드러운 곡면), 먼 바위는 가벼운 형상
     for (let i = 0; i < 5; i++) this.tpl.rock.push(paint(rockGeometry(1, 500 + i * 91, 2), 0xffffff));
     for (let i = 0; i < 3; i++) this.tpl.rockLo.push(paint(rockGeometry(1, 700 + i * 53, 1), 0xffffff));
+    // 중간 거리 바위 — 고세그먼트(고화질)와 가벼운 형상 사이
+    for (let i = 0; i < 4; i++) this.tpl.rockMid.push(paint(rockGeometry(1, 1600 + i * 59, 1), 0xffffff));
     // 바위 종류 다양화 — 층진 석회암 판 · 주상 절리 기둥 · 조약돌 무리
     for (let i = 0; i < 4; i++) this.tpl.slab.push(paint(slabRockGeometry(1, 1330 + i * 61), 0xffffff));
     for (let i = 0; i < 4; i++) this.tpl.column.push(paint(columnRockGeometry(1, 1440 + i * 67), 0xffffff));
@@ -958,7 +964,7 @@ export class World {
        얕은 산호 지대: 조약돌 무리 · 석회암 선반 · 이끼 낀 둥근 바위 · 굴러온 바위
        중층: 층진 석회암 판과 현무암 기둥   /   심해: 주상 절리 기둥과 부서진 현무암 */
     const geos = [flatFloor];
-    const rockCount = detail ? 10 : 4;
+    const rockCount = detail ? 7 : 3;
     const rockCol = new THREE.Color();
     for (let i = 0; i < rockCount; i++) {
       const lx = (rnd() - 0.5) * CHUNK * 0.94;
@@ -985,7 +991,7 @@ export class World {
           tpl = this.tpl.column[Math.floor(rnd() * this.tpl.column.length)];
           r = 1.3 + rnd() * 2.4;
         } else {
-          tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+          tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
           r = 1.2 + rnd() * 3.0;
         }
         hue = 0.58; sat = 0.05; lig = 0.13 + rnd() * 0.09;
@@ -998,7 +1004,7 @@ export class World {
           tpl = this.tpl.column[Math.floor(rnd() * this.tpl.column.length)];
           r = 1.2 + rnd() * 2.2; hue = 0.58; sat = 0.04; lig = 0.16 + rnd() * 0.08;
         } else {
-          tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+          tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
           r = 1.4 + rnd() * 3.0; lig = 0.19 + rnd() * 0.10;
         }
       } else if (pick < 0.24) {
@@ -1011,11 +1017,11 @@ export class World {
         r = 1.6 + rnd() * 3.2; hue = 0.105; sat = 0.06; lig = 0.23 + rnd() * 0.10;
       } else if (pick < 0.68) {
         // 이끼 낀 둥근 바위
-        tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+        tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
         r = 1.2 + rnd() * 2.4; hue = 0.21; sat = 0.13; lig = 0.15 + rnd() * 0.07;
       } else {
         // 굴러온 둥근 바위
-        tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+        tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
         r = 1.0 + rnd() * 2.8; hue = 0.09; sat = 0.05; lig = 0.16 + rnd() * 0.09;
       }
       // 회갈색 현무암 ~ 이끼 낀 암반 ~ 밝은 석회암 — 원색 없이 낮은 채도로
@@ -1034,7 +1040,7 @@ export class World {
 
     /* --- 바닥에 흩어진 잔돌 · 자갈 조각 (바위 사이를 메운다) --- */
     if (detail) {
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 3; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.96;
         const lz = (rnd() - 0.5) * CHUNK * 0.96;
         const gy = getTerrainHeight(ox + lx, oz + lz);
@@ -1065,7 +1071,7 @@ export class World {
         for (let i = 0; i < n; i++) {
           const a = (i / (n - 1)) * Math.PI;
           const rr = 2.0 + rnd() * 1.5;
-          const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+          const tpl = this.tpl.rockLo[Math.floor(rnd() * this.tpl.rockLo.length)];
           const geo = this._clonePainted(tpl, new THREE.Color().setHSL(0.10, 0.06 + rnd() * 0.05, 0.15 + rnd() * 0.09).getHex());
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
@@ -1307,6 +1313,15 @@ export class World {
       built++;
       if (now() > deadline) break;
     }
+  }
+
+  /** 지형 재질 전환 — 성능 진단/저사양 폴백 (full=false 면 단순 재질) */
+  setTerrainShader(full) {
+    this.rockMat = full ? this._terrainMaterial() : this.simpleRockMat;
+    this.floorMats[0] = this.rockMat;
+    for (const rec of this.chunks.values()) rec.terrain.material = this.rockMat;
+    // 큐를 비우고 다음 갱신에서 다시 만들게 한다 (재질이 바뀌었으므로)
+    this._ccx = 1e9;
   }
 
   /** 디버그/검증용 */
