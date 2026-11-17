@@ -217,9 +217,9 @@ function bakeRock(size) {
     shade *= 1 - crack * 0.12;
     // 이끼·규조가 붙은 듯한 아주 옅은 청록기
     const moss = smooth(0.58, 0.92, fbm(u, v, 5, 3, 201)) * 0.22;
-    o[0] = clamp01(shade * 0.97 - moss * 0.10) * 255;
-    o[1] = clamp01(shade * 0.99 + moss * 0.06) * 255;
-    o[2] = clamp01(shade * 0.93 - moss * 0.02) * 255;
+    o[0] = clamp01(shade * 0.98 - moss * 0.05) * 255;
+    o[1] = clamp01(shade * 0.99 + moss * 0.02) * 255;
+    o[2] = clamp01(shade * 0.95 - moss * 0.01) * 255;
     o[3] = clamp01(0.54 + (strata - 0.5) * 0.44 + (grain - 0.5) * 0.3 + (fine - 0.5) * 0.22 - crack * 0.35) * 255;
   });
 }
@@ -311,6 +311,30 @@ function bakeBasalt(size) {
     o[2] = clamp01(shade * 1.08) * 255;
     o[3] = clamp01(0.5 + edge * 0.28 + (grain - 0.5) * 0.3 + (fine - 0.5) * 0.16) * 255;
   });
+}
+
+/* =========================================================
+   매크로 노이즈 — 물결·균열 없는 저주파 3채널(UV 워프·밝기 변화용)
+   텍스처 타일 반복을 지우는 데 쓴다.
+   ========================================================= */
+function bakeMacro(size) {
+  const cv = canvasOf(size);
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const D = img.data;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = (y * size + x) * 4;
+      D[i] = clamp01(fbm(u, v, 3, 4, 9001)) * 255;
+      D[i + 1] = clamp01(fbm(u, v, 3, 4, 17551)) * 255;
+      D[i + 2] = clamp01(fbm(u, v, 5, 3, 26107)) * 255;
+      D[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
 }
 
 /* =========================================================
@@ -452,6 +476,7 @@ export function getTextures() {
   const [metalCv, metalH] = bakeMetal(256);
   const [orgCv, orgH] = bakeOrganic(128);
   const causticCv = bakeCaustics(256);
+  const macroCv = bakeMacro(256);
 
   SET = {
     /* 해저 지형 */
@@ -468,6 +493,7 @@ export function getTextures() {
     basalt: toTexture(basCv, { srgb: true, aniso: 8 }),
     basaltBump: toTexture(bakeScaled(basH, 128), { aniso: 4 }),
     caustics: toTexture(causticCv, { aniso: 4 }),
+    macro: toTexture(macroCv, { aniso: 4 }),
     /* 산호 · 암초 */
     coral: toTexture(coralCv, { srgb: true }),
     coralBump: toTexture(bakeScaled(coralH, 128)),

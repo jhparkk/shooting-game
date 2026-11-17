@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a5';
-import { getTextures } from './textures.js?v=20261117a5';
-import { Atmosphere } from './atmosphere.js?v=20261117a5';
+} from './models.js?v=20261117a6';
+import { getTextures } from './textures.js?v=20261117a6';
+import { Atmosphere } from './atmosphere.js?v=20261117a6';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -491,7 +491,7 @@ export class World {
       mat.customProgramCacheKey = () => 'indirect' + k;
       return mat;
     };
-    boostIndirect(this.coralMat, 2.1);
+    boostIndirect(this.coralMat, 3.0);
     this.kelpMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     boostIndirect(this.kelpMat, 1.7);
     const kelpTime = this.kelpUniform;
@@ -539,6 +539,7 @@ export class World {
       uAlgae: { value: t.algae },
       uBasalt: { value: t.basalt },
       uCaustics: { value: t.caustics },
+      uMacro: { value: t.macro },
       uTime: { value: 0 },
       uCausticI: { value: 1 },
       uDetail: { value: 1 },
@@ -559,7 +560,7 @@ export class World {
         'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
         'uniform sampler2D uSand;\nuniform sampler2D uCoralSand;\nuniform sampler2D uRock;\n' +
         'uniform sampler2D uAlgae;\nuniform sampler2D uBasalt;\n' +
-        'uniform sampler2D uCaustics;\nuniform float uTime;\nuniform float uCausticI;\n' +
+        'uniform sampler2D uCaustics;\nuniform sampler2D uMacro;\nuniform float uTime;\nuniform float uCausticI;\n' +
         'uniform float uDetail;\nuniform float uBump;\n' +
         // 값 노이즈 — 월드 좌표 기반이라 어디서도 반복되지 않는다
         'float abyssHash(vec2 p){ p = fract(p * vec2(127.13, 311.7)); p += dot(p, p + 34.53); return fract(p.x * p.y); }\n' +
@@ -581,23 +582,26 @@ export class World {
           float m2 = abyssFbm( wp.xz * 0.072 + 13.7 );          // ~14 유닛
           float m3 = abyssNoise( wp.xz * 0.29 + 5.3 );          // ~3.5 유닛
 
-          /* ---- 모래 : 월드 XZ 투영 ---- */
-          vec2 suv = wp.xz * 0.30 / clamp( up, 0.45, 1.0 );
+          /* ---- 매크로 노이즈 : 텍스처 타일을 지우는 저주파 변조 ---- */
+          vec3 mcA = texture2D( uMacro, wp.xz * 0.011 ).rgb;
+          vec3 mcB = texture2D( uMacro, wp.xz * 0.047 + 0.37 ).rgb;
+          vec2 warp = ( mcA.rg - 0.5 ) * 0.26;
+
+          /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
+          vec2 suv = wp.xz * 0.30 / clamp( up, 0.45, 1.0 ) + warp;
           vec4 sA = texture2D( uSand, suv );
-          vec4 sB = texture2D( uSand, suv * 0.19 + 0.37 );
-          vec3 sandyC = sA.rgb * ( 0.74 + 0.52 * sB.r );
+          vec3 sandyC = sA.rgb * ( 0.80 + 0.40 * mcB.b );
           // 굵은 자갈·조개 부스러기가 흩어진 패치
           sandyC = mix( sandyC, sandyC * vec3( 0.90, 0.88, 0.84 ), smoothstep( 0.52, 0.88, m3 ) );
           // 젖은 모래 — 큰 패치마다 밝기가 조금씩 다르다
           sandyC *= 0.86 + 0.24 * m2;
-          float sandH = texture2D( uSand, suv, 2.0 ).g * 0.65 + sB.g * 0.35;
+          float sandH = texture2D( uSand, suv, 2.0 ).g * 0.8 + mcB.b * 0.2;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
-          vec2 ruvA = vec2( wp.z * 0.115, wp.y * 0.15 );
-          vec2 ruvB = vec2( wp.x * 0.115, wp.y * 0.15 );
+          vec2 ruvA = vec2( wp.z * 0.115, wp.y * 0.15 ) + warp * 0.6;
+          vec2 ruvB = vec2( wp.x * 0.115, wp.y * 0.15 ) + warp * 0.6;
           vec4 rA = texture2D( uRock, ruvA );
           vec4 rB = texture2D( uRock, ruvB );
-          vec4 rM = texture2D( uRock, ruvA * 0.23 + 0.61 );     // 큰 얼룩(다른 배율)
           float wzm = abs( nw.z ) / max( 1e-3, abs( nw.x ) + abs( nw.z ) );
           vec3 rockyC = mix( rB.rgb, rA.rgb, wzm );
           float rockH = mix( rB.g, rA.g, wzm );
@@ -605,7 +609,7 @@ export class World {
           vec3 algaeC = texture2D( uAlgae, ruvA * 0.62 + 7.0 ).rgb;
           float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
           rockyC = mix( rockyC, algaeC * vec3( 0.82, 0.86, 0.78 ), algaeK * 0.22 );
-          rockyC *= 0.86 + 0.32 * rM.r;
+          rockyC *= 0.84 + 0.34 * mcB.r;
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
@@ -1058,10 +1062,10 @@ export class World {
         const gy = getTerrainHeight(wx, wz);
         if (gy < 1) continue;              // 해초 숲은 얕은 언덕에만
         if (slopeAt(wx, wz) > 0.95) continue;
-        const h = 3.0 + rnd() * 5.0;
-        const w = 0.78 + rnd() * 0.62;
+        const h = 3.6 + rnd() * 5.2;
+        const w = 0.46 + rnd() * 0.34;
         // 다시마 군락 — 같은 자리에 2~3 포기를 다른 높이로
-        const n = 1 + Math.floor(rnd() * 3);
+        const n = 2 + Math.floor(rnd() * 3);
         for (let k = 0; k < n; k++) {
           const geo = kelpGeometry(h * (0.65 + rnd() * 0.6), w, 300 + seed * 13 + i * 7 + k);
           const m = new THREE.Matrix4();
