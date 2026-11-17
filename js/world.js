@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b4';
-import { getTextures } from './textures.js?v=20261117b4';
-import { Atmosphere } from './atmosphere.js?v=20261117b4';
+} from './models.js?v=20261117b5';
+import { getTextures } from './textures.js?v=20261117b5';
+import { Atmosphere } from './atmosphere.js?v=20261117b5';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -494,7 +494,7 @@ export class World {
     };
     boostIndirect(this.coralMat, 3.0);
     this.kelpMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
-    boostIndirect(this.kelpMat, 1.7);
+    boostIndirect(this.kelpMat, 1.25);
     const kelpTime = this.kelpUniform;
     this.kelpMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = kelpTime;

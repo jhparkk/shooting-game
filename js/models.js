@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117b4';
+import { getTextures } from './textures.js?v=20261117b5';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -107,8 +107,8 @@ const smoothstep = (a, b, x) => {
 };
 
 const MET = {
-  hull: addMetal(new THREE.MeshPhongMaterial({ color: 0xa8792f, shininess: 26, specular: 0x4a5258 }), 0.42),
-  hullDark: addMetal(new THREE.MeshPhongMaterial({ color: 0x6e5124, shininess: 18, specular: 0x333b40 }), 0.4),
+  hull: addMetal(new THREE.MeshPhongMaterial({ color: 0x9d7a38, shininess: 34, specular: 0x5a636a }), 0.18),
+  hullDark: addMetal(new THREE.MeshPhongMaterial({ color: 0x6b5228, shininess: 22, specular: 0x3a4247 }), 0.18),
   accent: new THREE.MeshPhongMaterial({ color: 0x2e3438, shininess: 40, specular: 0x66707a }),
   glass: new THREE.MeshPhongMaterial({
     color: 0x9fc3c8, emissive: 0x123033, emissiveIntensity: 0.55,

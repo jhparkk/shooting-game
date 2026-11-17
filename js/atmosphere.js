@@ -81,9 +81,9 @@ const SURFACE_FRAG = /* glsl */ `
       1.0,
       cos(sq.y - sq.x * 0.28 - t * 0.35) * 0.42
     ));
-    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 42.0);
+    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 110.0);
     sunSpec *= 1.0 - smoothstep(25.0, 140.0, dist);
-    col += uSunColor * sunSpec * 0.95 * (1.0 - uDeep * 0.8);
+    col += uSunColor * sunSpec * 1.1 * (1.0 - uDeep * 0.8);
 
     /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
