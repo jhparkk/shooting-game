@@ -181,8 +181,8 @@ function bakeSand(size) {
     const shellBit = 1 - smooth(0.0, 0.045, shell.f1);
     /* 잔물결 — 실제 모래바닥의 물결 무늬. 서로 다른 방향의 두 파를 겹쳐
        한 방향으로 '빗질한' 줄무늬가 생기지 않게 한다. */
-    const ripA = Math.sin((v * 21 + u * 2.6 + warp * 3.2) * TAU);
-    const ripB = Math.sin((u * 27 - v * 3.4 + warp * 2.7) * TAU);
+    const ripA = Math.sin((v * 9 + u * 1.8 + warp * 2.6) * TAU);
+    const ripB = Math.sin((u * 13 - v * 2.4 + warp * 2.2) * TAU);
 
     let shade = 0.84
       + (blotch - 0.5) * 0.14
@@ -196,7 +196,7 @@ function bakeSand(size) {
     o[1] = clamp01(shade * 0.965) * 255;
     o[2] = clamp01(shade * 0.905) * 255;
     o[3] = clamp01(0.5 + (blotch - 0.5) * 0.16 + (patch - 0.5) * 0.14
-      + (fine - 0.5) * 0.34 + ripA * 0.20 + ripB * 0.12
+      + (fine - 0.5) * 0.30 + ripA * 0.16 + ripB * 0.12
       - bit * 0.24 - shellBit * 0.22) * 255;
   });
 }
@@ -558,7 +558,7 @@ export function getTextures() {
     macro: toTexture(macroCv, { aniso: 4 }),
     /* 노멀맵 — 높이맵에서 한 번만 굽는다 (프래그먼트 미분 범프는
        원거리에서 빗질한 줄무늬를 만들어 실사감을 망쳤다) */
-    sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 1.4), { aniso: 8 }),
+    sandNormal: toTexture(heightToNormal(bakeScaled(sandH, 128), 1.0), { aniso: 8 }),
     rockNormal: toTexture(heightToNormal(bakeScaled(rockH, 128), 1.1), { aniso: 8 }),
     basaltNormal: toTexture(heightToNormal(bakeScaled(basH, 128), 0.9), { aniso: 8 }),
     pebbleNormal: toTexture(heightToNormal(bakeScaled(pebH, 128), 1.9), { aniso: 8 }),
