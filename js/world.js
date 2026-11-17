@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117ca';
-import { getTextures } from './textures.js?v=20261117ca';
-import { Atmosphere } from './atmosphere.js?v=20261117ca';
+} from './models.js?v=20261117cb';
+import { getTextures } from './textures.js?v=20261117cb';
+import { Atmosphere } from './atmosphere.js?v=20261117cb';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -487,7 +487,7 @@ export class World {
       bumpScale: 0.22,
       specular: 0x2a3a3a,
       shininess: 14,
-      emissive: 0x0e0c0a,   // 완전히 검게 죽지 않도록 아주 옅은 산란광
+      emissive: 0x0a0806,   // 완전히 검게 죽지 않도록 아주 옅은 산란광
     });
     /* 산호·해초는 얇은 가지라 태양을 정면으로 받지 못해 새까맣게 죽는다.
        실제 수중에서는 산란광이 안쪽까지 스며들므로 간접광을 조금 올려 준다. */
@@ -501,7 +501,7 @@ export class World {
       mat.customProgramCacheKey = () => 'indirect' + k;
       return mat;
     };
-    boostIndirect(this.coralMat, 3.0);
+    boostIndirect(this.coralMat, 1.7);
     this.kelpMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     boostIndirect(this.kelpMat, 1.25);
     const kelpTime = this.kelpUniform;
@@ -595,7 +595,7 @@ export class World {
           vec3 nw = normalize( vWNrmV );
           float up = clamp( nw.y, 0.0, 1.0 );
           // 완만한 바닥 ↔ 급한 벽면 — 경사에 따라 모래와 암반이 저절로 갈린다
-          float flatK = smoothstep( 0.58, 0.86, up );
+          float flatK = smoothstep( 0.40, 0.72, up );
 
           /* ---- 월드 좌표 큰 변화 (타일 반복을 지운다) ---- */
           float m1 = abyssFbm( wp.xz * 0.016 );                 // ~60 유닛 패치
@@ -1102,8 +1102,8 @@ export class World {
          실제 산호는 한 색으로 칠한 플라스틱이 아니다 */
       const coralPick = () => {
         const base = zone.coral[Math.floor(rnd() * zone.coral.length)];
-        tmpCol.set(base).lerp(rockTone, 0.02 + rnd() * 0.06);
-        tmpCol.offsetHSL((rnd() - 0.5) * 0.03, (rnd() - 0.5) * 0.10, (rnd() - 0.5) * 0.05);
+        tmpCol.set(base).lerp(rockTone, 0.01 + rnd() * 0.04);
+        tmpCol.offsetHSL((rnd() - 0.5) * 0.035, (rnd() - 0.5) * 0.10, (rnd() - 0.5) * 0.06);
         return tmpCol.getHex();
       };
       // 가지 끝·군체 위쪽은 햇빛을 받아 밝다 — 위로 갈수록 옅어지는 그라데이션
@@ -1145,7 +1145,7 @@ export class World {
           const big = this.tpl.blob.indexOf(tpl) >= 0 || this.tpl.brain.indexOf(tpl) >= 0 ||
             this.tpl.table.indexOf(tpl) >= 0;
           const tall = this.tpl.fan.indexOf(tpl) >= 0;   // 부채산호는 키가 커서 줄인다
-          const sc = (1.6 + rnd() * 1.8) * (steep ? 0.78 : 1.0) * (big ? 0.7 : 1.0) * (tall ? 0.55 : 1.0);
+          const sc = (1.15 + rnd() * 1.35) * (steep ? 0.8 : 1.0) * (big ? 0.72 : 1.0) * (tall ? 0.55 : 1.0);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));
@@ -1170,7 +1170,7 @@ export class World {
         const color = coralPick();
         let geo = this._clonePainted(tpl, color, tipOf(color));
         if (geo.index) geo = geo.toNonIndexed();
-        const sc = 0.8 + rnd() * 1.5;
+        const sc = 0.6 + rnd() * 1.05;
         const m = new THREE.Matrix4();
         m.makeRotationY(rnd() * Math.PI * 2);
         m.scale(new THREE.Vector3(sc, sc * (0.8 + rnd() * 0.8), sc));
@@ -1730,7 +1730,7 @@ export class World {
           bank + Math.sin(this.time * 2 + o.p) * 0.12
         );
         q.setFromEuler(eul);
-        scl.setScalar(o.s * s.scale * 0.85);
+        scl.setScalar(o.s * s.scale * 1.0);
         m.compose(pos, q, scl);
         s.mesh.setMatrixAt(i, m);
       }
