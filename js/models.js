@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117a4';
+import { getTextures } from './textures.js?v=20261117a5';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2754,9 +2754,9 @@ export function rockGeometry(radius, seed, detail) {
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).normalize();
     const f = 1
-      + lump3(v.x * 1.5, v.y * 1.5, v.z * 1.5, s) * 0.20
-      + lump3(v.x * 3.6 + 4.0, v.y * 3.6, v.z * 3.6, s + 2.3) * 0.085
-      + lump3(v.x * 7.9, v.y * 7.9 + 2.0, v.z * 7.9, s + 4.1) * 0.028;
+      + lump3(v.x * 1.5, v.y * 1.5, v.z * 1.5, s) * 0.27
+      + lump3(v.x * 3.6 + 4.0, v.y * 3.6, v.z * 3.6, s + 2.3) * 0.11
+      + lump3(v.x * 7.9, v.y * 7.9 + 2.0, v.z * 7.9, s + 4.1) * 0.05;
     // 아래로 갈수록 살짝 넓어지고 납짝해진다 — 해저에 파묻혀 앉은 바위
     const widen = 1 + Math.max(0, -v.y) * 0.16;
     pos.setXYZ(
@@ -2771,26 +2771,47 @@ export function rockGeometry(radius, seed, detail) {
   return geo.toNonIndexed();
 }
 
-/** 가지형 산호 */
+/** 가지형 산호 — 밑동이 굵고 끝으로 갈수록 가늘어지는, 둥글게 굽은 가지 */
 export function branchCoralGeometry(color, seed) {
   const rnd = mulberry(seed);
   const parts = [];
-  const trunkH = 1.0 + rnd() * 1.1;
-  const trunk = new THREE.CylinderGeometry(0.09, 0.16, trunkH, 5);
+  const trunkH = 0.95 + rnd() * 0.95;
+  const trunk = new THREE.CylinderGeometry(0.15, 0.26, trunkH, 7, 2);
   trunk.translate(0, trunkH / 2, 0);
+  const tp = trunk.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const t = tp.getY(i) / trunkH;
+    tp.setX(i, tp.getX(i) + Math.sin(t * 2.2 + rnd() * 0.05) * 0.06);
+  }
+  trunk.computeVertexNormals();
   parts.push(paint(trunk, color));
 
-  const branches = 2 + Math.floor(rnd() * 3);
+  const branches = 3 + Math.floor(rnd() * 3);
   for (let i = 0; i < branches; i++) {
-    const h = 0.6 + rnd() * 0.8;
-    const b = new THREE.CylinderGeometry(0.045, 0.09, h, 5);
+    const h = 0.55 + rnd() * 0.75;
+    const b = new THREE.CylinderGeometry(0.06, 0.12, h, 6, 2);
     b.translate(0, h / 2, 0);
+    const bp = b.attributes.position;
+    const bend = (rnd() - 0.5) * 0.5;
+    for (let k = 0; k < bp.count; k++) {
+      const t = bp.getY(k) / h;
+      bp.setX(k, bp.getX(k) + bend * h * t * t);
+    }
+    b.computeVertexNormals();
     const m = new THREE.Matrix4();
-    const e = new THREE.Euler((rnd() - 0.5) * 1.0, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.0);
+    const e = new THREE.Euler((rnd() - 0.5) * 0.9, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.1);
     m.makeRotationFromEuler(e);
-    m.setPosition((rnd() - 0.5) * 0.3, trunkH * (0.55 + rnd() * 0.4), (rnd() - 0.5) * 0.3);
+    m.setPosition((rnd() - 0.5) * 0.34, trunkH * (0.5 + rnd() * 0.45), (rnd() - 0.5) * 0.34);
     b.applyMatrix4(m);
     parts.push(paint(b, color));
+    // 가지 끝의 작은 혹 — 뾰족한 원뿔 대신 산호 폴립 덩어리
+    if (rnd() < 0.65) {
+      const knob = new THREE.SphereGeometry(0.055 + rnd() * 0.04, 6, 4);
+      knob.applyMatrix4(new THREE.Matrix4().makeTranslation(
+        (rnd() - 0.5) * 0.34 + bend * 0.4, trunkH * (0.55 + rnd() * 0.4), (rnd() - 0.5) * 0.34
+      ));
+      parts.push(paint(knob, color));
+    }
   }
   return mergeGeometries(parts, false);
 }

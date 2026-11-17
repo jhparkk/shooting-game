@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a4';
-import { getTextures } from './textures.js?v=20261117a4';
-import { Atmosphere } from './atmosphere.js?v=20261117a4';
+} from './models.js?v=20261117a5';
+import { getTextures } from './textures.js?v=20261117a5';
+import { Atmosphere } from './atmosphere.js?v=20261117a5';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -542,7 +542,7 @@ export class World {
       uTime: { value: 0 },
       uCausticI: { value: 1 },
       uDetail: { value: 1 },
-      uBump: { value: 0.085 },
+      uBump: { value: 0.05 },
     };
     this.terrainUniforms = uni;
     mat.onBeforeCompile = (shader) => {
@@ -590,7 +590,7 @@ export class World {
           sandyC = mix( sandyC, sandyC * vec3( 0.90, 0.88, 0.84 ), smoothstep( 0.52, 0.88, m3 ) );
           // 젖은 모래 — 큰 패치마다 밝기가 조금씩 다르다
           sandyC *= 0.86 + 0.24 * m2;
-          float sandH = sA.g * 0.75 + sB.g * 0.25;
+          float sandH = texture2D( uSand, suv, 2.0 ).g * 0.65 + sB.g * 0.35;
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
           vec2 ruvA = vec2( wp.z * 0.115, wp.y * 0.15 );
@@ -604,7 +604,7 @@ export class World {
           // 암반 위 이끼·해조류 — 큰 패치에만 옅게
           vec3 algaeC = texture2D( uAlgae, ruvA * 0.62 + 7.0 ).rgb;
           float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
-          rockyC = mix( rockyC, algaeC * vec3( 0.80, 0.86, 0.76 ), algaeK * 0.38 );
+          rockyC = mix( rockyC, algaeC * vec3( 0.82, 0.86, 0.78 ), algaeK * 0.22 );
           rockyC *= 0.86 + 0.32 * rM.r;
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
@@ -619,7 +619,7 @@ export class World {
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
-          detail *= mix( vec3( 0.84 ), vec3( 0.54, 0.525, 0.485 ), flatK );
+          detail *= mix( vec3( 0.84 ), vec3( 0.58, 0.545, 0.475 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 
@@ -646,8 +646,8 @@ export class World {
             vec3 nW = normalize( vWNrmV );
             vec3 dpx = dFdx( vWPosV );
             vec3 dpy = dFdy( vWPosV );
-            float dhx = dFdx( hMicro ) * ( 0.6 + 0.9 * ( 1.0 - flatK ) );
-            float dhy = dFdy( hMicro ) * ( 0.6 + 0.9 * ( 1.0 - flatK ) );
+            float dhx = dFdx( hMicro ) * ( 0.12 + 1.15 * ( 1.0 - flatK ) );
+            float dhy = dFdy( hMicro ) * ( 0.12 + 1.15 * ( 1.0 - flatK ) );
             vec3 r1 = cross( dpy, nW );
             vec3 r2 = cross( nW, dpx );
             float det = dot( dpx, r1 );
@@ -900,7 +900,7 @@ export class World {
       const list = detail ? this.tpl.rock : this.tpl.rockLo;
       const tpl = list[Math.floor(rnd() * list.length)];
       // 회갈색 현무암 ~ 이끼 낀 암반 — 원색 없이 낮은 채도로
-      const g = 0.13 + rnd() * 0.10;
+      const g = 0.12 + rnd() * 0.09;
       const geo = this._clonePainted(
         tpl,
         rockCol.setHSL(0.09 + rnd() * 0.04, 0.05 + rnd() * 0.07, g).getHex()
@@ -1058,8 +1058,8 @@ export class World {
         const gy = getTerrainHeight(wx, wz);
         if (gy < 1) continue;              // 해초 숲은 얕은 언덕에만
         if (slopeAt(wx, wz) > 0.95) continue;
-        const h = 3.4 + rnd() * 6.5;
-        const w = 0.42 + rnd() * 0.45;
+        const h = 3.0 + rnd() * 5.0;
+        const w = 0.78 + rnd() * 0.62;
         // 다시마 군락 — 같은 자리에 2~3 포기를 다른 높이로
         const n = 1 + Math.floor(rnd() * 3);
         for (let k = 0; k < n; k++) {
