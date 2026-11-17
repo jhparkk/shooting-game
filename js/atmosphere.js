@@ -41,7 +41,6 @@ const SURFACE_FRAG = /* glsl */ `
     g += dir * (cos(ph) * a * k);
     amp += abs(a);
   }
-
   void main() {
     vec2 p = vWorld.xz;
     float t = uTime;
@@ -78,11 +77,14 @@ const SURFACE_FRAG = /* glsl */ `
     float edge = 0.655 + hn * 0.020 + gn.y * 0.03;
     float win = smoothstep(edge - 0.05, edge + 0.05, upness);
 
-    /* 창 안쪽 — 잔물결에 부서진 하늘빛 (밝은 마루 + 어두운 골) */
+    /* 창 안쪽 — 잔물결에 부서진 하늘빛.
+       매끈한 밝기 위에 '마루 등고선'을 얇게 올려 물결의 결을 또렷하게 만든다.
+       (실제 수면을 아래에서 보면 밝은 선이 그물처럼 엉긴 모양이 보인다) */
     float crest = smoothstep(-0.42, 0.78, hn);
-    vec3 inCol = uSurfaceColor * (0.30 + 0.52 * crest);
-    inCol += uSurfaceColor * pow(crest, 2.2) * 0.42;          // 마루의 밝은 세포
-    inCol *= 0.85 + 0.26 * smoothstep(-0.9, 0.9, hn);
+    float line = smoothstep(0.06, 0.26, hn) * (1.0 - smoothstep(0.30, 0.52, hn));
+    vec3 inCol = uSurfaceColor * (0.26 + 0.30 * crest);
+    inCol += uSurfaceColor * line * 0.34;
+    inCol *= 0.88 + 0.20 * smoothstep(-0.9, 0.9, hn);
 
     /* 창 가장자리 — 프레넬로 밝아지는 테두리 (여기가 '수면'으로 읽히는 경계) */
     float rim = exp(-pow((upness - edge) / 0.075, 2.0));
@@ -102,10 +104,10 @@ const SURFACE_FRAG = /* glsl */ `
     float glitter = pow(sd, 260.0) * (0.55 + 1.35 * win);
     col += uSunColor * glitter * (1.0 - smoothstep(20.0, 120.0, dist));
 
-    /* 태양이 수면을 뚫고 보이는 작은 원반 + 후광 */
+    /* 태양이 수면을 뚫고 보이는 작은 원반 + 아주 옅은 후광 */
     float sunUp = max(0.0, dot(view, uSunDir));
     col += uSunColor * pow(sunUp, 420.0) * 1.15 * (1.0 - uDeep * 0.8);
-    col += uSunColor * pow(sunUp, 26.0) * 0.055 * (1.0 - uDeep * 0.7);
+    col += uSunColor * pow(sunUp, 60.0) * 0.028 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.78, 2.0));
