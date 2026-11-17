@@ -167,32 +167,30 @@ function normalize(img, data, target, maxK) {
    ========================================================= */
 function bakeSand(size) {
   return bakePair(size, (u, v, o) => {
-    /* 실제 모래 물결은 마루가 둥글고 골이 얕은 비대칭 파형이며,
-       방향이 조금씩 흐트러진다. 큰 대비 없이 '입자'만 살린다 —
-       매크로 변화는 셰이더의 월드 좌표 노이즈가 맡는다(타일 반복 제거). */
-    const warp = fbm(u, v, 2, 3, 11);
-    const warp2 = fbm(u, v, 5, 2, 47);
-    const dir = v * 6.5 + u * 1.6 + warp * 3.6 + warp2 * 2.4;
+    /* 실제 모래는 '줄무늬 종이'가 아니다 — 덩어리진 젖은/마른 패치 + 입자 +
+       군데군데 남은 물결. 물결은 위상을 크게 흔들어 긴 줄로 이어지지 않게 한다. */
+    const warp = fbm(u, v, 2, 4, 11);
+    const warp2 = fbm(u, v, 5, 3, 47);
+    const dir = v * 4.2 + u * 2.6 + warp * 9.0 + warp2 * 5.0;
     const rip = Math.sin(dir * TAU) * 0.5 + 0.5;
-    const ripS = rip * rip * (3 - 2 * rip);          // 둥근 마루
-    const dir2 = v * 17.0 - u * 3.2 + warp * 5.0;
-    const rip2 = Math.sin(dir2 * TAU) * 0.5 + 0.5;
-    const grain = noise2(u * 220, v * 220, 220, 3);
-    const grain2 = noise2(u * 58, v * 58, 58, 91);
-    const pebble = worley(u, v, 24, 971);
-    const bit = 1 - smooth(0.0, 0.14, pebble.f1);     // 작은 자갈·조개 부스러기
+    const ripS = rip * rip * (3 - 2 * rip);
+    const patch = fbm(u, v, 3, 4, 131);
+    const grain = noise2(u * 230, v * 230, 230, 3);
+    const grain2 = noise2(u * 54, v * 54, 54, 91);
+    const pebble = worley(u, v, 26, 971);
+    const bit = 1 - smooth(0.0, 0.13, pebble.f1);
 
-    let shade = 0.82
-      + (ripS - 0.5) * 0.085
-      + (rip2 - 0.5) * 0.035
-      + (grain - 0.5) * 0.10
-      + (grain2 - 0.5) * 0.085;
-    shade *= 1 - bit * 0.13;
+    let shade = 0.80
+      + (ripS - 0.5) * 0.05
+      + (patch - 0.5) * 0.14
+      + (grain - 0.5) * 0.13
+      + (grain2 - 0.5) * 0.10;
+    shade *= 1 - bit * 0.16;
 
     o[0] = clamp01(shade * 1.0) * 255;
-    o[1] = clamp01(shade * 0.972) * 255;
-    o[2] = clamp01(shade * 0.918) * 255;
-    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.40 + (rip2 - 0.5) * 0.16 + (grain - 0.5) * 0.26 - bit * 0.22) * 255;
+    o[1] = clamp01(shade * 0.965) * 255;
+    o[2] = clamp01(shade * 0.905) * 255;
+    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.22 + (patch - 0.5) * 0.24 + (grain - 0.5) * 0.30 - bit * 0.26) * 255;
   });
 }
 

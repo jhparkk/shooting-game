@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a3';
-import { getTextures } from './textures.js?v=20261117a3';
-import { Atmosphere } from './atmosphere.js?v=20261117a3';
+} from './models.js?v=20261117a4';
+import { getTextures } from './textures.js?v=20261117a4';
+import { Atmosphere } from './atmosphere.js?v=20261117a4';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -479,7 +479,21 @@ export class World {
       specular: 0x2a3a3a,
       shininess: 14,
     });
+    /* 산호·해초는 얇은 가지라 태양을 정면으로 받지 못해 새까맣게 죽는다.
+       실제 수중에서는 산란광이 안쪽까지 스며들므로 간접광을 조금 올려 준다. */
+    const boostIndirect = (mat, k) => {
+      mat.onBeforeCompile = (sh) => {
+        sh.fragmentShader = sh.fragmentShader.replace(
+          '#include <lights_fragment_end>',
+          '#include <lights_fragment_end>\n  reflectedLight.indirectDiffuse *= ' + k.toFixed(2) + ';'
+        );
+      };
+      mat.customProgramCacheKey = () => 'indirect' + k;
+      return mat;
+    };
+    boostIndirect(this.coralMat, 2.1);
     this.kelpMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    boostIndirect(this.kelpMat, 1.7);
     const kelpTime = this.kelpUniform;
     this.kelpMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = kelpTime;
@@ -568,7 +582,7 @@ export class World {
           float m3 = abyssNoise( wp.xz * 0.29 + 5.3 );          // ~3.5 유닛
 
           /* ---- 모래 : 월드 XZ 투영 ---- */
-          vec2 suv = wp.xz * 0.18 / clamp( up, 0.42, 1.0 );
+          vec2 suv = wp.xz * 0.30 / clamp( up, 0.45, 1.0 );
           vec4 sA = texture2D( uSand, suv );
           vec4 sB = texture2D( uSand, suv * 0.19 + 0.37 );
           vec3 sandyC = sA.rgb * ( 0.74 + 0.52 * sB.r );
@@ -605,7 +619,7 @@ export class World {
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
-          detail *= mix( vec3( 0.84 ), vec3( 0.60, 0.585, 0.545 ), flatK );
+          detail *= mix( vec3( 0.84 ), vec3( 0.54, 0.525, 0.485 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 
@@ -975,7 +989,7 @@ export class World {
           const cgy = c === 0 ? gy : getTerrainHeight(wx + dx, wz + dz);
           let geo = this._clonePainted(tpl, color);
           if (geo.index) geo = geo.toNonIndexed();   // 바퀴·산호를 섞어 병합하려면 인덱스 여부를 통일
-          const sc = (1.62 + rnd() * 2.3) * (steep ? 0.78 : 1.0);
+          const sc = (2.1 + rnd() * 2.7) * (steep ? 0.78 : 1.0);
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(sc, sc * (0.9 + rnd() * 0.7), sc));

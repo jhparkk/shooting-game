@@ -83,12 +83,12 @@ const SURFACE_FRAG = /* glsl */ `
     ));
     float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 12.0);
     sunSpec *= 1.0 - smoothstep(25.0, 140.0, dist);
-    col += uSunColor * sunSpec * 1.15 * (1.0 - uDeep * 0.8);
+    col += uSunColor * sunSpec * 0.62 * (1.0 - uDeep * 0.8);
 
     /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
     col += uSunColor * pow(sd, 160.0) * 1.4 * (1.0 - uDeep * 0.85);
-    col += uSunColor * pow(sd, 8.0) * 0.11 * (1.0 - uDeep * 0.7);
+    col += uSunColor * pow(sd, 8.0) * 0.07 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
