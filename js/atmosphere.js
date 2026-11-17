@@ -363,7 +363,7 @@ export class Atmosphere {
 
   /* ---------- 심해 생물 발광 ---------- */
   _buildBiolume() {
-    const N = 560;
+    const N = 900;
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(N * 3);
     const seed = new Float32Array(N);
@@ -385,7 +385,7 @@ export class Atmosphere {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
 
-    this.bioUni = this._particleUniforms({ size: 0.42, opacity: 0.0, drift: 0.45, box: 150, pulse: 0.7 });
+    this.bioUni = this._particleUniforms({ size: 0.16, opacity: 0.0, drift: 0.45, box: 150, pulse: 0.7 });
     this.bio = new THREE.Points(geo, this._particleMaterial(this.bioUni));
     this.bio.frustumCulled = false;
     this.bio.renderOrder = 7;
@@ -499,7 +499,7 @@ export class Atmosphere {
     this.snowUni.uOpacity.value = 0.42 - 0.16 * Math.min(1, depth / 900);
     /* 생물 발광은 350m 아래부터 서서히 나타난다 */
     const bioK = Math.max(0, Math.min(1, (depth - 300) / 500));
-    this.bioUni.uOpacity.value = bioK * 1.05;
+    this.bioUni.uOpacity.value = bioK * 1.15;
     this.bio.visible = bioK > 0.02;
   }
 }
