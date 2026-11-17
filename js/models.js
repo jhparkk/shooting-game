@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117e';
+import { getTextures } from './textures.js?v=20261117f';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -566,7 +566,7 @@ export function makeSubmarine() {
   //  · 끝으로 갈수록 옅어지고, 물결 따라 미세하게 일렁인다
   const coneMat = new THREE.ShaderMaterial({
     uniforms: {
-      uI: { value: 0.045 },
+      uI: { value: 0.03 },
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(0.62, 0.93, 1.0) },
     },
@@ -596,7 +596,7 @@ export function makeSubmarine() {
         float ndv = abs(dot(normalize(vNrmV), normalize(vViewDir)));
         float core = smoothstep(0.0, 0.62, ndv);
         // 램프(원뿔 꼭대기)에서 멀어질수록 옅어진다
-        float axial = clamp((-vLocal.z - 0.4) / 22.0, 0.0, 1.0);
+        float axial = clamp((-vLocal.z - 0.4) / 24.0, 0.0, 1.0);
         float fade = pow(1.0 - axial, 1.35) * smoothstep(0.0, 0.10, axial);
         float ripple = 0.78 + 0.22 * sin(axial * 26.0 - uTime * 2.4 + vUv.x * 9.0);
         float a = core * fade * ripple * uI;
@@ -610,9 +610,9 @@ export function makeSubmarine() {
     side: THREE.DoubleSide,
     fog: false,
   });
-  const coneGeo = new THREE.ConeGeometry(2.5, 22, 24, 1, true);
+  const coneGeo = new THREE.ConeGeometry(7.2, 24, 26, 1, true);
   coneGeo.rotateX(Math.PI / 2);
-  coneGeo.translate(0, 0, -11.2);
+  coneGeo.translate(0, 0, -12.4);
   const beam = new THREE.Mesh(coneGeo, coneMat);
   beam.position.set(0, 0.18, -1.8);
   beam.frustumCulled = false;

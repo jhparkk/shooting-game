@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117e';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117e';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117e';
+import { Sound } from './audio.js?v=20261117f';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117f';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117f';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117e';
-import { FX } from './fx.js?v=20261117e';
+} from './models.js?v=20261117f';
+import { FX } from './fx.js?v=20261117f';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1458,7 +1458,7 @@ function updateHeadlight(dt, instant) {
   const beam = player.beam;
   if (beam && beam.material.uniforms) {
     const u = beam.material.uniforms;
-    u.uI.value += ((0.035 + deep * 0.24) - u.uI.value) * k;
+    u.uI.value += ((0.02 + deep * 0.13) - u.uI.value) * k;
     u.uTime.value += dt;
     const widen = 1 + deep * 0.55;
     const stretch = 1 + deep * 1.2;
@@ -2220,7 +2220,7 @@ function renderFrame(dt) {
       _upWorld.copy(camera.position).addScaledVector(UP, 80).project(camera);
       if (_upWorld.z < 1) {
         u.uUpUV.value.set(_upWorld.x * 0.5 + 0.5, _upWorld.y * 0.5 + 0.5);
-        u.uUpI.value = 0.07 * Math.max(0.16, 1 - depth / 1400);
+        u.uUpI.value = 0.07 * Math.max(0.24, 1 - depth / 1400);
       } else {
         u.uUpI.value = 0.02;
       }
