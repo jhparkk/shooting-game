@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117e0';
-import { getTextures } from './textures.js?v=20261117e0';
-import { Atmosphere } from './atmosphere.js?v=20261117e0';
+} from './models.js?v=20261117e1';
+import { getTextures } from './textures.js?v=20261117e1';
+import { Atmosphere } from './atmosphere.js?v=20261117e1';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -676,8 +676,15 @@ export class World {
           rockyC *= 0.88 + 0.24 * mc.r;
           // 수직에 가까운 큰 벽면 — 비스듬히 볼 때 텍스처가 늘어나 '천'처럼 보인다.
           // 저주파 노이즈로 부드럽게 덮어 넓은 명암 변화만 남긴다.
-          float steepK = 1.0 - smoothstep( 0.02, 0.12, up );
-          rockyC = mix( rockyC, rockyC * vec3( 0.96, 0.98, 1.0 ) * ( 0.88 + 0.24 * m1 ), steepK * 0.25 );
+          float steepK = 1.0 - smoothstep( 0.02, 0.30, up );
+          // 벽면은 텍스처가 비스듬히 늘어나 '천'처럼 보이므로, 늘어나지 않는
+          // 월드 좌표 노이즈로 암석의 얼룩과 결을 직접 그린다.
+          if ( steepK > 0.02 ) {
+            float wg = abyssNoise( wp.xz * 1.6 + wp.y * 0.9 );
+            float wg2 = abyssNoise( wp.xz * 0.55 + wp.y * 0.35 + 7.0 );
+            rockyC *= 1.0 + ( ( wg - 0.5 ) * 0.22 + ( wg2 - 0.5 ) * 0.30 - 0.06 ) * steepK;
+            rockyC *= mix( vec3( 1.0 ), vec3( 0.94, 0.97, 1.02 ), steepK );
+          }
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
