@@ -16,9 +16,9 @@ import {
   rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118b3';
-import { getTextures } from './textures.js?v=20261118b3';
-import { Atmosphere } from './atmosphere.js?v=20261118b3';
+} from './models.js?v=20261118b4';
+import { getTextures } from './textures.js?v=20261118b4';
+import { Atmosphere } from './atmosphere.js?v=20261118b4';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1593,6 +1593,10 @@ export class World {
           break;
         }
       }
+    }
+    // '동굴 없음' 으로 기억한 셀이 무한정 쌓이지 않게 정리
+    if (this.caveGeoCache.size > 80) {
+      for (const [k, v] of this.caveGeoCache) if (!v) this.caveGeoCache.delete(k);
     }
     return entry;
   }
