@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117df';
-import { getTextures } from './textures.js?v=20261117df';
-import { Atmosphere } from './atmosphere.js?v=20261117df';
+} from './models.js?v=20261117e0';
+import { getTextures } from './textures.js?v=20261117e0';
+import { Atmosphere } from './atmosphere.js?v=20261117e0';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -676,8 +676,8 @@ export class World {
           rockyC *= 0.88 + 0.24 * mc.r;
           // 수직에 가까운 큰 벽면 — 비스듬히 볼 때 텍스처가 늘어나 '천'처럼 보인다.
           // 저주파 노이즈로 부드럽게 덮어 넓은 명암 변화만 남긴다.
-          float steepK = 1.0 - smoothstep( 0.03, 0.20, up );
-          rockyC = mix( rockyC, rockyC * vec3( 0.96, 0.98, 1.0 ) * ( 0.86 + 0.28 * m1 ), steepK * 0.5 );
+          float steepK = 1.0 - smoothstep( 0.02, 0.12, up );
+          rockyC = mix( rockyC, rockyC * vec3( 0.96, 0.98, 1.0 ) * ( 0.88 + 0.24 * m1 ), steepK * 0.25 );
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
@@ -1763,7 +1763,7 @@ export class World {
           bank + Math.sin(this.time * 2 + o.p) * 0.12
         );
         q.setFromEuler(eul);
-        scl.setScalar(o.s * s.scale * 1.0);
+        scl.setScalar(o.s * s.scale * 0.88);
         m.compose(pos, q, scl);
         s.mesh.setMatrixAt(i, m);
       }

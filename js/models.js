@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117df';
+import { getTextures } from './textures.js?v=20261117e0';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2678,9 +2678,9 @@ const _schoolMat = Object.create(null);
    파랑·노랑·코랄·줄무늬 어종을 더한다. */
 export const FISH_KINDS = {
   silver: {
-    back: 0xa9bcc6, belly: 0xffffff, blend: [-0.40, 0.10],
+    back: 0x8098a8, belly: 0xf6fbfd, blend: [-0.36, 0.06],
     fin: 0xff8f3a, tail: 0xff7d2a, dorsal: 0xffa650,
-    emissive: 0x1f2628,
+    emissive: 0x141a1d,
   },
   tang: {
     back: 0x1f79b8, belly: 0x6ab8e2, blend: [-0.44, 0.08],
