@@ -16,9 +16,9 @@ import {
   rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118a7';
-import { getTextures } from './textures.js?v=20261118a7';
-import { Atmosphere } from './atmosphere.js?v=20261118a7';
+} from './models.js?v=20261118b1';
+import { getTextures } from './textures.js?v=20261118b1';
+import { Atmosphere } from './atmosphere.js?v=20261118b1';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1643,12 +1643,16 @@ export class World {
         slot.mesh.visible = false;
       }
     }
+    // 지오메트리 생성이 몰려 프레임이 튀지 않도록 한 프레임에 하나씩만 배정
+    let assigned = 0;
     for (const slot of this.caves) {
       if (slot.key) continue;
+      if (assigned >= 1) break;
       const i = want.findIndex((w, k) => !used.has(k));
       if (i < 0) break;
       used.add(i);
       this._assignCave(slot, want[i].entry, want[i].key);
+      assigned++;
     }
   }
 
