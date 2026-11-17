@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a1';
-import { getTextures } from './textures.js?v=20261117a1';
-import { Atmosphere } from './atmosphere.js?v=20261117a1';
+} from './models.js?v=20261117a2';
+import { getTextures } from './textures.js?v=20261117a2';
+import { Atmosphere } from './atmosphere.js?v=20261117a2';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -40,9 +40,9 @@ export const ZONES = [
     name: '표층 산호대',
     fog: 0x14616f, density: 0.0052,
     skyTop: 0x8fc9c9, skyMid: 0x2c7b96, skyBottom: 0x14616f,
-    hemiSky: 0xc6e6ea, hemiGround: 0x1c5560, hemi: 0.62,
+    hemiSky: 0xc6e6ea, hemiGround: 0x1c5560, hemi: 0.52,
     ambient: 0x8ec2cc, ambientI: 0.24,
-    sun: 0xfffbf0, sunI: 2.0, glow: 0.85,
+    sun: 0xfffbf0, sunI: 1.70, glow: 0.80,
     // 실제 수심 20~40m 산호는 대부분 갈색·올리브·테라코타, 일부만 옅은 분홍·보라
     // (형광 원색은 수중에서 이렇게 보이지 않는다)
     coral: [0x9a7057, 0x8a7a5c, 0xa8876a, 0x7c6a55, 0x96897a, 0x71836d, 0xa0776b, 0x8a6f78, 0xb09a7c],
@@ -568,7 +568,7 @@ export class World {
           float m3 = abyssNoise( wp.xz * 0.29 + 5.3 );          // ~3.5 유닛
 
           /* ---- 모래 : 월드 XZ 투영 ---- */
-          vec2 suv = wp.xz * 0.18;
+          vec2 suv = wp.xz * 0.18 / clamp( up, 0.42, 1.0 );
           vec4 sA = texture2D( uSand, suv );
           vec4 sB = texture2D( uSand, suv * 0.19 + 0.37 );
           vec3 sandyC = sA.rgb * ( 0.74 + 0.52 * sB.r );
@@ -605,7 +605,7 @@ export class World {
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
-          detail *= mix( vec3( 0.90 ), vec3( 0.78, 0.755, 0.70 ), flatK );
+          detail *= mix( vec3( 0.86 ), vec3( 0.66, 0.645, 0.60 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 

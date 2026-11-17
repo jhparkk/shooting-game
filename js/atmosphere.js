@@ -70,10 +70,20 @@ const SURFACE_FRAG = /* glsl */ `
     float swell = sin(p.x * 0.032 + t * 0.16) * sin(p.y * 0.028 - t * 0.13);
     col *= 0.95 + 0.06 * swell;
 
-    /* 태양 반사 — 잔물결 노멀이 태양 쪽을 향할 때만 강하게 */
-    vec3 nrm = normalize(vec3(n.x * 0.55, 1.0, n.y * 0.55));
-    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 26.0);
-    col += uSunColor * sunSpec * 1.05 * (1.0 - uDeep * 0.8);
+    /* 태양 반사 — 잔물결이 태양 쪽을 향할 때만.
+       예전엔 잔물결 주파수가 높아 수면 전체가 '구름 타일'처럼 덮였다.
+       낮은 주파수 + 좌표 워프 + 거리 페이드로 흩어진 반짝임만 남긴다. */
+    vec2 sq = p * 0.085 + vec2(
+      sin(p.y * 0.013 + t * 0.05), cos(p.x * 0.011 - t * 0.04)
+    ) * 2.0;
+    vec3 nrm = normalize(vec3(
+      sin(sq.x + t * 0.42 + n.x * 1.6) * 0.40,
+      1.0,
+      cos(sq.y - t * 0.35 + n.y * 1.6) * 0.40
+    ));
+    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 20.0);
+    sunSpec *= 1.0 - smoothstep(25.0, 140.0, dist);
+    col += uSunColor * sunSpec * 1.15 * (1.0 - uDeep * 0.8);
 
     /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
