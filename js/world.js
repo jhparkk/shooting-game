@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d3';
-import { getTextures } from './textures.js?v=20261117d3';
-import { Atmosphere } from './atmosphere.js?v=20261117d3';
+} from './models.js?v=20261117d4';
+import { getTextures } from './textures.js?v=20261117d4';
+import { Atmosphere } from './atmosphere.js?v=20261117d4';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -610,8 +610,19 @@ export class World {
           float pPebble = mc.g;   // 자갈 · 조약돌 지대
           float pLime = mc.b;     // 석회암 선반
 
-          /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
-          vec2 suv = wp.xz * 0.72 / clamp( up, 0.62, 1.0 ) + warp;
+          /* ---- 벽면 투영 축 ----
+             노멀에 수직인 '수평 방향'을 축으로 삼는다. 경사면에서 XZ 투영은
+             한 축으로 심하게 눌려 '빗질한 줄무늬'가 생기므로, 모래 uv 도
+             경사가 급해질수록 이 축으로 옮겨 간다. */
+          vec2 hdir = vec2( -nw.z, nw.x );
+          float hlen = length( hdir );
+          hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
+          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
+
+          /* ---- 모래 : 평지 XZ 투영 ↔ 경사면 투영을 섞는다 ---- */
+          vec2 suvFlat = wp.xz * 0.72 / clamp( up, 0.62, 1.0 ) + warp;
+          vec2 suvSlope = ruv * 1.55 + warp;
+          vec2 suv = mix( suvSlope, suvFlat, smoothstep( 0.55, 0.92, up ) );
           // 백사장 — 햇빛을 받아 밝다
           vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.82 + 0.30 * mc.g );
           sandyC = mix( sandyC, sandyC * vec3( 0.92, 0.90, 0.86 ), smoothstep( 0.52, 0.88, m3 ) );
@@ -623,12 +634,12 @@ export class World {
           flatC *= 0.90 + 0.20 * m2;
 
           /* ---- 자갈 · 조약돌 지대 — 굵은 자갈이 드러난 바닥 ---- */
-          vec3 pebC = texture2D( uPebble, wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + 8.1 ).rgb * ( 0.84 + 0.26 * mc.r );
+          vec3 pebC = texture2D( uPebble, mix( ruv * 0.5, wp.xz * 0.26, smoothstep( 0.55, 0.92, up ) ) + 8.1 ).rgb * ( 0.84 + 0.26 * mc.r );
           float pebK = smoothstep( 0.44, 0.68, pPebble + ( m2 - 0.5 ) * 0.2 ) * ( 0.55 + 0.45 * m3 );
           flatC = mix( flatC, pebC, pebK * 0.94 );
 
           /* ---- 밝은 석회암 바닥 — 마모된 판이 넓게 깔린 곳 ---- */
-          vec3 limeC = texture2D( uLimestone, wp.xz * 0.20 / clamp( up, 0.62, 1.0 ) + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
+          vec3 limeC = texture2D( uLimestone, mix( ruv * 0.42, wp.xz * 0.20, smoothstep( 0.55, 0.92, up ) ) + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
           float limeK = smoothstep( 0.52, 0.78, pLime + ( m1 - 0.5 ) * 0.2 );
           flatC = mix( flatC, limeC, limeK * 0.88 );
 
@@ -655,15 +666,7 @@ export class World {
           float mot2 = abyssNoise( wp.xz * 1.35 + 5.0 );
           flatC *= 1.0 + ( ( mot1 - 0.5 ) * 0.10 + ( mot2 - 0.5 ) * 0.06 ) * ripK;
 
-          /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
-          /* 벽면 투영 — 노멀에 수직인 '수평 방향'을 축으로 삼는다.
-             두 축(x,y)/(z,y)을 섞으면 대각선 벽에서 한 축이 늘어나
-             빗질한 듯한 줄무늬가 생겼다. 이렇게 하면 어떤 방향의 벽이든
-             늘어나지 않고, 텍스처 조회도 한 번으로 끝난다. */
-          vec2 hdir = vec2( -nw.z, nw.x );
-          float hlen = length( hdir );
-          hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
-          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
+          /* ---- 암벽 (경사면 투영 ruv 사용) ---- */
           vec3 rockyC = texture2D( uRock, ruv ).rgb;
           // 암반 위 이끼 · 해조류 — 초록빛 패치 (별도 텍스처 없이 초록으로 물들인다)
           float algaeK = smoothstep( 0.42, 0.74, m1 ) * ( 0.5 + 0.5 * smoothstep( 0.25, 0.8, m2 ) );
@@ -706,7 +709,7 @@ export class World {
 
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
-          vec3 nPB = texture2D( uPebbleN, wp.xz * 0.26 / clamp( up, 0.62, 1.0 ) + 8.1 ).xyz * 2.0 - 1.0;
+          vec3 nPB = texture2D( uPebbleN, mix( ruv * 0.5, wp.xz * 0.26, smoothstep( 0.55, 0.92, up ) ) + 8.1 ).xyz * 2.0 - 1.0;
           vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
           vec3 nB = texture2D( uBasaltN, buv ).xyz * 2.0 - 1.0;
           // 평평한 바닥의 요철은 '그 바닥이 실제로 무엇인지'를 따라간다
