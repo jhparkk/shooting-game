@@ -58,8 +58,8 @@ const SURFACE_FRAG = /* glsl */ `
     float c1 = sin(p.x * 0.26 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.23 - t * 0.27 + n.y * 1.6);
     float c2 = sin((p.x + p.y) * 0.41 - t * 0.44) * sin((p.x - p.y) * 0.35 + t * 0.38);
     float c3 = sin(p.x * 0.87 - p.y * 0.74 + t * 0.82) * sin(p.y * 0.79 + p.x * 0.62 - t * 0.67);
-    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 4.5) * 0.55
-                  + pow(max(c3, 0.0), 7.0) * 0.28;
+    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 4.5) * 0.30
+                  + pow(max(c3, 0.0), 7.0) * 0.14;
     /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
     sparkle *= 0.32 + 0.68 * (sin(p.x * 0.043 + t * 0.03) * sin(p.y * 0.051 - t * 0.024) * 0.5 + 0.5);
     /* 멀리 있는 물결은 뭉개서 타일·모아레가 보이지 않게 */
@@ -68,17 +68,17 @@ const SURFACE_FRAG = /* glsl */ `
 
     /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
     float swell = sin(p.x * 0.032 + t * 0.16) * sin(p.y * 0.028 - t * 0.13);
-    col *= 0.94 + 0.09 * swell;
+    col *= 0.95 + 0.06 * swell;
 
     /* 태양 반사 — 잔물결 노멀이 태양 쪽을 향할 때만 강하게 */
     vec3 nrm = normalize(vec3(n.x * 0.55, 1.0, n.y * 0.55));
     float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 26.0);
-    col += uSunColor * sunSpec * 1.5 * (1.0 - uDeep * 0.8);
+    col += uSunColor * sunSpec * 1.05 * (1.0 - uDeep * 0.8);
 
     /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
     float sd = max(0.0, dot(view, uSunDir));
-    col += uSunColor * pow(sd, 160.0) * 2.2 * (1.0 - uDeep * 0.85);
-    col += uSunColor * pow(sd, 8.0) * 0.16 * (1.0 - uDeep * 0.7);
+    col += uSunColor * pow(sd, 160.0) * 1.4 * (1.0 - uDeep * 0.85);
+    col += uSunColor * pow(sd, 8.0) * 0.11 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
@@ -238,8 +238,8 @@ export class Atmosphere {
     this.surfaceUni = {
       uTime: { value: 0 },
       uCamPos: { value: new THREE.Vector3() },
-      uSurfaceColor: { value: new THREE.Color(0.72, 1.05, 1.12) },
-      uDeepColor: { value: new THREE.Color(0.055, 0.30, 0.42) },
+      uSurfaceColor: { value: new THREE.Color(0.60, 0.84, 0.90) },
+      uDeepColor: { value: new THREE.Color(0.045, 0.23, 0.31) },
       uFogColor: { value: new THREE.Color(0x1f9fdc) },
       uSunDir: { value: new THREE.Vector3(-0.31, 0.93, 0.23).normalize() },
       uSunColor: { value: new THREE.Color(1.0, 0.98, 0.88) },
@@ -298,7 +298,7 @@ export class Atmosphere {
     this.shaftUni = {
       uTime: { value: 0 },
       uIntensity: { value: 0 },
-      uColor: { value: new THREE.Color(0.72, 0.95, 1.0) },
+      uColor: { value: new THREE.Color(0.66, 0.85, 0.92) },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.shaftUni,
@@ -342,7 +342,7 @@ export class Atmosphere {
       pos[i * 3 + 1] = Math.random();
       pos[i * 3 + 2] = Math.random();
       seed[i] = Math.random();
-      c.setHSL(0.47 + Math.random() * 0.14, 0.35 + Math.random() * 0.4, 0.62 + Math.random() * 0.3);
+      c.setHSL(0.47 + Math.random() * 0.14, 0.12 + Math.random() * 0.2, 0.58 + Math.random() * 0.28);
       tint[i * 3] = c.r;
       tint[i * 3 + 1] = c.g;
       tint[i * 3 + 2] = c.b;
@@ -464,7 +464,7 @@ export class Atmosphere {
     /* 빛줄기 — 표층에서만. 수심 320m 아래로는 사라진다 */
     const shaftK = Math.max(0, 1 - depth / 320);
     this.shaftUni.uTime.value = t;
-    this.shaftUni.uIntensity.value = 0.42 * shaftK * shaftK;
+    this.shaftUni.uIntensity.value = 0.26 * shaftK * shaftK;
     this.shafts.visible = shaftK > 0.02;
     if (this.shafts.visible) {
       for (let i = 0; i < this.shaftCount; i++) {

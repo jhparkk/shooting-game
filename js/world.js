@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117x';
-import { getTextures } from './textures.js?v=20261117x';
-import { Atmosphere } from './atmosphere.js?v=20261117x';
+} from './models.js?v=20261117y';
+import { getTextures } from './textures.js?v=20261117y';
+import { Atmosphere } from './atmosphere.js?v=20261117y';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -38,48 +38,50 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x106f8c, density: 0.0048,
-    skyTop: 0xa8f0ea, skyMid: 0x2496cc, skyBottom: 0x106f8c,
-    hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 0.68,
-    ambient: 0x9cdef6, ambientI: 0.28,
-    sun: 0xfffdf2, sunI: 2.25, glow: 1.0,
-    coral: [0xff5f8a, 0xff8a3c, 0xffc247, 0xe86ee0, 0xb07bff, 0x35e0c8, 0xff8fb8, 0xffe07a],
+    fog: 0x14616f, density: 0.0052,
+    skyTop: 0x8fc9c9, skyMid: 0x2c7b96, skyBottom: 0x14616f,
+    hemiSky: 0xc6e6ea, hemiGround: 0x1c5560, hemi: 0.62,
+    ambient: 0x8ec2cc, ambientI: 0.24,
+    sun: 0xfffbf0, sunI: 2.0, glow: 0.85,
+    // 실제 수심 20~40m 산호는 대부분 갈색·올리브·테라코타, 일부만 옅은 분홍·보라
+    // (형광 원색은 수중에서 이렇게 보이지 않는다)
+    coral: [0x9a7057, 0x8a7a5c, 0xa8876a, 0x7c6a55, 0x96897a, 0x71836d, 0xa0776b, 0x8a6f78, 0xb09a7c],
   },
   {
     name: '중층 해저 협곡',
-    fog: 0x0a5586, density: 0.0098,
-    skyTop: 0x5cc2ea, skyMid: 0x0a5586, skyBottom: 0x053a63,
-    hemiSky: 0xc2ecff, hemiGround: 0x14505f, hemi: 0.78,
-    ambient: 0x7fd0f0, ambientI: 0.4,
-    sun: 0xfdf8ec, sunI: 1.05, glow: 0.6,
-    coral: [0xe07a9a, 0xe0a255, 0xb884e8, 0x7fc2d8, 0xc47a68],
+    fog: 0x0d4a66, density: 0.0090,
+    skyTop: 0x4a97b4, skyMid: 0x0d4a66, skyBottom: 0x08384f,
+    hemiSky: 0xb2d8e4, hemiGround: 0x114552, hemi: 0.66,
+    ambient: 0x74b3c6, ambientI: 0.34,
+    sun: 0xfaf5e8, sunI: 0.95, glow: 0.5,
+    coral: [0x786a5a, 0x6b6a60, 0x877a68, 0x5e6b66, 0x776a70, 0x877f73, 0x6f6455],
   },
   {
     name: '심해 해구',
-    fog: 0x062a55, density: 0.0135,
-    skyTop: 0x164a8e, skyMid: 0x061c40, skyBottom: 0x01060f,
-    hemiSky: 0x4d7fd8, hemiGround: 0x050f26, hemi: 0.26,
-    ambient: 0x30508f, ambientI: 0.2,
-    sun: 0xc8d8ff, sunI: 0.34, glow: 0.3,
-    coral: [0x6fa8ff, 0x9fd8ff, 0xb08fff, 0x5fe0d0, 0x7f94ff],
+    fog: 0x06294a, density: 0.0130,
+    skyTop: 0x14406f, skyMid: 0x04182f, skyBottom: 0x01050c,
+    hemiSky: 0x4a72ac, hemiGround: 0x050e22, hemi: 0.26,
+    ambient: 0x2c4a78, ambientI: 0.22,
+    sun: 0xc8d8ff, sunI: 0.34, glow: 0.26,
+    coral: [0x4d5761, 0x59605f, 0x455055, 0x525862, 0x4a5258],
   },
   {
     name: '초심해 심연',
-    fog: 0x051c33, density: 0.0158,
-    skyTop: 0x0a2652, skyMid: 0x030c22, skyBottom: 0x010407,
-    hemiSky: 0x2a4a90, hemiGround: 0x03060e, hemi: 0.4,
-    ambient: 0x1d3163, ambientI: 0.3,
-    sun: 0x9db8e8, sunI: 0.2, glow: 0.15,
-    coral: [0x3f6cc0, 0x6f8fe0, 0x8f6fd8, 0x3fc0c0, 0x5f74d0],
+    fog: 0x051a2e, density: 0.0152,
+    skyTop: 0x0a2547, skyMid: 0x030b1c, skyBottom: 0x010305,
+    hemiSky: 0x2a4878, hemiGround: 0x03050c, hemi: 0.40,
+    ambient: 0x1c2e50, ambientI: 0.32,
+    sun: 0x9db8e8, sunI: 0.20, glow: 0.13,
+    coral: [0x3c4652, 0x47505c, 0x384250, 0x434a54, 0x3a4450],
   },
   {
     name: '극심해 해구',
-    fog: 0x020e1f, density: 0.0195,
+    fog: 0x020d1c, density: 0.0190,
     skyTop: 0x03102b, skyMid: 0x010413, skyBottom: 0x000103,
-    hemiSky: 0x1a3570, hemiGround: 0x02030a, hemi: 0.36,
-    ambient: 0x16244c, ambientI: 0.3,
-    sun: 0x8aa8dd, sunI: 0.12, glow: 0.08,
-    coral: [0x2e5aa8, 0x4f74c8, 0x6a4fc0, 0x2d9d9d, 0x46628f],
+    hemiSky: 0x1a3270, hemiGround: 0x02030a, hemi: 0.36,
+    ambient: 0x16244c, ambientI: 0.30,
+    sun: 0x8aa8dd, sunI: 0.12, glow: 0.07,
+    coral: [0x333d47, 0x3b4551, 0x2f3742, 0x40444a, 0x36404c],
   },
 ];
 
@@ -459,7 +461,7 @@ export class World {
     this.sun.position.set(-40, 120, 30);
     this.scene.add(this.sun);
 
-    this.rim = new THREE.DirectionalLight(0x8ff0ff, 0.35);
+    this.rim = new THREE.DirectionalLight(0x86bcc8, 0.16);
     this.rim.position.set(60, -20, -60);
     this.scene.add(this.rim);
   }
@@ -499,29 +501,34 @@ export class World {
   /**
    * 해저 지형 재질 — 수심에 따라 모래 → 암벽 → 심해 현무암으로 표면이 바뀌고,
    * 그 위에 실시간 수중 빛무늬(caustics)가 일렁인다.
-   * (MeshPhongMaterial + onBeforeCompile 주입으로 아이폰에서도 가볍게)
+   *
+   * 실사감의 핵심 두 가지
+   *  1) UV 를 정점마다 상자 투영하지 않고 **월드 좌표에서 프래그먼트마다** 만든다.
+   *     (예전엔 삼각형마다 투영 축이 달라져 바닥에 '그물' 무늬가 생겼다)
+   *  2) 텍스처는 미세 결만 담당하고, 큰 얼룩·패치 변화는 셰이더의 월드 노이즈가
+   *     만든다. 그래서 타일이 반복되는 느낌이 사라진다.
+   *  여기에 텍스처 높이값의 화면 미분으로 만든 미세 노멀(요철)을 더해,
+   *  탐조등이 비출 때 실제 모래알·암석 입자가 읽힌다.
    */
   _terrainMaterial() {
     const t = this.tex;
     const mat = new THREE.MeshPhongMaterial({
       vertexColors: true,
-      map: t.sand,              // USE_MAP 활성화 (vMapUv 사용) — 셰이더에서 직접 블렌딩
-      bumpMap: t.sandBump,
-      // 범프를 세게 주면 먼 모래밭에서 파형이 간섭해 '금 간 유리' 같은 무늬가 생긴다
-      bumpScale: 0.07,
-      specular: 0x2c4145,
-      shininess: 7,
+      map: t.sand,              // USE_MAP 만 켜 둔다 (실제 uv 는 셰이더가 만든다)
+      specular: 0x25343a,
+      shininess: 9,
     });
     const uni = {
       uSand: { value: t.sand },
       uCoralSand: { value: t.coralSand },
       uRock: { value: t.rock },
       uAlgae: { value: t.algae },
-      uReef: { value: t.reef },
       uBasalt: { value: t.basalt },
       uCaustics: { value: t.caustics },
       uTime: { value: 0 },
       uCausticI: { value: 1 },
+      uDetail: { value: 1 },
+      uBump: { value: 0.055 },
     };
     this.terrainUniforms = uni;
     mat.onBeforeCompile = (shader) => {
@@ -537,9 +544,10 @@ export class World {
       shader.fragmentShader =
         'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
         'uniform sampler2D uSand;\nuniform sampler2D uCoralSand;\nuniform sampler2D uRock;\n' +
-        'uniform sampler2D uAlgae;\nuniform sampler2D uReef;\nuniform sampler2D uBasalt;\n' +
+        'uniform sampler2D uAlgae;\nuniform sampler2D uBasalt;\n' +
         'uniform sampler2D uCaustics;\nuniform float uTime;\nuniform float uCausticI;\n' +
-        // 패치 바이옴용 값 노이즈 — 월드 좌표로 텍스처가 자연스럽게 섞이게 한다
+        'uniform float uDetail;\nuniform float uBump;\n' +
+        // 값 노이즈 — 월드 좌표 기반이라 어디서도 반복되지 않는다
         'float abyssHash(vec2 p){ p = fract(p * vec2(127.13, 311.7)); p += dot(p, p + 34.53); return fract(p.x * p.y); }\n' +
         'float abyssNoise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); ' +
         'float a = abyssHash(i); float b = abyssHash(i + vec2(1.0, 0.0)); float c = abyssHash(i + vec2(0.0, 1.0)); ' +
@@ -548,62 +556,102 @@ export class World {
         shader.fragmentShader.replace(
           '#include <map_fragment>',
           `
-          vec2 tuv = vMapUv;
-          vec3 cSand = texture2D( uSand, tuv ).rgb;
-          vec3 cCoralSand = texture2D( uCoralSand, tuv * 1.37 ).rgb;
-          vec3 cRock = texture2D( uRock, tuv * 0.72 ).rgb;
-          vec3 cAlgae = texture2D( uAlgae, tuv * 0.86 ).rgb;
-          vec3 cReef = texture2D( uReef, tuv * 1.12 ).rgb;
-          vec3 cBasalt = texture2D( uBasalt, tuv * 0.9 ).rgb;
+          vec3 wp = vWPosV;
+          vec3 nw = normalize( vWNrmV );
+          float up = clamp( nw.y, 0.0, 1.0 );
+          // 완만한 바닥 ↔ 급한 벽면 — 경사에 따라 모래와 암반이 저절로 갈린다
+          float flatK = smoothstep( 0.40, 0.80, up );
 
-          // 패치 바이옴 — 같은 언덕 안에서도 모래밭·해조 암반·산호초 암벽이 섞인다
-          float pBig = abyssFbm( vWPosV.xz * 0.021 );
-          float pMid = abyssFbm( vWPosV.xz * 0.075 + 11.3 );
-          float pFine = abyssNoise( vWPosV.xz * 0.34 + 3.7 );
+          /* ---- 월드 좌표 큰 변화 (타일 반복을 지운다) ---- */
+          float m1 = abyssFbm( wp.xz * 0.016 );                 // ~60 유닛 패치
+          float m2 = abyssFbm( wp.xz * 0.072 + 13.7 );          // ~14 유닛
+          float m3 = abyssNoise( wp.xz * 0.29 + 5.3 );          // ~3.5 유닛
 
-          float sandK = smoothstep( -20.0, 8.0, vWPosV.y );
-          float deepK = smoothstep( -120.0, -430.0, vWPosV.y );
-          float flatK = smoothstep( 0.33, 0.62, vWNrmV.y );
-          float sandW = sandK * flatK;
+          /* ---- 모래 : 월드 XZ 투영 ---- */
+          vec2 suv = wp.xz * 0.10;
+          vec4 sA = texture2D( uSand, suv );
+          vec4 sB = texture2D( uSand, suv * 0.19 + 0.37 );
+          vec3 sandyC = sA.rgb * ( 0.74 + 0.52 * sB.r );
+          // 굵은 자갈·조개 부스러기가 흩어진 패치
+          sandyC = mix( sandyC, sandyC * vec3( 0.90, 0.88, 0.84 ), smoothstep( 0.52, 0.88, m3 ) );
+          // 젖은 모래 — 큰 패치마다 밝기가 조금씩 다르다
+          sandyC *= 0.90 + 0.20 * m2;
+          float sandH = sA.g * 0.75 + sB.g * 0.25;
 
-          // 평지 — 보통 모래 ↔ 밝고 분홍빛이 도는 산호 모래
-          vec3 sandy = mix( cSand, cCoralSand, smoothstep( 0.36, 0.78, pMid ) );
-          // 벽면 — 회색 암벽 ↔ 이끼·해조류 낀 암반 ↔ 다채로운 산호석 암초
-          vec3 rocky = mix( cRock, cAlgae, smoothstep( 0.36, 0.62, pBig ) );
-          rocky = mix( rocky, cReef, smoothstep( 0.30, 0.72, pMid ) * ( 0.45 + 0.2 * pFine ) );
+          /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
+          vec2 ruvA = vec2( wp.z * 0.085, wp.y * 0.115 );
+          vec2 ruvB = vec2( wp.x * 0.085, wp.y * 0.115 );
+          vec4 rA = texture2D( uRock, ruvA );
+          vec4 rB = texture2D( uRock, ruvB );
+          vec4 rM = texture2D( uRock, ruvA * 0.23 + 0.61 );     // 큰 얼룩(다른 배율)
+          float wzm = abs( nw.z ) / max( 1e-3, abs( nw.x ) + abs( nw.z ) );
+          vec3 rockyC = mix( rB.rgb, rA.rgb, wzm );
+          float rockH = mix( rB.g, rA.g, wzm );
+          // 암반 위 이끼·해조류 — 큰 패치에만 옅게
+          vec3 algaeC = texture2D( uAlgae, ruvA * 0.62 + 7.0 ).rgb;
+          float algaeK = smoothstep( 0.52, 0.86, m1 ) * smoothstep( 0.30, 0.78, m2 );
+          rockyC = mix( rockyC, algaeC * vec3( 0.78, 0.88, 0.74 ), algaeK * 0.55 );
+          rockyC *= 0.86 + 0.32 * rM.r;
 
-          vec3 detail = mix( rocky, sandy, sandW );
-          // 얕은 산호 지대 — 암초에 분홍·주황 기운을 살짝 얹어 힐링감을 더한다
-          float reefK = smoothstep( -40.0, 6.0, vWPosV.y ) * smoothstep( 0.34, 0.86, pFine ) * ( 0.35 + 0.65 * ( 1.0 - flatK ) );
-          detail = mix( detail, detail * vec3( 1.26, 0.88, 1.04 ), reefK * 0.5 );
-          detail = mix( detail, cBasalt, deepK );
-          detail *= 1.02;
-          // 얕은 모래밭은 밝고 따뜻하게 — 진짜 백사장 느낌
-          detail *= mix( vec3( 1.0 ), vec3( 1.10, 1.08, 1.04 ), sandW );
+          /* ---- 수심이 깊으면 현무암·침전물 ---- */
+          float deepK = smoothstep( -110.0, -420.0, wp.y );
+          vec4 bA = texture2D( uBasalt, vec2( wp.y * 0.09, ( wp.x + wp.z ) * 0.07 ) );
+          vec3 basaltC = bA.rgb * ( 0.82 + 0.36 * m2 );
+          float basaltH = bA.g;
 
-          // 수중 빛무늬 — 표면색을 밝히고(곱셈) 약간의 빛을 더한다(덧셈)
-          float upK = clamp( vWNrmV.y, 0.0, 1.0 );
-          float cFade = smoothstep( -360.0, -20.0, vWPosV.y );
-          vec2 cuv = vWPosV.xz * 0.038;
+          vec3 detail = mix( rockyC, sandyC, flatK );
+          detail = mix( detail, basaltC, deepK * 0.88 );
+          float hMicro = mix( mix( rockH, sandH, flatK ), basaltH, deepK * 0.88 );
+
+          // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
+          detail *= mix( 1.0, 0.62, deepK );
+          detail *= mix( vec3( 1.0 ), vec3( 1.05, 1.02, 0.95 ), flatK );
+          // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
+          detail *= 0.94 + 0.12 * m3;
+
+          /* ---- 수중 빛무늬(caustics) : 얕은 평지에만, 넓게 번지는 빛 덩어리 ---- */
+          float cFade = smoothstep( -340.0, -20.0, wp.y );
+          vec2 cuv = wp.xz * 0.038;
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.019, uTime * 0.013 ) ).r;
           float cb = texture2D( uCaustics, cuv * 1.33 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
-          // 얇은 셀 선이 아니라, 넓게 번지는 부드러운 빛 덩어리
           float cshape = smoothstep( 0.18, 0.95, ca * 0.55 + cb * 0.65 );
           cshape = cshape * cshape;
-          float cpatch = smoothstep( 0.30, 0.82, abyssFbm( vWPosV.xz * 0.032 + 21.0 ) );
-          float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * upK * upK * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.12;
+          float cpatch = smoothstep( 0.30, 0.82, abyssFbm( wp.xz * 0.032 + 21.0 ) );
+          float caustic = cshape * cpatch * cFade * ( 0.02 + 0.98 * up * up * up ) * uCausticI;
+          detail *= 1.0 + caustic * 0.09;
+
           diffuseColor.rgb *= detail;
           `
-        ).replace(
+        )
+        .replace(
+          '#include <normal_fragment_begin>',
+          `#include <normal_fragment_begin>
+          /* 텍스처 높이값의 화면 미분으로 미세 요철 노멀을 만든다.
+             (별도 노멀맵 파일 없이, 확대해도 모래알·암석 입자가 살아난다) */
+          {
+            vec3 nW = normalize( vWNrmV );
+            vec3 dpx = dFdx( vWPosV );
+            vec3 dpy = dFdy( vWPosV );
+            float dhx = dFdx( hMicro ) * ( 0.6 + 0.9 * ( 1.0 - flatK ) );
+            float dhy = dFdy( hMicro ) * ( 0.6 + 0.9 * ( 1.0 - flatK ) );
+            vec3 r1 = cross( dpy, nW );
+            vec3 r2 = cross( nW, dpx );
+            float det = dot( dpx, r1 );
+            vec3 grad = sign( det ) * ( dhx * r1 + dhy * r2 );
+            vec3 nP = normalize( abs( det ) * nW - uBump * grad );
+            normal = normalize( mat3( viewMatrix ) * nP );
+          }
+          `
+        )
+        .replace(
           'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;',
           `
           // 물에 젖은 표면의 비스듬한 광택 — 가장자리로 갈수록 물빛이 얇게 덮인다
           vec3 vdir = normalize( cameraPosition - vWPosV );
-          float fres = pow( 1.0 - clamp( dot( normalize( vWNrmV ), vdir ), 0.0, 1.0 ), 3.0 );
+          float fres = pow( 1.0 - clamp( dot( normalize( vWNrmV ), vdir ), 0.0, 1.0 ), 4.0 );
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
-            + vec3( 0.58, 0.93, 1.0 ) * caustic * ( 0.045 + 0.05 * upK )
-            + vec3( 0.36, 0.72, 0.92 ) * fres * ( 0.022 + 0.05 * upK );
+            + vec3( 0.58, 0.93, 1.0 ) * caustic * ( 0.035 + 0.045 * up )
+            + vec3( 0.34, 0.68, 0.88 ) * fres * ( 0.014 + 0.035 * up );
           `
         );
     };
@@ -623,8 +671,10 @@ export class World {
 
   /* ---------------- 지형 소품 템플릿 (한 번만 만들어 재사용) ---------------- */
   _buildTemplates() {
-    this.tpl = { rock: [], branch: [], blob: [], tube: [], fan: [], brain: [], tuft: [] };
-    for (let i = 0; i < 5; i++) this.tpl.rock.push(paint(rockGeometry(1, 500 + i * 91), 0xffffff));
+    this.tpl = { rock: [], rockLo: [], branch: [], blob: [], tube: [], fan: [], brain: [], tuft: [] };
+    // 가까운 바위는 고세그먼트(부드러운 곡면), 먼 바위는 가벼운 형상
+    for (let i = 0; i < 5; i++) this.tpl.rock.push(paint(rockGeometry(1, 500 + i * 91, 2), 0xffffff));
+    for (let i = 0; i < 3; i++) this.tpl.rockLo.push(paint(rockGeometry(1, 700 + i * 53, 1), 0xffffff));
     for (let i = 0; i < 7; i++) this.tpl.branch.push(branchCoralGeometry(0xffffff, 610 + i * 37));
     for (let i = 0; i < 7; i++) this.tpl.blob.push(blobCoralGeometry(0xffffff, 720 + i * 41));
     for (let i = 0; i < 5; i++) this.tpl.tube.push(tubeCoralGeometry(0xffffff, 830 + i * 43));
@@ -751,27 +801,18 @@ export class World {
         vnor[k3 + 1] = uny;
         vnor[k3 + 2] = unz;
 
-        // 색 — 평평한 바닥은 모래, 벽면은 암벽(gray)
+        // 색은 '밝기·음영'만 담는다 — 표면의 갈색·회색은 셰이더의 월드 텍스처가 만든다
         const flatness = clamp01((uny - 0.35) / 0.55);   // 1 = 평지
-        const n =
-          Math.sin(wx * 0.15 + wz * 0.07) * 0.5 +
-          Math.cos(wz * 0.13 - wx * 0.09) * 0.5;
-        const kk = clamp01((n + 1.15) / 2.3);
         const dkRaw = clamp01((SURFACE_Y - y) / 1000);
         const dk = Math.pow(dkRaw, 0.7);
-        // 벽면은 큰 패치로 색이 갈린다 — 회백색 암벽 · 이끼 초록 · 산호 분홍/보라
-        const wall = 1 - flatness;
-        const wpatch = Math.sin(wx * 0.041 + wz * 0.017) * 0.5 + Math.cos(wz * 0.031 - wx * 0.026) * 0.5;
-        const hue = 0.10 + dk * 0.45 + wall * (0.09 + wpatch * 0.19);
-        const sat = 0.07 + flatness * 0.10 + wall * (0.08 + Math.max(0, wpatch) * 0.10);
         // 간이 앰비언트 오클루전 — 골짜기(이웃보다 낮은 곳)는 어둡게, 마루는 밝게.
         // 그림자 맵 없이도 깊이감이 생긴다.
         const avgN = (hL + hR + hD + hU) * 0.25;
         const bowl = clamp01((avgN - y) / (d * 0.75));
         const ridge = clamp01((y - avgN) / (d * 0.75));
-        const ao = clamp01(1.0 - bowl * 0.55 + ridge * 0.10);
-        const lit = (0.56 - dk * 0.28 + kk * 0.05) * (0.82 + flatness * 0.18) * ao;
-        fc.setHSL(hue, Math.max(0.02, sat), clamp01(lit));
+        const ao = clamp01(1.0 - bowl * 0.62 + ridge * 0.08);
+        const lit = (0.74 - dk * 0.30) * (0.90 + flatness * 0.10) * ao;
+        fc.setHSL(0.10, 0.015 + (1 - flatness) * 0.02, clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;
         vcol[k3 + 2] = fc.b;
@@ -836,21 +877,28 @@ export class World {
 
     /* --- 바위 (모든 청크 · 먼 곳에서도 실루엣을 만들어 준다) --- */
     const geos = [flatFloor];
-    const rockCount = detail ? 12 : 5;
+    const rockCount = detail ? 9 : 4;
     const rockCol = new THREE.Color();
     for (let i = 0; i < rockCount; i++) {
       const lx = (rnd() - 0.5) * CHUNK * 0.94;
       const lz = (rnd() - 0.5) * CHUNK * 0.94;
-      const r = (detail ? 1.1 : 2.0) + rnd() * (detail ? 3.0 : 5.0);
-      const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
-      const g = rnd() < 0.84 ? 0.2 + rnd() * 0.14 : 0.34 + rnd() * 0.12;
-      const geo = this._clonePainted(tpl, rockCol.setHSL(0.09, 0.12, g).getHex());
+      const r = (detail ? 1.0 : 1.8) + rnd() * (detail ? 2.8 : 4.6);
+      const list = detail ? this.tpl.rock : this.tpl.rockLo;
+      const tpl = list[Math.floor(rnd() * list.length)];
+      // 회갈색 현무암 ~ 이끼 낀 암반 — 원색 없이 낮은 채도로
+      const g = 0.16 + rnd() * 0.12;
+      const geo = this._clonePainted(
+        tpl,
+        rockCol.setHSL(0.09 + rnd() * 0.04, 0.05 + rnd() * 0.07, g).getHex()
+      );
       const m = new THREE.Matrix4();
-      m.makeRotationY(rnd() * Math.PI * 2);
-      m.scale(new THREE.Vector3(r, r, r));
-      m.setPosition(lx, getTerrainHeight(ox + lx, oz + lz) + r * 0.16, lz);
+      m.makeRotationFromEuler(new THREE.Euler(
+        (rnd() - 0.5) * 0.22, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.22
+      ));
+      m.scale(new THREE.Vector3(r, r * (0.8 + rnd() * 0.4), r));
+      // 해저에 파묻혀 앉은 느낌 — 바닥보다 살짝 아래에 놓는다
+      m.setPosition(lx, getTerrainHeight(ox + lx, oz + lz) - r * 0.08, lz);
       geo.applyMatrix4(m);
-      this._worldUv(geo, ox, oz);
       geos.push(geo);
     }
 
@@ -867,7 +915,7 @@ export class World {
           const a = (i / (n - 1)) * Math.PI;
           const rr = 2.0 + rnd() * 1.5;
           const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
-          const geo = this._clonePainted(tpl, new THREE.Color().setHSL(0.33, 0.24, 0.16 + rnd() * 0.12).getHex());
+          const geo = this._clonePainted(tpl, new THREE.Color().setHSL(0.10, 0.06 + rnd() * 0.05, 0.15 + rnd() * 0.09).getHex());
           const m = new THREE.Matrix4();
           m.makeRotationY(rnd() * Math.PI * 2);
           m.scale(new THREE.Vector3(rr, rr, rr));
@@ -877,7 +925,6 @@ export class World {
             az + Math.cos(a) * R * Math.sin(rot)
           );
           geo.applyMatrix4(m);
-          this._worldUv(geo, ox, oz);
           geos.push(geo);
         }
       }
@@ -892,6 +939,15 @@ export class World {
       const coralGeos = [];
       const zone = this.zone;
       const tmpCol = new THREE.Color();
+      const rockTone = new THREE.Color(0x6b6459);
+      /* 같은 팔레트라도 개체마다 색이 조금씩 다르고, 바닥 암반 톤이 섞여 있다 —
+         실제 산호는 한 색으로 칠한 플라스틱이 아니다 */
+      const coralPick = () => {
+        const base = zone.coral[Math.floor(rnd() * zone.coral.length)];
+        tmpCol.set(base).lerp(rockTone, 0.06 + rnd() * 0.18);
+        tmpCol.multiplyScalar(0.84 + rnd() * 0.30);
+        return tmpCol.getHex();
+      };
       for (let i = 0; i < 42; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.94;
         const lz = (rnd() - 0.5) * CHUNK * 0.94;
@@ -902,7 +958,7 @@ export class World {
         const slope = slopeAt(wx, wz);
         if (slope > 1.45) continue;             // 수직에 가까운 벽에는 심지 않는다
         const steep = slope > 0.7;              // 절벽 경사면 — 작고 단단한 산호 위주
-        const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
+        const color = coralPick();
         const kind = rnd();
         let tpl;
         if (kind < 0.26) tpl = this.tpl.branch[Math.floor(rnd() * this.tpl.branch.length)];
@@ -938,7 +994,7 @@ export class World {
         if (gy < -30) continue;
         if (slopeAt(wx, wz) > 2.0) continue;
         const tpl = this.tpl.tuft[Math.floor(rnd() * this.tpl.tuft.length)];
-        const color = zone.coral[Math.floor(rnd() * zone.coral.length)];
+        const color = coralPick();
         let geo = this._clonePainted(tpl, color);
         if (geo.index) geo = geo.toNonIndexed();
         const sc = 0.8 + rnd() * 1.5;
@@ -958,8 +1014,8 @@ export class World {
         const gy = getTerrainHeight(wx, wz);
         if (gy < -30) continue;
         const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
-        const cc = zone.coral[Math.floor(rnd() * zone.coral.length)];
-        let geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0xcfc6b4), 0.62).getHex());
+        const cc = coralPick();
+        let geo = this._clonePainted(tpl, tmpCol.set(cc).lerp(new THREE.Color(0x8d8676), 0.72).getHex());
         if (geo.index) geo = geo.toNonIndexed();
         const sc = 0.55 + rnd() * 1.1;
         const m = new THREE.Matrix4();
@@ -1327,9 +1383,8 @@ export class World {
     this.zoneIndex = i;
     this.zone = ZONES[i];
     this.zoneTarget = ZONES[i];
-    // 바닥 색은 항상 산호 지대 톤을 기본으로 (물빛은 update 에서 수심에 따라 변한다)
-    const tint = new THREE.Color(ZONES[0].coral[0]).lerp(new THREE.Color(0xffffff), 0.9);
-    this.floorMats.forEach((m) => m.color.copy(tint));
+    // 색은 정점 색(밝기)·텍스처·조명이 만든다 — 재질 색은 중립으로 둔다
+    this.floorMats.forEach((m) => m.color.setHex(0xffffff));
   }
 
   /* ---------------- 업데이트 ---------------- */

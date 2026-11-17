@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117x';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117x';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117x';
+import { Sound } from './audio.js?v=20261117y';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117y';
+import { RenderPipeline, QUALITY } from './render.js?v=20261117y';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117x';
-import { FX } from './fx.js?v=20261117x';
+} from './models.js?v=20261117y';
+import { FX } from './fx.js?v=20261117y';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2219,25 +2219,25 @@ function renderFrame(dt) {
       const u = pipeline.uni;
       u.uDepth.value = Math.min(1, depth / 900);
       // 깊어질수록 노출을 조금 올려 심해가 완전히 검게 죽지 않게
-      u.uExposure.value = 1.0 + 0.42 * Math.min(1, depth / 1400);
+      u.uExposure.value = 1.02 + 0.40 * Math.min(1, depth / 1400);
       /* 표층에서만 위에서 내려오는 밝은 물빛
    — 얕을수록 화면 위쪽이 환하고, 깊어지면 사라진다 */
-      u.uTopGlow.value = 0.03 * Math.max(0, 1 - depth / 620);
+      u.uTopGlow.value = 0.022 * Math.max(0, 1 - depth / 620);
       /* 하늘(위쪽) 방향을 화면 좌표로 — 물빛 돔의 중심 */
       _upWorld.copy(camera.position).addScaledVector(UP, 80).project(camera);
       if (_upWorld.z < 1) {
         u.uUpUV.value.set(_upWorld.x * 0.5 + 0.5, _upWorld.y * 0.5 + 0.5);
-        u.uUpI.value = 0.07 * Math.max(0.24, 1 - depth / 1400);
+        u.uUpI.value = 0.05 * Math.max(0.24, 1 - depth / 1400);
       } else {
         u.uUpI.value = 0.02;
       }
-      u.uSat.value = 1.13 + 0.1 * Math.min(1, depth / 1200);
+      u.uSat.value = 0.93 + 0.06 * Math.min(1, depth / 1200);
       /* 태양 빛줄기는 바라보는 방향과 수심에 따라 세기가 달라진다 */
       _sunWorld.copy(camera.position).addScaledVector(_sunDir, 420);
       camera.getWorldDirection(_camDirV);
       const toward = Math.max(0, _camDirV.dot(_sunDir));
       const k = Math.max(0, 1 - depth / 420);
-      pipeline.setSun(_sunWorld, camera, 0.85 * k * k * (0.15 + 0.85 * toward * toward));
+      pipeline.setSun(_sunWorld, camera, 0.62 * k * k * (0.15 + 0.85 * toward * toward));
     }
     pipeline.render(dt);
   } else {

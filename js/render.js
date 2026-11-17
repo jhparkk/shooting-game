@@ -59,11 +59,11 @@ export class RenderPipeline {
       uResolution: { value: new THREE.Vector2(1, 1) },
       uTime: { value: 0 },
       uExposure: { value: 1.02 },
-      uBloom: { value: 0.48 },
-      uBloomTint: { value: new THREE.Color(0.62, 0.9, 1.0) },
+      uBloom: { value: 0.34 },
+      uBloomTint: { value: new THREE.Color(0.70, 0.87, 0.94) },
       uRayI: { value: 0.0 },
       uSunUV: { value: new THREE.Vector2(0.5, 0.9) },
-      uSat: { value: 1.2 },
+      uSat: { value: 0.95 },
       uVig: { value: 0.5 },
       uGrain: { value: 0.012 },
       uWobble: { value: 1.0 },
@@ -72,7 +72,7 @@ export class RenderPipeline {
       uUpUV: { value: new THREE.Vector2(0.5, 1.6) },
       uUpI: { value: 0.0 },
       uSurfaceTint: { value: new THREE.Color(0.45, 0.95, 1.0) },
-      uShadowTint: { value: new THREE.Color(0.86, 0.97, 1.12) },
+      uShadowTint: { value: new THREE.Color(0.90, 0.98, 1.06) },
       uHighTint: { value: new THREE.Color(1.04, 1.0, 0.95) },
       uDepth: { value: 0 },
       uFade: { value: 1 },
@@ -124,7 +124,7 @@ export class RenderPipeline {
     this.brightMat = new THREE.ShaderMaterial({
       uniforms: {
         tDiffuse: { value: null },
-        uThreshold: { value: 0.72 },
+        uThreshold: { value: 0.86 },
         uKnee: { value: 0.35 },
         uTexel: { value: new THREE.Vector2(0.001, 0.001) },
       },
@@ -320,7 +320,7 @@ export class RenderPipeline {
     this.uni.uCA.value = p.chromatic ? 1.0 : 0.0;
     this.uni.uGrain.value = p.grain;
     this.uni.uWobble.value = p.wobble;
-    this.uni.uBloom.value = p.bloom ? 0.48 : 0.0;
+    this.uni.uBloom.value = p.bloom ? 0.34 : 0.0;
     this.rayMat.uniforms.uSteps.value = p.raySteps;
     this.resize(true);
   }

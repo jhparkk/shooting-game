@@ -167,28 +167,29 @@ function normalize(img, data, target, maxK) {
    ========================================================= */
 function bakeSand(size) {
   return bakePair(size, (u, v, o) => {
-    const warp = fbm(u, v, 3, 3, 11);
-    const warp2 = fbm(u, v, 6, 2, 47);
-    // 물결: u 축으로 흐르고 v 축으로 천천히 흔들린다
-    const rip = Math.sin((v * 7 + u * 1.2 + warp * 1.5 + warp2 * 1.0) * TAU);
-    const rip2 = Math.sin((v * 19 + warp2 * 2.2 + warp * 1.4) * TAU);
-    const grain = noise2(u * 256, v * 256, 256, 3);
-    const shell = fbm(u, v, 24, 2, 71);
+    /* 실제 모래 물결은 마루가 둥글고 골이 얕은 비대칭 파형이며,
+       방향이 조금씩 흐트러진다. 큰 대비 없이 '입자'만 살린다 —
+       매크로 변화는 셰이더의 월드 좌표 노이즈가 맡는다(타일 반복 제거). */
+    const warp = fbm(u, v, 2, 3, 11);
+    const warp2 = fbm(u, v, 5, 2, 47);
+    const dir = v * 5.0 + u * 1.1 + warp * 2.4 + warp2 * 1.6;
+    const rip = Math.sin(dir * TAU) * 0.5 + 0.5;
+    const ripS = rip * rip * (3 - 2 * rip);          // 둥근 마루
+    const grain = noise2(u * 220, v * 220, 220, 3);
+    const grain2 = noise2(u * 58, v * 58, 58, 91);
+    const pebble = worley(u, v, 24, 971);
+    const bit = 1 - smooth(0.0, 0.14, pebble.f1);     // 작은 자갈·조개 부스러기
 
-    // 밝기: 물결 마루 + 미세 모래알
-    const shade = 0.80
-      + rip * 0.05
-      + rip2 * 0.03
-      + (grain - 0.5) * 0.18
-      + (shell - 0.5) * 0.18;
+    let shade = 0.87
+      + (ripS - 0.5) * 0.05
+      + (grain - 0.5) * 0.075
+      + (grain2 - 0.5) * 0.075;
+    shade *= 1 - bit * 0.11;
 
-    const r = clamp01(shade * 0.97 + 0.02);
-    const g = clamp01(shade * 0.96 + 0.02);
-    const b = clamp01(shade * 0.92 + 0.02);
-    o[0] = (r * 255) | 0;
-    o[1] = (g * 255) | 0;
-    o[2] = (b * 255) | 0;
-    o[3] = clamp01(0.52 + rip * 0.3 + (grain - 0.5) * 0.3) * 255;
+    o[0] = clamp01(shade * 1.0) * 255;
+    o[1] = clamp01(shade * 0.972) * 255;
+    o[2] = clamp01(shade * 0.918) * 255;
+    o[3] = clamp01(0.52 + (ripS - 0.5) * 0.26 + (grain - 0.5) * 0.22 - bit * 0.2) * 255;
   });
 }
 
@@ -197,24 +198,28 @@ function bakeSand(size) {
    ========================================================= */
 function bakeRock(size) {
   return bakePair(size, (u, v, o) => {
-    // 지층: v 를 눌러 가로 띠를 만들고, u 로 흔들어 자연스럽게
-    const strata = fbm(u * 0.6, v * 7.5, 6, 4, 21);
-    const lump = fbm(u, v, 4, 4, 89);
-    const fine = noise2(u * 200, v * 200, 200, 5);
-    // 능선 패턴으로 균열선 — 다만 암벽 전체에 그물처럼 깔리지 않도록
-    // 큰 패치 안에서만 드문드문 나타나게 한다 (모래밭 위 '마른 진흙' 느낌 방지)
-    const ridge = 1 - Math.abs(fbm(u * 1.4, v * 1.4, 5, 3, 133) * 2 - 1);
-    const crackMask = smooth(0.52, 0.92, fbm(u, v, 2, 2, 777));
-    const crack = smooth(0.95, 1.0, ridge + fine * 0.02) * crackMask;
+    /* 암반: 얕은 지층 띠 + 입자 결. 균열은 아주 드물고 옅게 —
+       예전엔 균열 '그물'이 바닥까지 덮여 만화처럼 보였다. */
+    const strata = fbm(u * 0.6, v * 6.0, 6, 4, 21);
+    const lump = fbm(u, v, 3, 4, 89);
+    const fine = noise2(u * 190, v * 190, 190, 5);
+    const grain = noise2(u * 40, v * 40, 40, 313);
+    const ridge = 1 - Math.abs(fbm(u * 1.1, v * 1.1, 4, 3, 133) * 2 - 1);
+    const crackMask = smooth(0.86, 1.0, fbm(u, v, 2, 2, 777));
+    const crack = smooth(0.97, 1.0, ridge) * crackMask;
 
-    let shade = 0.46 + (strata - 0.5) * 0.34 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.10;
-    shade *= 1 - crack * 0.14;
-    // 이끼·규조가 붙은 듯한 녹회색
-    const moss = smooth(0.55, 0.9, fbm(u, v, 5, 3, 201)) * 0.28;
-    o[0] = clamp01(shade * 0.94 - moss * 0.14) * 255;
-    o[1] = clamp01(shade * 1.00 + moss * 0.10) * 255;
-    o[2] = clamp01(shade * 0.88 - moss * 0.06) * 245;
-    o[3] = clamp01(0.55 + (strata - 0.5) * 0.7 + (fine - 0.5) * 0.2 - crack * 0.4) * 255;
+    let shade = 0.50
+      + (strata - 0.5) * 0.20
+      + (lump - 0.5) * 0.20
+      + (grain - 0.5) * 0.10
+      + (fine - 0.5) * 0.09;
+    shade *= 1 - crack * 0.12;
+    // 이끼·규조가 붙은 듯한 아주 옅은 청록기
+    const moss = smooth(0.58, 0.92, fbm(u, v, 5, 3, 201)) * 0.22;
+    o[0] = clamp01(shade * 0.97 - moss * 0.10) * 255;
+    o[1] = clamp01(shade * 0.99 + moss * 0.06) * 255;
+    o[2] = clamp01(shade * 0.93 - moss * 0.02) * 255;
+    o[3] = clamp01(0.54 + (strata - 0.5) * 0.44 + (grain - 0.5) * 0.3 + (fine - 0.5) * 0.22 - crack * 0.35) * 255;
   });
 }
 
@@ -232,13 +237,13 @@ function bakeCoralSand(size) {
     const bits = worley(u, v, 34, 1217);
     const piece = 1 - smooth(0.0, 0.24, bits.f1);
     const warm = fbm(u, v, 11, 2, 1223);
-    let shade = 0.92 + rip * 0.035 + rip2 * 0.02 + (grain - 0.5) * 0.09;
-    shade *= 1 - piece * 0.10;
-    const pink = smooth(0.62, 0.92, warm) * piece;
-    o[0] = clamp01(shade * 1.0 + pink * 0.16) * 255;
-    o[1] = clamp01(shade * 0.985 - pink * 0.05) * 255;
-    o[2] = clamp01(shade * 0.955 + pink * 0.02) * 255;
-    o[3] = clamp01(0.5 + rip * 0.26 + (grain - 0.5) * 0.26 - piece * 0.2) * 255;
+    let shade = 0.90 + rip * 0.03 + rip2 * 0.018 + (grain - 0.5) * 0.08;
+    shade *= 1 - piece * 0.09;
+    const pink = smooth(0.66, 0.94, warm) * piece;
+    o[0] = clamp01(shade * 1.0 + pink * 0.05) * 255;
+    o[1] = clamp01(shade * 0.985 - pink * 0.02) * 255;
+    o[2] = clamp01(shade * 0.955) * 255;
+    o[3] = clamp01(0.5 + rip * 0.22 + (grain - 0.5) * 0.24 - piece * 0.18) * 255;
   });
 }
 
@@ -255,15 +260,15 @@ function bakeReef(size) {
     let shade = 0.82 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.1;
     shade *= 1 - pore * 0.15;   // 구멍 대비를 낮춰 먼 거리에서 그물 무늬로 보이지 않게
     shade *= 0.86 + smooth(0.03, 0.2, cell2.f2 - cell2.f1) * 0.2;
-    // 색 — 분홍 · 주황 · 보랏빛 산호 알갱이가 패치로
+    // 색 — 아주 옅은 분홍·주황·회보라가 패치로 (바다 속에서는 대부분 회갈색)
     const pick = fbm(u, v, 9, 3, 1333);
-    const pink = smooth(0.56, 0.82, pick) * 0.55;
-    const orange = smooth(0.44, 0.30, pick) * 0.4;
-    const violet = smooth(0.86, 0.98, pick) * 0.35;
-    o[0] = clamp01(shade * 1.02 + pink * 0.26 + orange * 0.3 + violet * 0.12) * 255;
-    o[1] = clamp01(shade * 0.97 + pink * 0.06 + orange * 0.16 - violet * 0.06) * 255;
-    o[2] = clamp01(shade * 0.97 + pink * 0.16 - orange * 0.1 + violet * 0.3) * 255;
-    o[3] = clamp01(0.58 + (lump - 0.5) * 0.5 - pore * 0.42 + (fine - 0.5) * 0.2) * 255;
+    const pink = smooth(0.60, 0.86, pick) * 0.55;
+    const orange = smooth(0.44, 0.28, pick) * 0.4;
+    const violet = smooth(0.88, 0.99, pick) * 0.35;
+    o[0] = clamp01(shade * 1.0 + pink * 0.09 + orange * 0.11 + violet * 0.03) * 255;
+    o[1] = clamp01(shade * 0.97 + pink * 0.02 + orange * 0.06 - violet * 0.02) * 255;
+    o[2] = clamp01(shade * 0.95 + pink * 0.05 - orange * 0.04 + violet * 0.09) * 255;
+    o[3] = clamp01(0.58 + (lump - 0.5) * 0.44 - pore * 0.36 + (fine - 0.5) * 0.18) * 255;
   });
 }
 
@@ -279,10 +284,10 @@ function bakeAlgaeRock(size) {
     const weed = smooth(0.5, 0.86, fbm(u * 1.3, v * 0.55, 7, 3, 1423));
     const fuzzy = smooth(0.55, 0.95, fbm(u, v, 26, 2, 1429));
     let shade = 0.5 + (strata - 0.5) * 0.3 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.1;
-    const green = weed * (0.32 + fuzzy * 0.34);
-    o[0] = clamp01(shade * 0.94 - green * 0.2) * 255;
-    o[1] = clamp01(shade * 1.02 + green * 0.34) * 255;
-    o[2] = clamp01(shade * 0.9 - green * 0.04) * 255;
+    const green = weed * (0.18 + fuzzy * 0.18);
+    o[0] = clamp01(shade * 0.95 - green * 0.12) * 255;
+    o[1] = clamp01(shade * 1.0 + green * 0.2) * 255;
+    o[2] = clamp01(shade * 0.92 - green * 0.02) * 255;
     o[3] = clamp01(0.52 + (strata - 0.5) * 0.6 + (fine - 0.5) * 0.22 + green * 0.2) * 255;
   });
 }
@@ -292,16 +297,18 @@ function bakeAlgaeRock(size) {
    ========================================================= */
 function bakeBasalt(size) {
   return bakePair(size, (u, v, o) => {
-    const w = worley(u, v, 7, 313);
-    const edge = smooth(0.02, 0.13, w.f2 - w.f1);          // 셀 경계 = 균열
-    const lump = fbm(u, v, 8, 3, 401);
-    const fine = noise2(u * 220, v * 220, 220, 7);
-    let shade = 0.20 + (lump - 0.5) * 0.16 + (fine - 0.5) * 0.06;
-    shade *= 0.55 + edge * 0.45;
-    o[0] = clamp01(shade * 0.94) * 255;
+    /* 현무암 — 주상 절리 '그물'을 없애고, 옅은 세로 결 + 입자만 남긴다 */
+    const w = worley(u, v, 5, 313);
+    const edge = smooth(0.0, 0.42, w.f2 - w.f1);
+    const lump = fbm(u, v, 7, 3, 401);
+    const fine = noise2(u * 200, v * 200, 200, 7);
+    const grain = noise2(u * 46, v * 46, 46, 719);
+    let shade = 0.30 + (lump - 0.5) * 0.12 + (grain - 0.5) * 0.10 + (fine - 0.5) * 0.06;
+    shade *= 0.84 + edge * 0.16;
+    o[0] = clamp01(shade * 0.95) * 255;
     o[1] = clamp01(shade * 0.97) * 255;
-    o[2] = clamp01(shade * 1.22 + 0.02) * 255;
-    o[3] = clamp01(0.45 + edge * 0.5 + (fine - 0.5) * 0.15) * 255;
+    o[2] = clamp01(shade * 1.08) * 255;
+    o[3] = clamp01(0.5 + edge * 0.28 + (grain - 0.5) * 0.3 + (fine - 0.5) * 0.16) * 255;
   });
 }
 
