@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c5';
-import { getTextures } from './textures.js?v=20261117c5';
-import { Atmosphere } from './atmosphere.js?v=20261117c5';
+} from './models.js?v=20261117c6';
+import { getTextures } from './textures.js?v=20261117c6';
+import { Atmosphere } from './atmosphere.js?v=20261117c6';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1065,6 +1065,38 @@ export class World {
         geos.push(geo);
       }
     }
+
+    /* --- 바위 아치 (가끔) --- */
+    if (detail && rnd() < 0.22) {
+      const ax = (rnd() - 0.5) * CHUNK * 0.5;
+      const az = (rnd() - 0.5) * CHUNK * 0.5;
+      const gy = getTerrainHeight(ox + ax, oz + az);
+      if (gy > -4) {
+        const R = 13 + rnd() * 8;
+        const rot = rnd() * Math.PI * 2;
+        const n = 9;
+        for (let i = 0; i < n; i++) {
+          const a = (i / (n - 1)) * Math.PI;
+          const rr = 2.0 + rnd() * 1.5;
+          const tpl = this.tpl.rock[Math.floor(rnd() * this.tpl.rock.length)];
+          const geo = this._clonePainted(tpl, new THREE.Color().setHSL(0.10, 0.06 + rnd() * 0.05, 0.15 + rnd() * 0.09).getHex());
+          const m = new THREE.Matrix4();
+          m.makeRotationY(rnd() * Math.PI * 2);
+          m.scale(new THREE.Vector3(rr, rr, rr));
+          m.setPosition(
+            ax + Math.cos(a) * R * Math.cos(rot),
+            gy + 1.5 + Math.sin(a) * R * 1.05,
+            az + Math.cos(a) * R * Math.sin(rot)
+          );
+          geo.applyMatrix4(m);
+          geos.push(geo);
+        }
+      }
+    }
+
+    const terrainGeo = mergeGeometries(geos, false);
+    rec.terrain.geometry = terrainGeo;
+    terrainGeo.computeBoundingSphere();
 
     /* --- 산호초 --- */
     if (detail) {
