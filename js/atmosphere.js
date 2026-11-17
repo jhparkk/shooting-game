@@ -55,15 +55,15 @@ const SURFACE_FRAG = /* glsl */ `
     vec3 col = mix(uDeepColor * 0.62, uSurfaceColor, win);
 
     /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
-    float c1 = sin(p.x * 0.41 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.37 - t * 0.27 + n.y * 1.6);
-    float c2 = sin((p.x + p.y) * 0.63 - t * 0.44) * sin((p.x - p.y) * 0.55 + t * 0.38);
-    float c3 = sin(p.x * 1.31 - p.y * 1.12 + t * 0.82) * sin(p.y * 1.19 + p.x * 0.94 - t * 0.67);
+    float c1 = sin(p.x * 0.26 + t * 0.31 + n.x * 1.4) * sin(p.y * 0.23 - t * 0.27 + n.y * 1.6);
+    float c2 = sin((p.x + p.y) * 0.41 - t * 0.44) * sin((p.x - p.y) * 0.35 + t * 0.38);
+    float c3 = sin(p.x * 0.87 - p.y * 0.74 + t * 0.82) * sin(p.y * 0.79 + p.x * 0.62 - t * 0.67);
     float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 4.5) * 0.55
                   + pow(max(c3, 0.0), 7.0) * 0.28;
     /* 큰 덩어리로 끊어 타일처럼 보이지 않게 */
     sparkle *= 0.32 + 0.68 * (sin(p.x * 0.043 + t * 0.03) * sin(p.y * 0.051 - t * 0.024) * 0.5 + 0.5);
     /* 멀리 있는 물결은 뭉개서 타일·모아레가 보이지 않게 */
-    sparkle *= 1.0 - smoothstep(45.0, 190.0, dist);
+    sparkle *= 1.0 - smoothstep(35.0, 150.0, dist);
     col += uSurfaceColor * sparkle * (0.30 + win * 0.55);
 
     /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
@@ -82,8 +82,8 @@ const SURFACE_FRAG = /* glsl */ `
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
     float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
-    col = mix(col, uFogColor, clamp(fogF, 0.0, 1.0));
-    float alpha = 1.0 - smoothstep(160.0, 430.0, dist);
+    col = mix(col, uFogColor * 0.94, clamp(fogF, 0.0, 1.0));
+    float alpha = 1.0 - smoothstep(140.0, 380.0, dist);
     gl_FragColor = vec4(col, alpha);
   }
 `;

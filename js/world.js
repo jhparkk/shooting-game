@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117g';
-import { getTextures } from './textures.js?v=20261117g';
-import { Atmosphere } from './atmosphere.js?v=20261117g';
+} from './models.js?v=20261117h';
+import { getTextures } from './textures.js?v=20261117h';
+import { Atmosphere } from './atmosphere.js?v=20261117h';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -38,8 +38,8 @@ export const DEPTH_SCALE = 1.35;
 export const ZONES = [
   {
     name: '표층 산호대',
-    fog: 0x157a99, density: 0.0045,
-    skyTop: 0xb4f6f2, skyMid: 0x2aa6dc, skyBottom: 0x157a99,
+    fog: 0x106f8c, density: 0.0048,
+    skyTop: 0xa8f0ea, skyMid: 0x2496cc, skyBottom: 0x106f8c,
     hemiSky: 0xd8fbff, hemiGround: 0x1f6f8f, hemi: 0.68,
     ambient: 0x9cdef6, ambientI: 0.28,
     sun: 0xfffdf2, sunI: 2.25, glow: 1.0,
@@ -429,7 +429,7 @@ export class World {
         varying vec3 vDir;
         void main() {
           // 지평선(수평 방향)은 안개색과 같게, 위로 갈수록 표층의 밝은 물빛
-          vec3 c = mix(bottom * 0.86, mid, smoothstep(0.02, 0.46, vY));
+          vec3 c = mix(bottom * 0.94, mid, smoothstep(0.02, 0.46, vY));
           c = mix(c, top, smoothstep(0.44, 0.99, vY));
           // 표면 위 태양 — 수중에서 보면 퍼진 빛덩어리로 보인다
           float sd = max(0.0, dot(vDir, uSunDir));
@@ -587,11 +587,11 @@ export class World {
           float ca = texture2D( uCaustics, cuv + vec2( uTime * 0.012, uTime * 0.008 ) ).r;
           float cb = texture2D( uCaustics, cuv * 1.71 + vec2( -uTime * 0.015, uTime * 0.012 ) ).r;
           // 얇은 셀 선이 아니라, 넓게 번지는 부드러운 빛 덩어리
-          float cshape = smoothstep( 0.55, 1.15, ca * 0.55 + cb * 0.65 );
+          float cshape = smoothstep( 0.62, 1.25, ca * 0.55 + cb * 0.65 );
           cshape = cshape * cshape;
           float cpatch = smoothstep( 0.30, 0.82, abyssFbm( vWPosV.xz * 0.032 + 21.0 ) );
           float caustic = cshape * cpatch * cFade * ( 0.04 + 0.96 * upK * upK ) * uCausticI;
-          detail *= 1.0 + caustic * 0.5;
+          detail *= 1.0 + caustic * 0.38;
           diffuseColor.rgb *= detail;
           `
         ).replace(
