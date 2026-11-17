@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117c7';
-import { getTextures } from './textures.js?v=20261117c7';
-import { Atmosphere } from './atmosphere.js?v=20261117c7';
+} from './models.js?v=20261117c8';
+import { getTextures } from './textures.js?v=20261117c8';
+import { Atmosphere } from './atmosphere.js?v=20261117c8';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -546,14 +546,11 @@ export class World {
       uPebble: { value: t.pebble },
       uLimestone: { value: t.limestone },
       uRock: { value: t.rock },
-      uAlgae: { value: t.algae },
       uBasalt: { value: t.basalt },
       uCaustics: { value: t.caustics },
       uMacro: { value: t.macro },
       uSandN: { value: t.sandNormal },
-      uCoralSandN: { value: t.coralSandNormal },
       uPebbleN: { value: t.pebbleNormal },
-      uLimestoneN: { value: t.limestoneNormal },
       uRockN: { value: t.rockNormal },
       uBasaltN: { value: t.basaltNormal },
       uTime: { value: 0 },
@@ -575,11 +572,11 @@ export class World {
       shader.fragmentShader =
         'varying vec3 vWPosV;\nvarying vec3 vWNrmV;\n' +
         'uniform sampler2D uSand;\nuniform sampler2D uCoralSand;\nuniform sampler2D uPebble;\n' +
-        'uniform sampler2D uLimestone;\nuniform sampler2D uRock;\nuniform sampler2D uAlgae;\n' +
+        'uniform sampler2D uLimestone;\nuniform sampler2D uRock;\n' +
         'uniform sampler2D uBasalt;\nuniform sampler2D uCaustics;\nuniform sampler2D uMacro;\n' +
         'uniform float uTime;\nuniform float uCausticI;\n' +
-        'uniform sampler2D uSandN;\nuniform sampler2D uCoralSandN;\nuniform sampler2D uPebbleN;\n' +
-        'uniform sampler2D uLimestoneN;\nuniform sampler2D uRockN;\nuniform sampler2D uBasaltN;\n' +
+        'uniform sampler2D uSandN;\nuniform sampler2D uPebbleN;\n' +
+        'uniform sampler2D uRockN;\nuniform sampler2D uBasaltN;\n' +
         'uniform float uDetail;\nuniform float uBump;\n' +
         // 값 노이즈 — 월드 좌표 기반이라 어디서도 반복되지 않는다
         'float abyssHash(vec2 p){ p = fract(p * vec2(127.13, 311.7)); p += dot(p, p + 34.53); return fract(p.x * p.y); }\n' +
@@ -601,38 +598,33 @@ export class World {
           float m2 = abyssFbm( wp.xz * 0.072 + 13.7 );          // ~14 유닛
           float m3 = abyssNoise( wp.xz * 0.29 + 5.3 );          // ~3.5 유닛
 
-          /* ---- 지대(바이옴)를 가르는 저주파 노이즈 ----
-             같은 언덕 안에서도 밝은 산호 모래 · 자갈밭 · 석회암 선반 · 이끼 암반이
-             자연스럽게 갈리고, 넓은 바닥이 한 가지 질감으로만 덮이지 않는다. */
-          float pCoral  = abyssFbm( wp.xz * 0.023 + 3.1 );      // 밝은 산호 모래
-          float pPebble = abyssFbm( wp.xz * 0.041 + 17.3 );     // 자갈 · 조약돌 지대
-          float pLime   = abyssFbm( wp.xz * 0.029 + 41.9 );     // 석회암 선반
-          float pMoss   = abyssFbm( wp.xz * 0.034 + 63.7 );     // 이끼 낀 암반
-
-          /* ---- 매크로 노이즈 : 텍스처 타일을 지우는 저주파 변조 ---- */
-          vec3 mcA = texture2D( uMacro, wp.xz * 0.011 ).rgb;
-          vec3 mcB = texture2D( uMacro, wp.xz * 0.047 + 0.37 ).rgb;
-          vec2 warp = ( mcA.rg - 0.5 ) * 0.26;
+          /* ---- 매크로 노이즈 : 텍스처 타일을 지우고 '지대'를 가르는 저주파 변조 ----
+             한 장의 3채널을 그대로 써서 추가 노이즈 계산 없이 바이옴 패치를 만든다. */
+          vec3 mc = texture2D( uMacro, wp.xz * 0.011 ).rgb;
+          vec2 warp = ( mc.rg - 0.5 ) * 0.26;
+          float pCoral = mc.r;    // 밝은 산호 모래 지대
+          float pPebble = mc.g;   // 자갈 · 조약돌 지대
+          float pLime = mc.b;     // 석회암 선반
 
           /* ---- 모래 : 월드 XZ 투영 (+ 노이즈 워프) ---- */
           vec2 suv = wp.xz * 0.17 / clamp( up, 0.55, 1.0 ) + warp;
           // 백사장 — 햇빛을 받아 밝다
-          vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.88 + 0.26 * mcB.b );
+          vec3 sandyC = texture2D( uSand, suv ).rgb * ( 0.88 + 0.26 * mc.g );
           sandyC = mix( sandyC, sandyC * vec3( 0.94, 0.92, 0.88 ), smoothstep( 0.52, 0.88, m3 ) );
           // 옅은 분홍빛 산호 모래 — 산호 부스러기가 섞인 밝은 패치
-          vec3 coralSandC = texture2D( uCoralSand, suv * 0.86 + 3.4 ).rgb * ( 1.00 + 0.24 * mcB.b );
-          float coralK = smoothstep( 0.44, 0.74, pCoral + ( m2 - 0.5 ) * 0.28 ) * 0.92;
+          vec3 coralSandC = texture2D( uCoralSand, suv * 0.86 + 3.4 ).rgb * ( 1.00 + 0.24 * mc.b );
+          float coralK = smoothstep( 0.46, 0.72, pCoral + ( m2 - 0.5 ) * 0.28 ) * 0.92;
           vec3 flatC = mix( sandyC, coralSandC, coralK );
           flatC *= 0.90 + 0.20 * m2;
 
           /* ---- 자갈 · 조약돌 지대 — 굵은 자갈이 드러난 바닥 ---- */
-          vec3 pebC = texture2D( uPebble, suv * 0.66 + 8.1 ).rgb * ( 0.86 + 0.26 * mcB.r );
-          float pebK = smoothstep( 0.55, 0.82, pPebble ) * ( 0.55 + 0.45 * m3 );
+          vec3 pebC = texture2D( uPebble, suv * 0.66 + 8.1 ).rgb * ( 0.86 + 0.26 * mc.r );
+          float pebK = smoothstep( 0.44, 0.68, pPebble + ( m2 - 0.5 ) * 0.2 ) * ( 0.55 + 0.45 * m3 );
           flatC = mix( flatC, pebC, pebK * 0.94 );
 
           /* ---- 밝은 석회암 바닥 — 마모된 판이 넓게 깔린 곳 ---- */
-          vec3 limeC = texture2D( uLimestone, suv * 0.72 + 21.0 ).rgb * ( 0.94 + 0.20 * mcB.b );
-          float limeK = smoothstep( 0.58, 0.86, pLime );
+          vec3 limeC = texture2D( uLimestone, suv * 0.72 + 21.0 ).rgb * ( 0.94 + 0.20 * mc.g );
+          float limeK = smoothstep( 0.52, 0.78, pLime + ( m1 - 0.5 ) * 0.2 );
           flatC = mix( flatC, limeC, limeK * 0.88 );
 
           /* ---- 암벽 : 수직 투영 (벽면에서 늘어나지 않게 두 방향을 섞는다) ---- */
@@ -644,16 +636,13 @@ export class World {
           float hlen = length( hdir );
           hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
           vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
-          vec4 rA = texture2D( uRock, ruv );
-          vec3 rockyC = rA.rgb;
-          // 암반 위 이끼 · 해조류 — 초록빛 패치
-          vec3 algaeC = texture2D( uAlgae, ruv * 0.62 + 7.0 ).rgb;
-          float algaeK = smoothstep( 0.42, 0.74, pMoss ) * ( 0.5 + 0.5 * smoothstep( 0.25, 0.8, m2 ) );
-          rockyC = mix( rockyC, algaeC * vec3( 0.88, 1.00, 0.86 ), algaeK * 0.62 );
+          vec3 rockyC = texture2D( uRock, ruv ).rgb;
+          // 암반 위 이끼 · 해조류 — 초록빛 패치 (별도 텍스처 없이 초록으로 물들인다)
+          float algaeK = smoothstep( 0.42, 0.74, m1 ) * ( 0.5 + 0.5 * smoothstep( 0.25, 0.8, m2 ) );
+          rockyC = mix( rockyC, rockyC * vec3( 0.80, 1.06, 0.74 ) + vec3( 0.015, 0.05, 0.0 ), algaeK * 0.75 );
           // 성긴 석회암 선반 — 층이 진 밝은 판이 벽을 가로지른다
-          vec3 limeWall = texture2D( uLimestone, ruv * 0.72 + 5.5 ).rgb;
-          rockyC = mix( rockyC, limeWall, smoothstep( 0.60, 0.88, pLime ) * 0.6 );
-          rockyC *= 0.90 + 0.26 * mcB.r;
+          rockyC = mix( rockyC, limeC, smoothstep( 0.56, 0.82, pLime ) * 0.62 );
+          rockyC *= 0.88 + 0.24 * mc.r;
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
@@ -662,9 +651,8 @@ export class World {
           vec2 buv = ruv * 0.72 + vec2( 0.21, 0.37 );
           vec3 basaltC = texture2D( uBasalt, buv ).rgb * ( 0.86 + 0.30 * m2 );
           // 깊은 바닥에도 밝은 퇴적물이 패치로 고인다 — 바닥이 한 색으로 죽지 않게
-          vec3 deepSed = texture2D( uSand, suv * 0.9 + 11.0 ).rgb;
-          float sedK = smoothstep( 0.52, 0.86, pCoral ) * 0.55;
-          flatC = mix( flatC, deepSed, sedK );
+          float sedK = smoothstep( 0.52, 0.80, pCoral ) * 0.55;
+          flatC = mix( flatC, sandyC * 0.9, sedK );
 
           vec3 detail = mix( rockyC, flatC, flatK );
           detail = mix( detail, basaltC, deepK * 0.88 );
@@ -690,15 +678,12 @@ export class World {
 
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
-          vec3 nCS = texture2D( uCoralSandN, suv * 0.86 + 3.4 ).xyz * 2.0 - 1.0;
           vec3 nPB = texture2D( uPebbleN, suv * 0.66 + 8.1 ).xyz * 2.0 - 1.0;
-          vec3 nLS = texture2D( uLimestoneN, suv * 0.72 + 21.0 ).xyz * 2.0 - 1.0;
           vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
           vec3 nB = texture2D( uBasaltN, buv ).xyz * 2.0 - 1.0;
           // 평평한 바닥의 요철은 '그 바닥이 실제로 무엇인지'를 따라간다
-          vec3 nFlat = mix( nS, nCS, coralK );
-          nFlat = mix( nFlat, nPB, pebK * 0.94 );
-          nFlat = mix( nFlat, nLS, limeK * 0.88 );
+          vec3 nFlat = mix( nS, nPB, pebK * 0.94 );
+          nFlat = mix( nFlat, nPB * 0.75 + nS * 0.25, limeK * 0.6 );
           vec3 nTan = mix( nR, nFlat, flatK );
           nTan = mix( nTan, nB, deepK * 0.88 );
           // 모래는 (X,Z) 축, 벽면은 (수평방향, Y) 축
@@ -1128,7 +1113,7 @@ export class World {
         return this.tpl.anemone[Math.floor(rnd() * this.tpl.anemone.length)];
       };
 
-      for (let i = 0; i < 46; i++) {
+      for (let i = 0; i < 40; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.94;
         const lz = (rnd() - 0.5) * CHUNK * 0.94;
         const wx = ox + lx;
@@ -1163,7 +1148,7 @@ export class World {
         }
       }
       // 산호 카펫 — 바닥과 경사면을 작은 산호 다발 · 말미잘로 촘촘히 덮는다
-      for (let i = 0; i < 52; i++) {
+      for (let i = 0; i < 38; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.96;
         const lz = (rnd() - 0.5) * CHUNK * 0.96;
         const wx = ox + lx;
@@ -1171,7 +1156,7 @@ export class World {
         const gy = getTerrainHeight(wx, wz);
         if (gy < -30) continue;
         if (slopeAt(wx, wz) > 2.0) continue;
-        const useAnemone = rnd() < 0.28;
+        const useAnemone = rnd() < 0.2;
         const tpl = useAnemone
           ? this.tpl.anemone[Math.floor(rnd() * this.tpl.anemone.length)]
           : this.tpl.tuft[Math.floor(rnd() * this.tpl.tuft.length)];

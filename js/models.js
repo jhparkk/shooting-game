@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117c7';
+import { getTextures } from './textures.js?v=20261117c8';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -3091,12 +3091,12 @@ export function anemoneCoralGeometry(color, seed) {
   parts.push(paint(base, color));
   const c0 = new THREE.Color(color);
   const tip = c0.clone().offsetHSL(0, 0.06, 0.14);
-  const n = 12 + Math.floor(rnd() * 8);
+  const n = 9 + Math.floor(rnd() * 5);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + rnd() * 0.35;
     const d = R * (0.45 + rnd() * 0.5);
     const h = R * (1.0 + rnd() * 1.3);
-    const t = new THREE.CylinderGeometry(R * 0.045, R * 0.09, h, 5, 2);
+    const t = new THREE.CylinderGeometry(R * 0.05, R * 0.095, h, 4, 1);
     const p = t.attributes.position;
     const bend = 0.16 + rnd() * 0.14;
     for (let k = 0; k < p.count; k++) {
@@ -3183,7 +3183,7 @@ export function leafyPlantGeometry(height, width, seed) {
 /** 가는 잎 해초 군락 — 촘촘히 솟은 가는 잎이 물결 따라 살랑인다 */
 export function grassTuftGeometry(height, width, seed) {
   const rnd = mulberry(seed);
-  const blades = 12 + Math.floor(rnd() * 9);
+  const blades = 9 + Math.floor(rnd() * 7);
   const parts = [];
   const base = new THREE.Color();
   const tipC = new THREE.Color();
