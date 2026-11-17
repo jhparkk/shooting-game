@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117a2';
-import { getTextures } from './textures.js?v=20261117a2';
-import { Atmosphere } from './atmosphere.js?v=20261117a2';
+} from './models.js?v=20261117a3';
+import { getTextures } from './textures.js?v=20261117a3';
+import { Atmosphere } from './atmosphere.js?v=20261117a3';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -40,9 +40,9 @@ export const ZONES = [
     name: '표층 산호대',
     fog: 0x14616f, density: 0.0052,
     skyTop: 0x8fc9c9, skyMid: 0x2c7b96, skyBottom: 0x14616f,
-    hemiSky: 0xc6e6ea, hemiGround: 0x1c5560, hemi: 0.52,
+    hemiSky: 0xc6e6ea, hemiGround: 0x1c5560, hemi: 0.46,
     ambient: 0x8ec2cc, ambientI: 0.24,
-    sun: 0xfffbf0, sunI: 1.70, glow: 0.80,
+    sun: 0xfffbf0, sunI: 1.35, glow: 0.72,
     // 실제 수심 20~40m 산호는 대부분 갈색·올리브·테라코타, 일부만 옅은 분홍·보라
     // (형광 원색은 수중에서 이렇게 보이지 않는다)
     coral: [0x9a7057, 0x8a7a5c, 0xa8876a, 0x7c6a55, 0x96897a, 0x71836d, 0xa0776b, 0x8a6f78, 0xb09a7c],
@@ -53,7 +53,7 @@ export const ZONES = [
     skyTop: 0x4a97b4, skyMid: 0x0d4a66, skyBottom: 0x08384f,
     hemiSky: 0xb2d8e4, hemiGround: 0x114552, hemi: 0.66,
     ambient: 0x74b3c6, ambientI: 0.34,
-    sun: 0xfaf5e8, sunI: 0.95, glow: 0.5,
+    sun: 0xfaf5e8, sunI: 0.80, glow: 0.45,
     coral: [0x786a5a, 0x6b6a60, 0x877a68, 0x5e6b66, 0x776a70, 0x877f73, 0x6f6455],
   },
   {
@@ -605,7 +605,7 @@ export class World {
 
           // 알베도 — 모래는 밝고, 암반은 중간, 현무암은 어둡다 (실제 바다의 명암비)
           detail *= mix( 1.0, 0.62, deepK );
-          detail *= mix( vec3( 0.86 ), vec3( 0.66, 0.645, 0.60 ), flatK );
+          detail *= mix( vec3( 0.84 ), vec3( 0.60, 0.585, 0.545 ), flatK );
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 
@@ -945,7 +945,7 @@ export class World {
       const coralPick = () => {
         const base = zone.coral[Math.floor(rnd() * zone.coral.length)];
         tmpCol.set(base).lerp(rockTone, 0.03 + rnd() * 0.10);
-        tmpCol.multiplyScalar(1.02 + rnd() * 0.34);
+        tmpCol.multiplyScalar(1.18 + rnd() * 0.40);
         return tmpCol.getHex();
       };
       for (let i = 0; i < 42; i++) {
@@ -1044,8 +1044,8 @@ export class World {
         const gy = getTerrainHeight(wx, wz);
         if (gy < 1) continue;              // 해초 숲은 얕은 언덕에만
         if (slopeAt(wx, wz) > 0.95) continue;
-        const h = 4.5 + rnd() * 11;
-        const w = 0.7 + rnd() * 0.8;
+        const h = 3.4 + rnd() * 6.5;
+        const w = 0.42 + rnd() * 0.45;
         // 다시마 군락 — 같은 자리에 2~3 포기를 다른 높이로
         const n = 1 + Math.floor(rnd() * 3);
         for (let k = 0; k < n; k++) {

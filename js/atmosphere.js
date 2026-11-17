@@ -57,13 +57,13 @@ const SURFACE_FRAG = /* glsl */ `
     /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
     /* 잔물결 반짝임 — 좌표를 크게 휘게(warp) 두어 격자·타일이 보이지 않게.
        실제 수면은 '규칙적인 구름무늬'가 아니라 불규칙하게 흩어진 빛이다. */
-    vec2 wq = p * 0.062 + vec2(
+    vec2 wq = p * 0.055 + vec2(
       sin(p.y * 0.021 + t * 0.06), cos(p.x * 0.019 - t * 0.05)
     ) * 2.4;
-    float c1 = sin(wq.x + n.x * 2.0 + t * 0.21) * cos(wq.y * 0.9 - t * 0.18 + n.y * 2.0);
-    float c2 = sin((wq.x + wq.y) * 1.7 - t * 0.33 + n.x) * cos((wq.x - wq.y) * 1.4 + t * 0.27);
-    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 6.0) * 0.20;
-    sparkle *= 1.0 - smoothstep(18.0, 90.0, dist);
+    float c1 = sin(wq.x + t * 0.21) * cos(wq.y * 0.9 - t * 0.18);
+    float c2 = sin((wq.x + wq.y) * 1.7 - t * 0.33) * cos((wq.x - wq.y) * 1.4 + t * 0.27);
+    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 6.0) * 0.16;
+    sparkle *= 1.0 - smoothstep(10.0, 55.0, dist);
     col += uSurfaceColor * sparkle * (0.22 + win * 0.40);
 
     /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
@@ -73,15 +73,15 @@ const SURFACE_FRAG = /* glsl */ `
     /* 태양 반사 — 잔물결이 태양 쪽을 향할 때만.
        예전엔 잔물결 주파수가 높아 수면 전체가 '구름 타일'처럼 덮였다.
        낮은 주파수 + 좌표 워프 + 거리 페이드로 흩어진 반짝임만 남긴다. */
-    vec2 sq = p * 0.085 + vec2(
+    vec2 sq = p * 0.075 + vec2(
       sin(p.y * 0.013 + t * 0.05), cos(p.x * 0.011 - t * 0.04)
     ) * 2.0;
     vec3 nrm = normalize(vec3(
-      sin(sq.x + t * 0.42 + n.x * 1.6) * 0.40,
+      sin(sq.x + sq.y * 0.35 + t * 0.42) * 0.42,
       1.0,
-      cos(sq.y - t * 0.35 + n.y * 1.6) * 0.40
+      cos(sq.y - sq.x * 0.28 - t * 0.35) * 0.42
     ));
-    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 20.0);
+    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 12.0);
     sunSpec *= 1.0 - smoothstep(25.0, 140.0, dist);
     col += uSunColor * sunSpec * 1.15 * (1.0 - uDeep * 0.8);
 

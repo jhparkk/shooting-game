@@ -172,7 +172,7 @@ function bakeSand(size) {
        매크로 변화는 셰이더의 월드 좌표 노이즈가 맡는다(타일 반복 제거). */
     const warp = fbm(u, v, 2, 3, 11);
     const warp2 = fbm(u, v, 5, 2, 47);
-    const dir = v * 6.0 + u * 1.1 + warp * 2.4 + warp2 * 1.6;
+    const dir = v * 6.5 + u * 1.6 + warp * 3.6 + warp2 * 2.4;
     const rip = Math.sin(dir * TAU) * 0.5 + 0.5;
     const ripS = rip * rip * (3 - 2 * rip);          // 둥근 마루
     const dir2 = v * 17.0 - u * 3.2 + warp * 5.0;
