@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117c2';
-import { getTextures } from './textures.js?v=20261117c2';
-import { Atmosphere } from './atmosphere.js?v=20261117c2';
+} from './models.js?v=20261117c3';
+import { getTextures } from './textures.js?v=20261117c3';
+import { Atmosphere } from './atmosphere.js?v=20261117c3';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -622,7 +622,10 @@ export class World {
 
           /* ---- 수심이 깊으면 현무암·침전물 ---- */
           float deepK = smoothstep( -110.0, -420.0, wp.y );
-          vec4 bA = texture2D( uBasalt, vec2( wp.y * 0.09, ( wp.x + wp.z ) * 0.07 ) );
+          // 현무암도 벽면 축(ruv)으로 투영 — (y, x+z) 축은 경사면에서 한 방향이
+          // 늘어나 탐조등 아래 '폭포' 같은 줄무늬를 만들었다
+          vec2 buv = ruv * 0.72 + vec2( 0.21, 0.37 );
+          vec4 bA = texture2D( uBasalt, buv );
           vec3 basaltC = bA.rgb * ( 0.82 + 0.36 * m2 );
 
           vec3 detail = mix( rockyC, sandyC, flatK );
@@ -648,7 +651,7 @@ export class World {
           /* ---- 법선 요철 : 노멀맵을 지형의 투영 축에 맞춰 적용 ---- */
           vec3 nS = texture2D( uSandN, suv ).xyz * 2.0 - 1.0;
           vec3 nR = texture2D( uRockN, ruv ).xyz * 2.0 - 1.0;
-          vec3 nB = texture2D( uBasaltN, vec2( wp.y * 0.09, ( wp.x + wp.z ) * 0.07 ) ).xyz * 2.0 - 1.0;
+          vec3 nB = texture2D( uBasaltN, buv ).xyz * 2.0 - 1.0;
           vec3 nTan = mix( nR, nS, flatK );
           nTan = mix( nTan, nB, deepK * 0.88 );
           // 모래는 (X,Z) 축, 벽면은 (수평방향, Y) 축
