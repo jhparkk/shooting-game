@@ -3088,8 +3088,8 @@ export function rockCaveGeometry(seed, opts) {
     0.05 * Math.sin(u * 11.3 + s6 + a * 2);
 
   /* 통로 반지름 — 가운데는 일정하고, 아가리에서 살짝 벌어지는 나팔 모양 */
-  const boreAt = (u, a) => bore * (1 + 0.26 * smoothstep(0.70, 1.0, Math.abs(u)))
-    * (1 + 0.055 * Math.sin(a * 4 + u * 1.7 + s2));
+  const boreAt = (u, a) => bore * (1 + 0.32 * smoothstep(0.68, 1.0, Math.abs(u)))
+    * (1 + 0.085 * Math.sin(a * 4 + u * 1.7 + s2) + 0.05 * Math.sin(a * 7 - u * 3.1 + s1));
 
   /* 바깥 반지름 — 타원체를 요철로 흔든 것 */
   const outerAt = (u, a) => {
@@ -3193,12 +3193,12 @@ export function rockCaveGeometry(seed, opts) {
       const ri = boreAt(u, a);
       const th = ro - ri;
       if (th < 2.6) continue;
-      const rm = (ro + ri) * 0.5;
+      const rm = ri + th * 0.5;
       colliders.push({
         x: rm * Math.cos(a),
         y: rm * Math.sin(a) * ky,
         z: u * A,
-        r: Math.max(1.6, th * 0.5 + 0.25),
+        r: Math.max(1.5, th * 0.45 - 0.3),
       });
     }
   }

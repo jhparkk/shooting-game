@@ -1539,10 +1539,12 @@ export class World {
 
     let x;
     let z;
+    let rot = spec.rot;
     if (spec.home) {
-      // 출발 지점 바로 앞 — 잠수정이 바라보는 쪽에 동굴 아가리가 열린다
-      x = -26;
-      z = 2;
+      // 출발 지점 왼쪽 앞 — 잠수정이 바라보는 쪽으로 동굴 아가리가 열린다
+      x = -72;
+      z = 22;
+      rot = Math.atan2(52, 38);      // 축(아가리)이 출발 지점(-20, 60)을 향하도록
     } else {
       x = cx * CAVE_CELL + spec.jx;
       z = cz * CAVE_CELL + spec.jz;
@@ -1569,12 +1571,12 @@ export class World {
       radius: spec.radius,
       bore: spec.bore,
     });
-    const axis = new THREE.Vector3(Math.sin(spec.rot), 0, Math.cos(spec.rot));
+    const axis = new THREE.Vector3(Math.sin(rot), 0, Math.cos(rot));
     const entry = {
       geo: made.geo,
       colsLocal: made.colliders,
       pos: new THREE.Vector3(x, y, z),
-      rot: spec.rot,
+      rot,
       axis,
       bore: spec.bore,
       radius: spec.radius,
