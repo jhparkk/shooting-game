@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d5';
-import { getTextures } from './textures.js?v=20261117d5';
-import { Atmosphere } from './atmosphere.js?v=20261117d5';
+} from './models.js?v=20261117d6';
+import { getTextures } from './textures.js?v=20261117d6';
+import { Atmosphere } from './atmosphere.js?v=20261117d6';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1132,7 +1132,7 @@ export class World {
         const base = zone.coral[Math.floor(rnd() * zone.coral.length)];
         tmpCol.set(base).lerp(rockTone, 0.01 + rnd() * 0.04);
         tmpCol.offsetHSL((rnd() - 0.5) * 0.035, (rnd() - 0.5) * 0.08, (rnd() - 0.5) * 0.05);
-        tmpCol.multiplyScalar(0.90);
+        tmpCol.multiplyScalar(1.12);
         return tmpCol.getHex();
       };
       // 가지 끝·군체 위쪽은 햇빛을 받아 밝다 — 위로 갈수록 옅어지는 그라데이션
@@ -1184,7 +1184,7 @@ export class World {
         }
       }
       // 산호 카펫 — 바닥과 경사면을 작은 산호 다발 · 말미잘로 촘촘히 덮는다
-      for (let i = 0; i < 38; i++) {
+      for (let i = 0; i < 46; i++) {
         const lx = (rnd() - 0.5) * CHUNK * 0.96;
         const lz = (rnd() - 0.5) * CHUNK * 0.96;
         const wx = ox + lx;
@@ -1270,7 +1270,7 @@ export class World {
           sy = (1.3 + rnd() * 2.3) * sizeK;
         }
         // 군락 — 같은 자리에 몇 포기씩 모아 심어 숲처럼 보이게
-        const n = kind < 0.34 ? 2 + Math.floor(rnd() * 3) : 1 + Math.floor(rnd() * 3);
+        const n = kind < 0.34 ? 2 + Math.floor(rnd() * 4) : 2 + Math.floor(rnd() * 3);
         for (let k = 0; k < n; k++) {
           const geo = tpl.clone();           // 템플릿의 초록 그라데이션 색을 그대로 쓴다
           const m = new THREE.Matrix4();
