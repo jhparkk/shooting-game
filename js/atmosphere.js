@@ -75,15 +75,15 @@ const SURFACE_FRAG = /* glsl */ `
     /* 스넬의 창 — 수직에서 48.6°(cos 0.66) 안쪽만 하늘이 보이고,
        바깥은 전반사 거울이 된다. 경계는 잔물결 따라 흔들린다. */
     float edge = 0.655 + hn * 0.020 + gn.y * 0.03;
-    float win = smoothstep(edge - 0.05, edge + 0.05, upness);
+    float win = smoothstep(edge - 0.028, edge + 0.028, upness);
 
     /* 창 안쪽 — 잔물결에 부서진 하늘빛.
        매끈한 밝기 위에 '마루 등고선'을 얇게 올려 물결의 결을 또렷하게 만든다.
        (실제 수면을 아래에서 보면 밝은 선이 그물처럼 엉긴 모양이 보인다) */
     float crest = smoothstep(-0.42, 0.78, hn);
-    float line = smoothstep(0.10, 0.23, hn) * (1.0 - smoothstep(0.27, 0.40, hn));
-    vec3 inCol = uSurfaceColor * (0.26 + 0.28 * crest);
-    inCol += mix(uSurfaceColor, vec3(0.92, 0.99, 1.0), 0.55) * line * 0.38;
+    float line = smoothstep(0.13, 0.22, hn) * (1.0 - smoothstep(0.25, 0.36, hn));
+    vec3 inCol = uSurfaceColor * (0.20 + 0.24 * crest);
+    inCol += mix(uSurfaceColor, vec3(0.97, 1.0, 1.0), 0.45) * line * 0.30;
     inCol *= 0.88 + 0.20 * smoothstep(-0.9, 0.9, hn);
 
     /* 창 가장자리 — 프레넬로 밝아지는 테두리 (여기가 '수면'으로 읽히는 경계) */
