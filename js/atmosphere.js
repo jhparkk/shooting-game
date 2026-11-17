@@ -33,67 +33,83 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float uDeep;
   varying vec3 vWorld;
 
+  /* 방향파 하나 — 파고(h)와 기울기(g)를 함께 쌓는다 */
+  void addWave(inout float h, inout vec2 g, inout float amp, vec2 p, vec2 dir, float len, float a, float speed, float t) {
+    float k = 6.2831853 / len;
+    float ph = dot(p, dir) * k + t * speed;
+    h += sin(ph) * a;
+    g += dir * (cos(ph) * a * k);
+    amp += abs(a);
+  }
+
   void main() {
     vec2 p = vWorld.xz;
     float t = uTime;
-
-    /* 잔물결 노멀 — 여러 방향의 파동을 겹친다 */
-    vec2 n = vec2(0.0);
-    n += vec2(cos(p.x * 0.31 + t * 0.75), cos(p.y * 0.27 - t * 0.66)) * 0.55;
-    n += vec2(cos(p.x * 0.83 - p.y * 0.61 + t * 1.5), cos(p.y * 0.74 + p.x * 0.52 - t * 1.25)) * 0.32;
-    n += vec2(cos(p.x * 2.1 + p.y * 1.7 + t * 2.3), cos(p.y * 1.9 - p.x * 1.5 + t * 2.0)) * 0.17;
-    n += vec2(cos(p.x * 5.3 - p.y * 4.1 - t * 3.1), cos(p.y * 4.7 + p.x * 3.9 + t * 2.9)) * 0.07;
 
     vec3 view = normalize(vWorld - uCamPos);
     float dist = length(vWorld - uCamPos);
     float upness = view.y;
 
-    /* 스넬의 창 — 수직에서 48.6° 안쪽만 하늘빛이 보이고, 바깥은 거울처럼 어둡다 */
-    float windowEdge = 0.63 + n.x * 0.035;
-    float win = smoothstep(windowEdge - 0.10, windowEdge + 0.06, upness);
+    /* 거리에 따라 고주파 성분을 감쇠 — 멀리서 지글거림(에일리어싱)이 생기지 않게 */
+    float fMid = 1.0 - smoothstep(16.0, 70.0, dist);
+    float fNear = 1.0 - smoothstep(7.0, 26.0, dist);
 
-    vec3 col = mix(uDeepColor * 0.62, uSurfaceColor, win);
+    /* ---- 파도 합성 : 방향이 서로 다른 7개 성분 ----
+       실제 수면은 규칙적인 격자가 아니라, 서로 다른 방향의 너울이 겹쳐
+       부서지며 흩어진 빛의 세포를 만든다. */
+    float h = 0.0;
+    vec2 g = vec2(0.0);
+    float amp = 0.0;
+    addWave(h, g, amp, p, normalize(vec2(0.82, 0.57)), 33.0, 0.86, 0.34, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.38, 0.92)), 22.0, 0.72, 0.46, t);
+    addWave(h, g, amp, p, normalize(vec2(0.95, -0.31)), 12.6, 0.56 * (0.35 + 0.65 * fMid), 0.62, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.61, -0.79)), 8.3, 0.44 * (0.3 + 0.7 * fMid), 0.82, t);
+    addWave(h, g, amp, p, normalize(vec2(0.27, 0.96)), 5.1, 0.30 * fNear, 1.15, t);
+    addWave(h, g, amp, p, normalize(vec2(-0.87, 0.49)), 3.2, 0.21 * fNear, 1.55, t);
+    addWave(h, g, amp, p, normalize(vec2(0.59, -0.81)), 2.1, 0.14 * fNear, 2.05, t);
 
-    /* 잔물결에 부서지는 빛 — 격자무늬가 아니라 자연스럽게 흩어진 반짝임 */
-    /* 잔물결 반짝임 — 좌표를 크게 휘게(warp) 두어 격자·타일이 보이지 않게.
-       실제 수면은 '규칙적인 구름무늬'가 아니라 불규칙하게 흩어진 빛이다. */
-    vec2 wq = p * 0.055 + vec2(
-      sin(p.y * 0.021 + t * 0.06), cos(p.x * 0.019 - t * 0.05)
-    ) * 2.4;
-    float c1 = sin(wq.x + t * 0.21) * cos(wq.y * 0.9 - t * 0.18);
-    float c2 = sin((wq.x + wq.y) * 1.7 - t * 0.33) * cos((wq.x - wq.y) * 1.4 + t * 0.27);
-    float sparkle = pow(max(c1 * 0.6 + c2 * 0.4, 0.0), 6.0) * 0.16;
-    sparkle *= 1.0 - smoothstep(10.0, 55.0, dist);
-    col += uSurfaceColor * sparkle * (0.22 + win * 0.40);
+    float hn = h / max(amp, 0.001);              // -1 .. 1 로 정규화한 파고
+    vec2 gn = g / max(amp, 0.001);               // 무차원 기울기
+    vec3 nrm = normalize(vec3(-gn.x * 1.15, 1.0, -gn.y * 1.15));
 
-    /* 큰 너울 — 수면이 평평한 판처럼 보이지 않도록 */
-    float swell = sin(p.x * 0.032 + t * 0.16) * sin(p.y * 0.028 - t * 0.13);
-    col *= 0.95 + 0.06 * swell;
+    /* 스넬의 창 — 수직에서 48.6°(cos 0.66) 안쪽만 하늘이 보이고,
+       바깥은 전반사 거울이 된다. 경계는 잔물결 따라 흔들린다. */
+    float edge = 0.655 + hn * 0.020 + gn.y * 0.03;
+    float win = smoothstep(edge - 0.05, edge + 0.05, upness);
 
-    /* 태양 반사 — 잔물결이 태양 쪽을 향할 때만.
-       예전엔 잔물결 주파수가 높아 수면 전체가 '구름 타일'처럼 덮였다.
-       낮은 주파수 + 좌표 워프 + 거리 페이드로 흩어진 반짝임만 남긴다. */
-    vec2 sq = p * 0.075 + vec2(
-      sin(p.y * 0.013 + t * 0.05), cos(p.x * 0.011 - t * 0.04)
-    ) * 2.0;
-    vec3 nrm = normalize(vec3(
-      sin(sq.x + sq.y * 0.35 + t * 0.42) * 0.13,
-      1.0,
-      cos(sq.y - sq.x * 0.28 - t * 0.35) * 0.13
-    ));
-    float sunSpec = pow(max(dot(nrm, uSunDir), 0.0), 60.0);
-    sunSpec *= 1.0 - smoothstep(25.0, 140.0, dist);
-    col += uSunColor * sunSpec * 0.55 * (1.0 - uDeep * 0.8);
+    /* 창 안쪽 — 잔물결에 부서진 하늘빛 (밝은 마루 + 어두운 골) */
+    float crest = smoothstep(-0.35, 0.85, hn);
+    vec3 inCol = uSurfaceColor * (0.34 + 0.62 * crest);
+    inCol += uSurfaceColor * pow(crest, 3.0) * 0.55;          // 마루의 밝은 세포
+    inCol *= 0.86 + 0.30 * smoothstep(-0.9, 0.9, hn);
 
-    /* 태양이 비치는 곳 — 아주 밝은 원반과 그 주변 후광 */
-    float sd = max(0.0, dot(view, uSunDir));
-    col += uSunColor * pow(sd, 160.0) * 1.9 * (1.0 - uDeep * 0.85);
-    col += uSunColor * pow(sd, 8.0) * 0.10 * (1.0 - uDeep * 0.7);
+    /* 창 가장자리 — 프레넬로 밝아지는 테두리 (여기가 '수면'으로 읽히는 경계) */
+    float rim = smoothstep(edge - 0.13, edge - 0.01, upness) * (1.0 - smoothstep(edge + 0.01, edge + 0.09, upness));
+    inCol += uSurfaceColor * rim * 0.42;
+
+    /* 창 바깥 — 전반사: 물속이 거울에 비친 어두운 청록, 잔물결에 깨진 반사광 */
+    float mir = smoothstep(-0.75, 0.75, hn);
+    vec3 outCol = uDeepColor * (0.55 + 0.42 * mir);
+    outCol += uSurfaceColor * pow(max(hn, 0.0), 4.0) * 0.10;   // 거울에 비친 밝은 물결
+    outCol *= 0.94 + 0.12 * smoothstep(0.2, 1.0, upness);
+
+    vec3 col = mix(outCol, inCol, win);
+
+    /* 태양 반사를 잔물결이 깨뜨린 반짝임 — 창 안팎 모두에서 보인다 */
+    vec3 reflDir = reflect(view, nrm);
+    float sd = max(0.0, dot(reflDir, uSunDir));
+    float glitter = pow(sd, 260.0) * (0.55 + 1.35 * win);
+    col += uSunColor * glitter * (1.0 - smoothstep(20.0, 120.0, dist));
+
+    /* 태양이 수면을 뚫고 보이는 작은 원반 + 후광 */
+    float sunUp = max(0.0, dot(view, uSunDir));
+    col += uSunColor * pow(sunUp, 420.0) * 1.15 * (1.0 - uDeep * 0.8);
+    col += uSunColor * pow(sunUp, 26.0) * 0.055 * (1.0 - uDeep * 0.7);
 
     /* 거리에 따른 안개 — 멀어지면 물빛 하늘에 자연스럽게 녹아든다 */
-    float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.9, 2.0));
-    col = mix(col, uFogColor * 0.94, clamp(fogF, 0.0, 1.0));
-    float alpha = 1.0 - smoothstep(140.0, 380.0, dist);
+    float fogF = 1.0 - exp(-pow(dist * uFogDensity * 0.78, 2.0));
+    col = mix(col, uFogColor * 0.96, clamp(fogF, 0.0, 1.0));
+    float alpha = 1.0 - smoothstep(150.0, 400.0, dist);
     gl_FragColor = vec4(col, alpha);
   }
 `;

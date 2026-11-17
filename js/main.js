@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261117e3';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261117e3';
-import { RenderPipeline, QUALITY } from './render.js?v=20261117e3';
+import { Sound } from './audio.js?v=20261118a1';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118a1';
+import { RenderPipeline, QUALITY } from './render.js?v=20261118a1';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261117e3';
-import { FX } from './fx.js?v=20261117e3';
+} from './models.js?v=20261118a1';
+import { FX } from './fx.js?v=20261118a1';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1570,7 +1570,7 @@ function updatePlayer(dt) {
 /* ---------------- 카메라 ---------------- */
 function snapCamera() {
   camDirFrom(camLook, CAM.yaw, CAM.pitch);
-  CAM.distNow = CAM.dist;
+  CAM.distNow = (world && world.caveInside && world.caveInside(P.pos)) ? Math.min(CAM.dist, 6.4) : CAM.dist;
   const lift = Math.min(1.9, CAM.distNow * 0.13);
   camera.position.set(
     P.pos.x - camLook.x * CAM.distNow,
@@ -1608,8 +1608,10 @@ function updateCamera(dt) {
   }
 
   camDirFrom(camLook, CAM.yaw, CAM.pitch);
-  CAM.distNow += (CAM.dist - CAM.distNow) * damp(11, dt);
-
+  /* 동굴 안에서는 카메라를 몸 가까이 당긴다 — 15유닛 뒤면 암벽 속으로 들어간다 */
+  const inCave = world && world.caveInside ? world.caveInside(P.pos) : 0;
+  const wantDist = inCave ? Math.min(CAM.dist, 6.4) : CAM.dist;
+  CAM.distNow += (wantDist - CAM.distNow) * damp(inCave ? 7 : 11, dt);
   const shake = G.shake;
   const sx = shake > 0 ? rand(-1, 1) * shake * 0.45 : 0;
   const sy = shake > 0 ? rand(-1, 1) * shake * 0.45 : 0;
@@ -1628,6 +1630,10 @@ function updateCamera(dt) {
   const gy = terrainHeight(camTmp.x, camTmp.z) + 1.8;
   if (camTmp.y < gy) camTmp.y = gy;
   if (camTmp.y > SURFACE_Y - 1.2) camTmp.y = SURFACE_Y - 1.2;
+  // 동굴 암벽 — 카메라가 벽을 뚫고 밖을 비추지 않도록 밀어낸다
+  if (world && world.resolveSolidCollisions) {
+    world.resolveSolidCollisions(camTmp, 1.0, null, { cavesOnly: true });
+  }
 
   camera.position.lerp(camTmp, damp(CAM.distNow < 7 ? 17 : 9, dt));
   const gy2 = terrainHeight(camera.position.x, camera.position.z) + 1.6;
@@ -1982,6 +1988,23 @@ function resolveCreatureContacts() {
     // 살짝 부딪히는 물결
     fx.ring(P.pos.clone(), 0xbfefff, 9, 0.4);
   }
+}
+
+/* ---------------- 바위·동굴 충돌 — 바위에 부딪히면 튕겨 나간다 -------------
+   지형(바닥·절벽)은 높이 함수로 이미 막혀 있었지만, 해저에 놓인 바위와
+   큰 바위 동굴은 그냥 통과했다. 충돌 구체로 막고, 들어가는 속도만큼
+   되튕기게 한다. (동굴 통로 한가운데는 비어 있어 그대로 지나갈 수 있다) */
+function resolveSolidContacts() {
+  if (!world || !world.resolveSolidCollisions) return 0;
+  const pushed = world.resolveSolidCollisions(P.pos, SUB_R, P.vel);
+  if (pushed <= 0) return 0;
+  if (G.bumpCd <= 0) {
+    G.bumpCd = 0.5;
+    G.shake = Math.max(G.shake, 0.30);
+    sound.bump();
+    fx.ring(P.pos.clone(), 0xdfeee4, 7, 0.32);
+  }
+  return pushed;
 }
 
 /* ---------------- 어뢰 ---------------- */
@@ -2398,6 +2421,7 @@ function updateGame(dt) {
   updateBoss(dt);
   resolveBossContact();
   resolveCreatureContacts();
+  resolveSolidContacts();
   clampToWorld(P.pos, P.vel);
   updateSubTransform(0);
   updateHeadlight(dt);
@@ -2864,6 +2888,107 @@ function boot() {
         box: c.colliders.map((s) => +s.r.toFixed(2)),
       })),
       chunks: () => world.chunkStats(),
+      /* ---- 바위·동굴 검증용 ---- */
+      caves: () => (world.caves || []).filter((c) => c.key).map((c) => ({
+        key: c.key,
+        pos: [+c.center.x.toFixed(1), +c.center.y.toFixed(1), +c.center.z.toFixed(1)],
+        axis: [+c.axis.x.toFixed(2), +c.axis.z.toFixed(2)],
+        bore: +c.bore.toFixed(1),
+        halfLength: +(c.halfLength || 0).toFixed(1),
+        cols: c.cols.length,
+      })),
+      /** 동굴 아가리 앞으로 이동 — 동굴 구경/통과 검증 */
+      goCave: (which, back) => {
+        const list = (world.caves || []).filter((c) => c.key);
+        if (!list.length) return null;
+        const c = list[Math.min(list.length - 1, which || 0)];
+        const away = back === undefined ? 1 : back;
+        const d = (c.halfLength || 20) + 16;
+        const px = c.center.x - c.axis.x * d * away;
+        const pz = c.center.z - c.axis.z * d * away;
+        P.pos.set(px, c.center.y + 0.4, pz);
+        P.yaw = Math.atan2(-c.axis.x * away, -c.axis.z * away);
+        P.vel.set(0, 0, 0);
+        CAM.yaw = P.yaw;
+        CAM.pitch = -0.06;
+        snapCamera();
+        return {
+          key: c.key,
+          pos: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)],
+          dist: +Math.hypot(P.pos.x - c.center.x, P.pos.z - c.center.z).toFixed(1),
+          bore: +c.bore.toFixed(1),
+        };
+      },
+      /** 통로 안으로 들어가 정면을 본다 — 내부 컷 */
+      goCaveIn: (which) => {
+        const list = (world.caves || []).filter((c) => c.key);
+        if (!list.length) return null;
+        const c = list[Math.min(list.length - 1, which || 0)];
+        const d = (c.halfLength || 20) - 6;
+        P.pos.set(c.center.x - c.axis.x * d, c.center.y, c.center.z - c.axis.z * d);
+        P.yaw = Math.atan2(-c.axis.x, -c.axis.z);
+        P.vel.set(0, 0, 0);
+        CAM.yaw = P.yaw;
+        CAM.pitch = -0.02;
+        snapCamera();
+        return { key: c.key, inside: world.caveInside(P.pos), pos: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)] };
+      },
+      /** 유효한 바위·동굴 충돌체 개수와, 실제로 튕기는지 수치 확인 */
+      solidTest: (speed) => {
+        const v0 = speed || 22;
+        const out = { caves: [], chunkRocks: 0 };
+        let chunkCol = null;
+        for (const rec of world.chunks.values()) {
+          if (rec.cols && rec.cols.length) {
+            out.chunkRocks += rec.cols.length;
+            if (!chunkCol) chunkCol = rec.cols[0];
+          }
+        }
+        const cave = (world.caves || []).find((c) => c.key && c.cols.length);
+        out.caveCols = cave ? cave.cols.length : 0;
+
+        const probe = (s, label) => {
+          const pos = new THREE.Vector3(s.x + (s.r + SUB_R + 0.6), s.y, s.z);
+          const vel = new THREE.Vector3(-v0, 0, 0);
+          const d0 = pos.clone().sub(new THREE.Vector3(s.x, s.y, s.z)).length();
+          const pushed = world.resolveSolidCollisions(pos, SUB_R, vel, label === 'cave' ? { cavesOnly: true } : {});
+          const d1 = pos.clone().sub(new THREE.Vector3(s.x, s.y, s.z)).length();
+          return {
+            pushed: +pushed.toFixed(2),
+            distBefore: +d0.toFixed(2),
+            distAfter: +d1.toFixed(2),
+            minDist: +(s.r + SUB_R).toFixed(2),
+            velBefore: +v0.toFixed(1),
+            velAfterX: +vel.x.toFixed(2),
+            velAfterLen: +vel.length().toFixed(2),
+            bounced: vel.x > 0,       // 벽 쪽(-x)으로 가던 속도가 바깥(+x)으로 뒤집혔다
+          };
+        };
+        if (cave) out.caves.push(probe(cave.cols[Math.floor(cave.cols.length / 2)], 'cave'));
+        if (chunkCol) out.chunkRock = probe(chunkCol, 'rock');
+        return out;
+      },
+      /** 실제 게임 루프로 벽에 돌진시켜 본다 (속도 반전 확인) */
+      liveBump: async (secs) => {
+        const cave = (world.caves || []).find((c) => c.key && c.cols.length);
+        if (!cave) return { ok: false, reason: 'no cave' };
+        const s = cave.cols[Math.floor(cave.cols.length / 2)];
+        const pos = new THREE.Vector3(s.x + (s.r + SUB_R + 6), s.y, s.z);
+        P.pos.copy(pos);
+        P.vel.copy(new THREE.Vector3(-24, 0, 0));
+        P.yaw = Math.atan2(24, 0);       // -x 쪽을 본다
+        const t0 = performance.now();
+        await new Promise((r) => setTimeout(r, (secs || 0.6) * 1000));
+        return {
+          ok: true,
+          ms: Math.round(performance.now() - t0),
+          pos: [+P.pos.x.toFixed(2), +P.pos.y.toFixed(2), +P.pos.z.toFixed(2)],
+          wallDist: +P.pos.distanceTo(new THREE.Vector3(s.x, s.y, s.z)).toFixed(2),
+          minDist: +(s.r + SUB_R).toFixed(2),
+          vel: [+P.vel.x.toFixed(2), +P.vel.y.toFixed(2), +P.vel.z.toFixed(2)],
+          outward: P.pos.x - s.x > 0,
+        };
+      },
       setPos: (x, z, dy) => {
         P.pos.set(x, terrainHeight(x, z) + (dy === undefined ? 7 : dy), z);
         P.vel.set(0, 0, 0);

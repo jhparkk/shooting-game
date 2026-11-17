@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261117e3';
+import { getTextures } from './textures.js?v=20261118a1';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -3050,6 +3050,167 @@ export function pebbleClusterGeometry(radius, seed) {
     parts.push(g);
   }
   return mergeGeometries(parts, false);
+}
+
+/**
+ * 큰 바위 동굴 — 거대한 암반 덩어리에 자연스러운 통로가 뚫린 구조.
+ *
+ * 예쁜 둥근 바위를 동그랗게 쌓아 만든 '무지개 아치'와 달리,
+ * 하나의 유기적인 암반 덩어리(매끄러운 타원체 + 여러 옥타브 요철)에
+ * 굽이치는 통로가 뚫려 있다. 통로는 잠수정이 그대로 지나갈 수 있고,
+ * 입구는 둥근 드릴 구멍이 아니라 잔물결처럼 삐뚤빼뚤한 자연 동굴 아가리다.
+ *
+ * 좌표계: 통로 축 = 로컬 Z (원점 통과), 반환하는 colliders 도 로컬 좌표.
+ * geo 는 인덱스 지오메트리라 정점 수가 적다 (통로 안쪽·바깥쪽 한 덩어리).
+ */
+export function rockCaveGeometry(seed, opts) {
+  const o = opts || {};
+  const rnd = mulberry(seed);
+  const A = o.halfLength === undefined ? 22 : o.halfLength;   // 축 방향 반길이
+  const B = o.radius === undefined ? 20 : o.radius;           // 최대 외곽 반지름
+  const bore = o.bore === undefined ? 6.4 : o.bore;           // 통로 반지름
+  const NS = o.segU === undefined ? 34 : o.segU;              // 축 방향 분할
+  const NA = o.segA === undefined ? 44 : o.segA;              // 둘레 분할
+  const ky = 0.86;                                            // 세로로 살짝 눌러 앉은 암반
+
+  const s1 = rnd() * 6.28, s2 = rnd() * 6.28, s3 = rnd() * 6.28;
+  const s4 = rnd() * 6.28, s5 = rnd() * 6.28, s6 = rnd() * 6.28;
+
+  /* 단면 형상 — 완전한 원이 아니라 비대칭으로 불룩한 암반 */
+  const section = (a) => 1 + 0.15 * Math.cos(a * 2 + s1) + 0.085 * Math.cos(a * 3 - s2)
+    + 0.05 * Math.cos(a * 5 + s3);
+
+  /* 외곽 요철 — 낮은 주파수의 큰 혹 + 잔 요철. 입구 쪽으로 갈수록 조금씩 다르다 */
+  const lump = (a, u) =>
+    0.20 * Math.sin(a * 3 + u * 4.1 + s3) +
+    0.11 * Math.sin(a * 5 - u * 2.3 + s4) +
+    0.07 * Math.sin(a * 9 + u * 7.7 + s5) +
+    0.05 * Math.sin(u * 11.3 + s6 + a * 2);
+
+  /* 통로 반지름 — 가운데는 일정하고, 아가리에서 살짝 벌어지는 나팔 모양 */
+  const boreAt = (u, a) => bore * (1 + 0.26 * smoothstep(0.70, 1.0, Math.abs(u)))
+    * (1 + 0.055 * Math.sin(a * 4 + u * 1.7 + s2));
+
+  /* 바깥 반지름 — 타원체를 요철로 흔든 것 */
+  const outerAt = (u, a) => {
+    const base = B * section(a) * Math.sqrt(Math.max(0, 1 - u * u)) * (1 + 0.10 * u);
+    return base * (1 + lump(a, u));
+  };
+
+  /* 각도마다 통로 입구의 u 를 찾는다 (바깥면이 통로에 맞닿는 곳) — 삐뚤빼뚤한 아가리 */
+  const rimU = (a) => {
+    let lo = 0.45, hi = 1.0;
+    for (let k = 0; k < 22; k++) {
+      const m = (lo + hi) * 0.5;
+      if (outerAt(m, a) > boreAt(m, a)) lo = m; else hi = m;
+    }
+    return hi;
+  };
+
+  const pos = [];       // 정점 좌표
+  const idx = [];       // 삼각형
+
+  const stitch = (map, flip) => {
+    for (let i = 0; i < NS; i++) {
+      for (let j = 0; j < NA; j++) {
+        const j2 = (j + 1) % NA;
+        const a0 = map[i][j], a1 = map[i + 1][j], a2 = map[i + 1][j2], a3 = map[i][j2];
+        if (flip) idx.push(a0, a1, a2, a0, a2, a3);
+        else idx.push(a0, a2, a1, a0, a3, a2);
+      }
+    }
+  };
+
+  /* 각도마다 아가리 위치가 달라 삼각형이 이어지도록, u 범위를 각도별로 잡는다 */
+  const rims = [];
+  for (let j = 0; j < NA; j++) rims.push(rimU((j / NA) * Math.PI * 2));
+  /* 이웃 각도와 너무 튀지 않게 두 번 부드럽게 (삐뚤빼뚤함은 남긴다) */
+  for (let pass = 0; pass < 2; pass++) {
+    const src = rims.slice();
+    for (let j = 0; j < NA; j++) {
+      rims[j] = (src[(j + NA - 1) % NA] + src[j] * 2 + src[(j + 1) % NA]) * 0.25;
+    }
+  }
+
+  const rowOf = (radiusFn, yScale) => {
+    const map = [];
+    for (let i = 0; i <= NS; i++) {
+      const row = [];
+      for (let j = 0; j < NA; j++) {
+        const a = (j / NA) * Math.PI * 2;
+        const u = -rims[j] + 2 * rims[j] * (i / NS);
+        let r = radiusFn(u, a);
+        if (i === 0 || i === NS) r = boreAt(u, a);
+        row.push(pos.length / 3);
+        pos.push(r * Math.cos(a), r * Math.sin(a) * yScale, u * A);
+      }
+      map.push(row);
+    }
+    return map;
+  };
+
+  const outerMap = rowOf(outerAt, ky);
+  stitch(outerMap, false);          // 바깥면 — 법선이 바깥을 향하도록
+  const innerMap = rowOf((u, a) => boreAt(u, a), 0.92);
+  stitch(innerMap, true);           // 통로 안쪽 — 법선이 축을 향하도록
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+
+  /* 이음선을 합쳐 부드러운 음영 — 각진 로우폴리 느낌이 나지 않게 */
+  const merged = mergeVertices(geo, 1e-4);
+  merged.computeVertexNormals();
+
+  /* 정점 색 — 위로 갈수록 밝은 암반, 통로 안쪽은 조금 어둡게 (빛이 덜 든다) */
+  const p = merged.attributes.position;
+  const nrm = merged.attributes.normal;
+  const colors = new Float32Array(p.count * 3);
+  const col = new THREE.Color();
+  const hue = o.hue === undefined ? 0.098 : o.hue;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    const upk = clamp01(nrm.getY(i) * 0.5 + 0.5);
+    const lig = 0.135 + 0.105 * upk + 0.03 * Math.sin(y * 0.7 + s1);
+    col.setHSL(hue, 0.055, clamp01(lig));
+    colors[i * 3] = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  merged.computeBoundingSphere();
+
+  /* ---- 충돌체 : 통로 벽의 두께 한가운데를 구체로 채운다 ----
+     안쪽에서도 바깥에서도 벽에 부딪히면 밀려나고, 통로 한가운데는 비어 있다. */
+  const colliders = [];
+  const NC = 18;   // 축 방향
+  const AC = 10;   // 둘레
+  for (let i = 0; i < NC; i++) {
+    const u = -0.94 + (1.88) * (i / (NC - 1));
+    for (let j = 0; j < AC; j++) {
+      const a = (j / AC) * Math.PI * 2;
+      const ro = outerAt(u, a);
+      const ri = boreAt(u, a);
+      const th = ro - ri;
+      if (th < 2.6) continue;
+      const rm = (ro + ri) * 0.5;
+      colliders.push({
+        x: rm * Math.cos(a),
+        y: rm * Math.sin(a) * ky,
+        z: u * A,
+        r: Math.max(1.6, th * 0.5 + 0.25),
+      });
+    }
+  }
+
+  return {
+    geo: merged,
+    colliders,
+    halfLength: A,
+    radius: B,
+    bore: bore,
+    rim: rims,
+  };
 }
 
 /** 테이블(판) 산호 — 짧은 줄기 위로 펼쳐진 얇은 판, 가장자리가 물결친다 */

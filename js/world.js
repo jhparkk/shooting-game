@@ -13,11 +13,12 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
+  rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117e3';
-import { getTextures } from './textures.js?v=20261117e3';
-import { Atmosphere } from './atmosphere.js?v=20261117e3';
+} from './models.js?v=20261118a1';
+import { getTextures } from './textures.js?v=20261118a1';
+import { Atmosphere } from './atmosphere.js?v=20261118a1';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -146,9 +147,13 @@ export function zoneIndexForDepth(depth) {
 export const CHUNK = 96;          // 청크 한 변 (월드 단위)
 const SEG = 16;                   // 청크당 격자 분할 (6 유닛 간격)
 const VIEW = 3;                   // 시야 청크 반경 → 7×7 = 49 청크 (반경 336)
-const DETAIL = 2;                 // 이 반경 안의 청크에 산호·해초·아치 (5×5)
+const DETAIL = 2;                 // 이 반경 안의 청크에 산호·해초 (5×5)
 const BUILD_BUDGET_MS = 6;        // 프레임당 청크 생성 예산
 const BUILD_MAX_PER_FRAME = 1;
+
+/* 큰 바위 동굴 — 셀 하나당 하나씩, 플레이어 주변 셀만 활성화한다 */
+const CAVE_CELL = 330;
+const CAVE_SLOTS = 5;
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const smoothstep = (a, b, x) => {
@@ -396,6 +401,7 @@ export class World {
     this._buildBubbles();
     this.atmo = new Atmosphere(scene);
     this._buildVents();
+    this._buildCaves();
     this._buildSchools();
     this._buildCreatures();
     this.setZone(0);
@@ -846,7 +852,7 @@ export class World {
     kelp.visible = false;
     group.add(terrain, coral, kelp);
     this.scene.add(group);
-    return { group, terrain, coral, kelp, cx: 0, cz: 0, key: '' };
+    return { group, terrain, coral, kelp, cx: 0, cz: 0, key: '', cols: [] };
   }
 
   _releaseRecord(rec, key) {
@@ -1007,6 +1013,7 @@ export class World {
        얕은 산호 지대: 조약돌 무리 · 석회암 선반 · 이끼 낀 둥근 바위 · 굴러온 바위
        중층: 층진 석회암 판과 현무암 기둥   /   심해: 주상 절리 기둥과 부서진 현무암 */
     const geos = [flatFloor];
+    const cols = [];              // 이 청크 바위의 충돌체(월드 좌표 구체)
     const rockCount = detail ? 7 : 3;
     const rockCol = new THREE.Color();
     for (let i = 0; i < rockCount; i++) {
@@ -1018,6 +1025,7 @@ export class World {
       const pick = rnd();
       let tpl;
       let r;
+      let kind = 'rock';
       let hue = 0.09;
       let sat = 0.06;
       let lig = 0.24;
@@ -1032,7 +1040,7 @@ export class World {
         // 심해 — 주상 절리 기둥과 부서진 현무암
         if (pick < 0.55) {
           tpl = this.tpl.column[Math.floor(rnd() * this.tpl.column.length)];
-          r = 1.3 + rnd() * 2.4;
+          r = 1.3 + rnd() * 2.4; kind = 'column';
         } else {
           tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
           r = 1.2 + rnd() * 3.0;
@@ -1042,10 +1050,10 @@ export class World {
         // 협곡 · 중층 — 층진 석회암 판과 굴러온 바위, 가끔 기둥
         if (pick < 0.42) {
           tpl = this.tpl.slab[Math.floor(rnd() * this.tpl.slab.length)];
-          r = 1.8 + rnd() * 3.4; hue = 0.105; sat = 0.06; lig = 0.21 + rnd() * 0.09;
+          r = 1.8 + rnd() * 3.4; hue = 0.105; sat = 0.06; lig = 0.21 + rnd() * 0.09; kind = 'slab';
         } else if (pick < 0.68) {
           tpl = this.tpl.column[Math.floor(rnd() * this.tpl.column.length)];
-          r = 1.2 + rnd() * 2.2; hue = 0.58; sat = 0.04; lig = 0.16 + rnd() * 0.08;
+          r = 1.2 + rnd() * 2.2; hue = 0.58; sat = 0.04; lig = 0.16 + rnd() * 0.08; kind = 'column';
         } else {
           tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
           r = 1.4 + rnd() * 3.0; lig = 0.19 + rnd() * 0.10;
@@ -1053,11 +1061,11 @@ export class World {
       } else if (pick < 0.24) {
         // 얕은 바닥의 조약돌 무리 — 모래에 굴러다니는 둥근 자갈
         tpl = this.tpl.pebble[Math.floor(rnd() * this.tpl.pebble.length)];
-        r = 1.4 + rnd() * 2.4; hue = 0.09; sat = 0.06; lig = 0.21 + rnd() * 0.10; flat = 0.7;
+        r = 1.4 + rnd() * 2.4; hue = 0.09; sat = 0.06; lig = 0.21 + rnd() * 0.10; flat = 0.7; kind = 'pebble';
       } else if (pick < 0.48) {
         // 석회암 선반 — 햇빛 받는 밝은 판
         tpl = this.tpl.slab[Math.floor(rnd() * this.tpl.slab.length)];
-        r = 1.6 + rnd() * 3.2; hue = 0.105; sat = 0.06; lig = 0.23 + rnd() * 0.10;
+        r = 1.6 + rnd() * 3.2; hue = 0.105; sat = 0.06; lig = 0.23 + rnd() * 0.10; kind = 'slab';
       } else if (pick < 0.68) {
         // 이끼 낀 둥근 바위
         tpl = this.tpl.rockMid[Math.floor(rnd() * this.tpl.rockMid.length)];
@@ -1079,6 +1087,23 @@ export class World {
       m.setPosition(lx, gy - r * 0.08 * flat, lz);
       geo.applyMatrix4(m);
       geos.push(geo);
+
+      /* 같은 바위에 충돌체를 둔다 — 잠수정이 바위를 그냥 통과하지 않도록.
+         형상이 제각각이라 구체 한두 개로 감싼다 (게임플레이용 근사). */
+      const wx = ox + lx;
+      const wz = oz + lz;
+      const wy = gy - r * 0.08 * flat;
+      if (kind === 'column') {
+        const hh = r * 1.15;
+        cols.push({ x: wx, y: wy + hh * 0.45, z: wz, r: r * 0.5 });
+        cols.push({ x: wx, y: wy + hh * 0.45 + r * 0.75, z: wz, r: r * 0.42 });
+      } else if (kind === 'slab') {
+        cols.push({ x: wx, y: wy + r * 0.10, z: wz, r: r * 0.70 });
+      } else if (kind === 'pebble') {
+        cols.push({ x: wx, y: wy + r * 0.05, z: wz, r: r * 0.55 });
+      } else {
+        cols.push({ x: wx, y: wy + r * 0.10, z: wz, r: r * 0.78 });
+      }
     }
 
     /* --- 바닥에 흩어진 잔돌 · 자갈 조각 (바위 사이를 메운다) --- */
@@ -1102,37 +1127,14 @@ export class World {
       }
     }
 
-    /* --- 바위 아치 (가끔) --- */
-    if (detail && rnd() < 0.22) {
-      const ax = (rnd() - 0.5) * CHUNK * 0.5;
-      const az = (rnd() - 0.5) * CHUNK * 0.5;
-      const gy = getTerrainHeight(ox + ax, oz + az);
-      if (gy > -4) {
-        const R = 13 + rnd() * 8;
-        const rot = rnd() * Math.PI * 2;
-        const n = 9;
-        for (let i = 0; i < n; i++) {
-          const a = (i / (n - 1)) * Math.PI;
-          const rr = 2.0 + rnd() * 1.5;
-          const tpl = this.tpl.rockLo[Math.floor(rnd() * this.tpl.rockLo.length)];
-          const geo = this._clonePainted(tpl, new THREE.Color().setHSL(0.10, 0.06 + rnd() * 0.05, 0.15 + rnd() * 0.09).getHex());
-          const m = new THREE.Matrix4();
-          m.makeRotationY(rnd() * Math.PI * 2);
-          m.scale(new THREE.Vector3(rr, rr, rr));
-          m.setPosition(
-            ax + Math.cos(a) * R * Math.cos(rot),
-            gy + 1.5 + Math.sin(a) * R * 1.05,
-            az + Math.cos(a) * R * Math.sin(rot)
-          );
-          geo.applyMatrix4(m);
-          geos.push(geo);
-        }
-      }
-    }
+    /* --- 큰 바위 동굴은 이 청크 지오메트리에 넣지 않는다 ---
+       (청크 경계를 여러 개 넘는 거대 구조물이라 월드가 따로 관리한다:
+        _buildCaves / _updateCaves) */
 
     const terrainGeo = mergeGeometries(geos, false);
     rec.terrain.geometry = terrainGeo || flatFloor;
     rec.terrain.geometry.computeBoundingSphere();
+    rec.cols = cols;
 
     /* --- 산호초 --- */
     if (detail) {
@@ -1471,6 +1473,265 @@ export class World {
     }
   }
 
+  /* =========================================================
+     큰 바위 동굴 — 셀 단위로 하나씩, 플레이어 주변 것만 활성화
+     ---------------------------------------------------------
+     셀(330유닛)마다 해시로 결정되는 자리에 거대 암반 동굴이 놓인다.
+     플레이어 주변 3×3 셀의 동굴을 슬롯(5개)에 배정하고, 멀어지면
+     다른 동굴로 갈아 끼운다 — 메모리도 화면 밖 계산도 늘지 않는다.
+     ========================================================= */
+  _buildCaves() {
+    this.caves = [];
+    this.caveGeoCache = new Map();     // 셀키 -> { geo, colliders, ... }
+    for (let i = 0; i < CAVE_SLOTS; i++) {
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.rockMat);
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      this.scene.add(mesh);
+      this.caves.push({
+        mesh,
+        key: '',
+        cols: [],            // 월드 좌표 충돌체
+        center: new THREE.Vector3(),
+        radius: 0,
+        axis: new THREE.Vector3(0, 0, 1),
+        bore: 0,
+      });
+    }
+  }
+
+  /** 셀 (cx, cz) 에 동굴이 있는지, 있으면 그 모양 */
+  _caveSeed(cx, cz) {
+    const h = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663)) >>> 0;
+    const rnd = mulberry(h);
+    // 출발 지점 근처에는 반드시 하나 — 처음부터 동굴을 만나볼 수 있게
+    const home = cx === 0 && cz === 0;
+    if (!home) {
+      const d = Math.hypot(cx, cz);
+      const chance = 0.5 + Math.min(0.3, d * 0.05);
+      if (rnd() > chance) return null;
+    }
+    const seed = (h % 100000) + 1;
+    const sizeK = 0.85 + rnd() * 0.45;
+    const boreK = 0.95 + rnd() * 0.25;
+    return {
+      seed,
+      halfLength: (20 + rnd() * 7) * sizeK,
+      radius: (17 + rnd() * 6) * sizeK,
+      bore: 6.0 * boreK,
+      rot: rnd() * Math.PI * 2,
+      jx: (rnd() - 0.5) * CAVE_CELL * 0.5,
+      jz: (rnd() - 0.5) * CAVE_CELL * 0.5,
+      home,
+    };
+  }
+
+  /** 셀 → 동굴 지오메트리 (캐시) + 월드 배치 */
+  _caveForCell(cx, cz) {
+    const key = cx + ',' + cz;
+    const hit = this.caveGeoCache.get(key);
+    if (hit) return hit;
+    const spec = this._caveSeed(cx, cz);
+    if (!spec) {
+      this.caveGeoCache.set(key, null);
+      return null;
+    }
+
+    let x;
+    let z;
+    if (spec.home) {
+      // 출발 지점 바로 앞 — 잠수정이 바라보는 쪽에 동굴 아가리가 열린다
+      x = -26;
+      z = 2;
+    } else {
+      x = cx * CAVE_CELL + spec.jx;
+      z = cz * CAVE_CELL + spec.jz;
+    }
+
+    // 놓일 자리의 지형 높이 — 너무 기울어진 벽면은 피한다
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2;
+      const g = getTerrainHeight(x + Math.cos(ang) * 16, z + Math.sin(ang) * 16);
+      lo = Math.min(lo, g);
+      hi = Math.max(hi, g);
+    }
+    const ground = getTerrainHeight(x, z);
+    if (!spec.home && hi - lo > 26) {         // 절벽면 — 다른 셀로 넘긴다
+      this.caveGeoCache.set(key, null);
+      return null;
+    }
+    const y = Math.max(ground, lo * 0.35 + ground * 0.65) + spec.radius * 0.42;
+
+    const made = rockCaveGeometry(spec.seed, {
+      halfLength: spec.halfLength,
+      radius: spec.radius,
+      bore: spec.bore,
+    });
+    const axis = new THREE.Vector3(Math.sin(spec.rot), 0, Math.cos(spec.rot));
+    const entry = {
+      geo: made.geo,
+      colsLocal: made.colliders,
+      pos: new THREE.Vector3(x, y, z),
+      rot: spec.rot,
+      axis,
+      bore: spec.bore,
+      radius: spec.radius,
+      halfLength: spec.halfLength,
+      reach: Math.hypot(spec.halfLength, spec.radius) + 3,
+    };
+    this.caveGeoCache.set(key, entry);
+    if (this.caveGeoCache.size > 14) {
+      // 가장 오래된 것 하나를 버린다 (지오메트리 메모리 유지)
+      for (const [k, v] of this.caveGeoCache) {
+        if (k !== key) {
+          if (v && v.geo) v.geo.dispose();
+          this.caveGeoCache.delete(k);
+          break;
+        }
+      }
+    }
+    return entry;
+  }
+
+  _assignCave(slot, entry, key) {
+    slot.key = key;
+    slot.mesh.geometry = entry.geo;
+    slot.mesh.position.copy(entry.pos);
+    slot.mesh.rotation.set(0, entry.rot, 0);
+    slot.mesh.visible = true;
+    slot.center.copy(entry.pos);
+    slot.radius = entry.reach;
+    slot.axis.copy(entry.axis);
+    slot.bore = entry.bore;
+    slot.halfLength = entry.halfLength;
+    // 로컬 충돌체 → 월드 좌표 (동굴은 Y 축 회전만 한다)
+    const cos = Math.cos(entry.rot);
+    const sin = Math.sin(entry.rot);
+    slot.cols = entry.colsLocal.map((s) => ({
+      x: entry.pos.x + s.x * cos + s.z * sin,
+      y: entry.pos.y + s.y,
+      z: entry.pos.z - s.x * sin + s.z * cos,
+      r: s.r,
+    }));
+  }
+
+  _updateCaves(px, pz) {
+    if (!this.caves) return;
+    const ccx = Math.round(px / CAVE_CELL);
+    const ccz = Math.round(pz / CAVE_CELL);
+    const keys = [];
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) keys.push((ccx + dx) + ',' + (ccz + dz));
+    }
+    const want = [];
+    for (const k of keys) {
+      const [cx, cz] = k.split(',').map(Number);
+      const e = this._caveForCell(cx, cz);
+      if (e) want.push({ key: k, entry: e });
+    }
+    // 이미 배정된 슬롯 유지
+    const used = new Set();
+    for (const slot of this.caves) {
+      const i = want.findIndex((w) => w.key === slot.key);
+      if (i >= 0) used.add(i);
+      else if (slot.key) {
+        slot.key = '';
+        slot.mesh.visible = false;
+      }
+    }
+    for (const slot of this.caves) {
+      if (slot.key) continue;
+      const i = want.findIndex((w, k) => !used.has(k));
+      if (i < 0) break;
+      used.add(i);
+      this._assignCave(slot, want[i].entry, want[i].key);
+    }
+  }
+
+  /**
+   * 바위·동굴 충돌 — 부딪히면 밀려나고, 속도는 법선 방향으로 되튄다.
+   * @returns {number} 이번 호출에서 밀려난 거리 (0 이면 충돌 없음)
+   */
+  resolveSolidCollisions(pos, radius, vel, opts) {
+    const o = opts || {};
+    let pushed = 0;
+    const C = 1.55;                // 반발 계수 (1 = 완전 탄성)
+    const hit = (s) => {
+      const dx = pos.x - s.x;
+      const dy = pos.y - s.y;
+      const dz = pos.z - s.z;
+      const rr = s.r + radius;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= rr * rr) return false;
+      const d = Math.sqrt(d2) || 0.0001;
+      const nx = dx / d;
+      const ny = dy / d;
+      const nz = dz / d;
+      const over = rr - d;
+      pos.x += nx * over;
+      pos.y += ny * over;
+      pos.z += nz * over;
+      if (vel) {
+        const vn = vel.x * nx + vel.y * ny + vel.z * nz;
+        if (vn < 0) {
+          // 잠수정이 벽으로 들어가는 속도만큼 되튄다 + 약간의 마찰
+          vel.x -= nx * vn * C;
+          vel.y -= ny * vn * C;
+          vel.z -= nz * vn * C;
+          vel.multiplyScalar(0.92);
+        }
+      }
+      pushed += over;
+      return true;
+    };
+
+    // 1) 청크 바위 — 가까운 청크만
+    if (!o.cavesOnly) {
+      const ccx = Math.round(pos.x / CHUNK);
+      const ccz = Math.round(pos.z / CHUNK);
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const rec = this.chunks.get((ccx + dx) + ',' + (ccz + dz));
+          if (!rec || !rec.cols) continue;
+          for (let i = 0; i < rec.cols.length; i++) hit(rec.cols[i]);
+        }
+      }
+    }
+
+    // 2) 큰 바위 동굴 — 가까운 동굴만
+    for (const c of this.caves || []) {
+      if (!c.key) continue;
+      const dx = pos.x - c.center.x;
+      const dy = pos.y - c.center.y;
+      const dz = pos.z - c.center.z;
+      const reach = c.radius + radius + 2;
+      if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+      for (let i = 0; i < c.cols.length; i++) hit(c.cols[i]);
+    }
+
+    return pushed;
+  }
+
+  /** 이 점이 동굴 통로 안에 있는지 (0=밖, 1=한가운데) — 카메라 거리 조절용 */
+  caveInside(pos) {
+    for (const c of this.caves || []) {
+      if (!c.key) continue;
+      const dx = pos.x - c.center.x;
+      const dy = pos.y - c.center.y;
+      const dz = pos.z - c.center.z;
+      if (dx * dx + dy * dy + dz * dz > (c.radius + 4) * (c.radius + 4)) continue;
+      // 축 방향 거리와 축에서의 반경
+      const along = dx * c.axis.x + dz * c.axis.z;
+      const perpX = dx - c.axis.x * along;
+      const perpZ = dz - c.axis.z * along;
+      const perp = Math.hypot(perpX, dy, perpZ);
+      if (Math.abs(along) < (c.halfLength || 20) && perp < c.bore * 1.15) return 1;
+    }
+    return 0;
+  }
+
   /* ---------------- 물고기 떼 ---------------- */
   _seedSchool(school, rnd, px, pz) {
     const ang = rnd() * Math.PI * 2;
@@ -1670,6 +1931,9 @@ export class World {
 
     // 청크 스트리밍
     this._streamChunks(playerPos);
+
+    // 큰 바위 동굴 — 주변 셀의 동굴을 슬롯에 배정
+    this._updateCaves(playerPos.x, playerPos.z);
 
     // 수심에 따른 물빛 전환 — 표층 산호대에서 극심해 해구까지 다섯 단계
     const depth = Math.max(0, (SURFACE_Y - playerPos.y) * DEPTH_SCALE);
