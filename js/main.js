@@ -3,16 +3,16 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261118b1';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118b1';
-import { RenderPipeline, QUALITY } from './render.js?v=20261118b1';
+import { Sound } from './audio.js?v=20261118b2';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118b2';
+import { RenderPipeline, QUALITY } from './render.js?v=20261118b2';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261118b1';
-import { FX } from './fx.js?v=20261118b1';
+} from './models.js?v=20261118b2';
+import { FX } from './fx.js?v=20261118b2';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2947,9 +2947,14 @@ function boot() {
         const cave = (world.caves || []).find((c) => c.key && c.cols.length);
         out.caveCols = cave ? cave.cols.length : 0;
 
-        const probe = (s, label) => {
-          const pos = new THREE.Vector3(s.x + (s.r + SUB_R - 0.9), s.y, s.z);
-          const vel = new THREE.Vector3(-v0, 0, 0);
+        const probe = (s, label, from) => {
+          const n = from || { x: 1, y: 0, z: 0 };
+          const pos = new THREE.Vector3(
+            s.x + n.x * (s.r + SUB_R - 0.9),
+            s.y + n.y * (s.r + SUB_R - 0.9),
+            s.z + n.z * (s.r + SUB_R - 0.9)
+          );
+          const vel = new THREE.Vector3(-n.x * v0, -n.y * v0, -n.z * v0);
           const d0 = pos.clone().sub(new THREE.Vector3(s.x, s.y, s.z)).length();
           const pushed = world.resolveSolidCollisions(pos, SUB_R, vel, label === 'cave' ? { cavesOnly: true } : {});
           const d1 = pos.clone().sub(new THREE.Vector3(s.x, s.y, s.z)).length();
@@ -2959,14 +2964,27 @@ function boot() {
             distAfter: +d1.toFixed(2),
             minDist: +(s.r + SUB_R).toFixed(2),
             velBefore: +v0.toFixed(1),
-            velAfterX: +vel.x.toFixed(2),
+            velAfterAlong: +((vel.x * -n.x + vel.y * -n.y + vel.z * -n.z)).toFixed(2),
             velAfterLen: +vel.length().toFixed(2),
-            bounced: vel.x > 0,       // 벽 쪽(-x)으로 가던 속도가 바깥(+x)으로 뒤집혔다
+            bounced: (vel.x * -n.x + vel.y * -n.y + vel.z * -n.z) > 0,  // 벽 쪽 속도가 반대로 뒤집혔다
             clear: d1 >= s.r + SUB_R - 0.05,   // 밀려난 뒤 구체 밖으로 나왔는가
           };
         };
-        if (cave) out.caves.push(probe(cave.cols[Math.floor(cave.cols.length / 2)], 'cave'));
-        if (chunkCol) out.chunkRock = probe(chunkCol, 'rock');
+        if (cave) {
+          // 통로 축에서 벽을 향해 돌진하는 잠수정 (아가리 쪽 구체)
+          const s = cave.cols[Math.floor(cave.cols.length * 0.5)];
+          const ax = cave.axis.x, az = cave.axis.z;
+          const along = (s.x - cave.center.x) * ax + (s.z - cave.center.z) * az;
+          let rx = s.x - cave.center.x - ax * along;
+          const ry = s.y - cave.center.y;
+          let rz = s.z - cave.center.z - az * along;
+          const rl = Math.hypot(rx, ry, rz) || 1;
+          const nrm = { x: rx / rl, y: ry / rl, z: rz / rl };   // 축 → 벽 방향
+          out.caves.push(probe(s, 'cave', nrm));
+        }
+        if (chunkCol) {
+          out.chunkRock = probe(chunkCol, 'rock', { x: 1, y: 0, z: 0 });
+        }
         return out;
       },
       /** 실제 게임 루프로 벽에 돌진시켜 본다 (속도 반전 확인) */

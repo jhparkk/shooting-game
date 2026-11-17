@@ -16,9 +16,9 @@ import {
   rockCaveGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118b1';
-import { getTextures } from './textures.js?v=20261118b1';
-import { Atmosphere } from './atmosphere.js?v=20261118b1';
+} from './models.js?v=20261118b2';
+import { getTextures } from './textures.js?v=20261118b2';
+import { Atmosphere } from './atmosphere.js?v=20261118b2';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
