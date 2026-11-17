@@ -219,18 +219,19 @@ function bakeRock(size) {
     const crackMask = smooth(0.86, 1.0, fbm(u, v, 2, 2, 777));
     const crack = smooth(0.97, 1.0, ridge) * crackMask;
 
-    let shade = 0.50
-      + (strata - 0.5) * 0.20
-      + (lump - 0.5) * 0.20
-      + (grain - 0.5) * 0.10
-      + (fine - 0.5) * 0.09;
+    // 지층 줄무늬는 약하게 — 곡면 경사에서 '나뭇결'처럼 보이지 않게
+    let shade = 0.52
+      + (strata - 0.5) * 0.07
+      + (lump - 0.5) * 0.24
+      + (grain - 0.5) * 0.13
+      + (fine - 0.5) * 0.11;
     shade *= 1 - crack * 0.12;
     // 이끼·규조가 붙은 듯한 아주 옅은 청록기
     const moss = smooth(0.58, 0.92, fbm(u, v, 5, 3, 201)) * 0.22;
     o[0] = clamp01(shade * 0.98 - moss * 0.05) * 255;
     o[1] = clamp01(shade * 0.99 + moss * 0.02) * 255;
     o[2] = clamp01(shade * 0.95 - moss * 0.01) * 255;
-    o[3] = clamp01(0.54 + (strata - 0.5) * 0.44 + (grain - 0.5) * 0.3 + (fine - 0.5) * 0.22 - crack * 0.35) * 255;
+    o[3] = clamp01(0.54 + (strata - 0.5) * 0.20 + (grain - 0.5) * 0.34 + (fine - 0.5) * 0.26 - crack * 0.32) * 255;
   });
 }
 
