@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117cc';
-import { getTextures } from './textures.js?v=20261117cc';
-import { Atmosphere } from './atmosphere.js?v=20261117cc';
+} from './models.js?v=20261117cd';
+import { getTextures } from './textures.js?v=20261117cd';
+import { Atmosphere } from './atmosphere.js?v=20261117cd';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -42,8 +42,8 @@ export const ZONES = [
     name: '표층 산호대',
     fog: 0x16737f, density: 0.0050,
     skyTop: 0x9ee0dc, skyMid: 0x389cab, skyBottom: 0x16737f,
-    hemiSky: 0xdcefee, hemiGround: 0x3a5a55, hemi: 0.55,
-    ambient: 0xc2dcdb, ambientI: 0.30,
+    hemiSky: 0xf2f4ec, hemiGround: 0x33504f, hemi: 0.55,
+    ambient: 0xd8ded8, ambientI: 0.30,
     sun: 0xfff6e0, sunI: 1.45, glow: 1.0,
     // 밝은 산호초 팔레트 — 자연스러운 코랄 핑크·오렌지·연보라·에메랄드·황금빛.
     // 형광 원색이 아니라 햇빛 아래 실제 산호가 띠는 색으로, 개체마다 조금씩 다르다.
@@ -56,7 +56,7 @@ export const ZONES = [
     name: '중층 해저 협곡',
     fog: 0x0f5d7d, density: 0.0062,
     skyTop: 0x67b8c9, skyMid: 0x1a7d9c, skyBottom: 0x0f5d7d,
-    hemiSky: 0xc4e6ee, hemiGround: 0x155a63, hemi: 0.62,
+    hemiSky: 0xe6f0f0, hemiGround: 0x1c4f58, hemi: 0.62,
     ambient: 0x86c8d8, ambientI: 0.34,
     sun: 0xfdf8ea, sunI: 0.80, glow: 0.58,
     coral: [0xc08a74, 0xa9848f, 0xb59a72, 0x8fa89c, 0xbb8f79, 0xa5968f],
@@ -896,7 +896,9 @@ export class World {
         const bowl = clamp01((avgN - y) / (d * 0.75));
         const ridge = clamp01((y - avgN) / (d * 0.75));
         const ao = clamp01(1.0 - bowl * 0.62 + ridge * 0.08);
-        const lit = (0.70 - dk * 0.14) * (0.90 + flatness * 0.10) * ao;
+        // 알베도 배율 — 밝은 모래밭이 회색으로 죽지 않도록 바닥을 밝게 두고,
+        // 깊어질수록·그늘질수록 조금씩 낮춘다
+        const lit = (0.88 - dk * 0.13) * (0.94 + flatness * 0.06) * ao;
         fc.setHSL(0.10, 0.015 + (1 - flatness) * 0.02, clamp01(lit));
         vcol[k3] = fc.r;
         vcol[k3 + 1] = fc.g;

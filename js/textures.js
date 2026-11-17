@@ -153,7 +153,8 @@ function normalize(img, data, target, maxK) {
   for (let i = 0; i < data.length; i += 4) sum += data[i];
   const mean = sum / n / 255;
   if (mean < 0.02) return;
-  const k = Math.min(maxK, Math.max(0.55, 0.55 / mean));
+  // 대비를 너무 깎지 않는다 — 밝은 모래 텍스처가 '민무늬 회색'이 되던 원인
+  const k = Math.min(maxK, Math.max(0.92, 0.55 / mean));
   for (let i = 0; i < data.length; i += 4) {
     for (let c = 0; c < 3; c++) {
       const v = target + (data[i + c] / 255 - mean) * k;
