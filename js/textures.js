@@ -253,7 +253,7 @@ function bakeReef(size) {
     const lump = fbm(u, v, 6, 4, 1321);
     const fine = noise2(u * 210, v * 210, 210, 1327);
     let shade = 0.82 + (lump - 0.5) * 0.26 + (fine - 0.5) * 0.1;
-    shade *= 1 - pore * 0.34;
+    shade *= 1 - pore * 0.15;   // 구멍 대비를 낮춰 먼 거리에서 그물 무늬로 보이지 않게
     shade *= 0.86 + smooth(0.03, 0.2, cell2.f2 - cell2.f1) * 0.2;
     // 색 — 분홍 · 주황 · 보랏빛 산호 알갱이가 패치로
     const pick = fbm(u, v, 9, 3, 1333);

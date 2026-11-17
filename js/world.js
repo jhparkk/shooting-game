@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117t';
-import { getTextures } from './textures.js?v=20261117t';
-import { Atmosphere } from './atmosphere.js?v=20261117t';
+} from './models.js?v=20261117u';
+import { getTextures } from './textures.js?v=20261117u';
+import { Atmosphere } from './atmosphere.js?v=20261117u';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -570,7 +570,7 @@ export class World {
           vec3 sandy = mix( cSand, cCoralSand, smoothstep( 0.36, 0.78, pMid ) );
           // 벽면 — 회색 암벽 ↔ 이끼·해조류 낀 암반 ↔ 다채로운 산호석 암초
           vec3 rocky = mix( cRock, cAlgae, smoothstep( 0.36, 0.62, pBig ) );
-          rocky = mix( rocky, cReef, smoothstep( 0.30, 0.72, pMid ) * ( 0.7 + 0.3 * pFine ) );
+          rocky = mix( rocky, cReef, smoothstep( 0.30, 0.72, pMid ) * ( 0.45 + 0.2 * pFine ) );
 
           vec3 detail = mix( rocky, sandy, sandW );
           // 얕은 산호 지대 — 암초에 분홍·주황 기운을 살짝 얹어 힐링감을 더한다
