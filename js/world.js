@@ -15,9 +15,9 @@ import {
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261117d4';
-import { getTextures } from './textures.js?v=20261117d4';
-import { Atmosphere } from './atmosphere.js?v=20261117d4';
+} from './models.js?v=20261117d5';
+import { getTextures } from './textures.js?v=20261117d5';
+import { Atmosphere } from './atmosphere.js?v=20261117d5';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -617,7 +617,7 @@ export class World {
           vec2 hdir = vec2( -nw.z, nw.x );
           float hlen = length( hdir );
           hdir = hlen > 1e-3 ? hdir / hlen : vec2( 1.0, 0.0 );
-          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.115, wp.y * 0.15 ) + warp * 0.6;
+          vec2 ruv = vec2( dot( wp.xz, hdir ) * 0.075, wp.y * 0.085 ) + warp * 0.6;
 
           /* ---- 모래 : 평지 XZ 투영 ↔ 경사면 투영을 섞는다 ---- */
           vec2 suvFlat = wp.xz * 0.72 / clamp( up, 0.62, 1.0 ) + warp;
@@ -691,8 +691,8 @@ export class World {
           // 알베도 — 햇빛 받는 모래·석회암은 밝고, 암반은 중간, 현무암은 어둡다
           detail *= mix( 1.0, 0.96, flatK );
           detail *= mix( vec3( 1.0 ), vec3( 1.05, 1.0, 0.92 ), flatK );   // 따뜻한 모래빛
-          detail *= mix( 1.0, 0.82, deepK );                              // 깊은 곳은 가라앉은 톤
-          detail *= mix( vec3( 1.0 ), vec3( 0.76, 0.82, 0.92 ), deepK );  // 현무암은 푸르게
+          detail *= mix( 1.0, 0.70, deepK );                              // 깊은 곳은 가라앉은 톤
+          detail *= mix( vec3( 1.0 ), vec3( 0.72, 0.78, 0.90 ), deepK );  // 현무암은 푸르게
           // 아주 미세한 입자 결 — 확대해도 플라스틱처럼 매끈해 보이지 않게
           detail *= 0.94 + 0.12 * m3;
 
@@ -744,7 +744,7 @@ export class World {
           float fres = pow( 1.0 - clamp( dot( normalize( vWNrmV ), vdir ), 0.0, 1.0 ), 4.0 );
           vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance
             + vec3( 0.58, 0.93, 1.0 ) * caustic * ( 0.05 + 0.07 * up )
-            + vec3( 0.34, 0.68, 0.88 ) * fres * ( 0.014 + 0.035 * up );
+            + vec3( 0.34, 0.68, 0.88 ) * fres * ( 0.008 + 0.020 * up );
           `
         );
     };
