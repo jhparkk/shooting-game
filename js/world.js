@@ -13,9 +13,9 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   kelpGeometry, paint, mulberry,
-} from './models.js?v=20261117b8';
-import { getTextures } from './textures.js?v=20261117b8';
-import { Atmosphere } from './atmosphere.js?v=20261117b8';
+} from './models.js?v=20261117b9';
+import { getTextures } from './textures.js?v=20261117b9';
+import { Atmosphere } from './atmosphere.js?v=20261117b9';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -530,8 +530,10 @@ export class World {
     const mat = new THREE.MeshPhongMaterial({
       vertexColors: true,
       map: t.sand,              // USE_MAP 만 켜 둔다 (실제 uv 는 셰이더가 만든다)
-      specular: 0x25343a,
-      shininess: 9,
+      // 넓고 센 스페큘러는 비스듬한 탐조등 아래에서 '비단'처럼 번들거린다 —
+      // 젖은 암반의 좁고 약한 광택만 남긴다
+      specular: 0x121a1d,
+      shininess: 24,
     });
     const uni = {
       uSand: { value: t.sand },
