@@ -1185,7 +1185,7 @@ function beginBoss(kind, model, opts) {
   // 심연룡은 마디를 몸 뒤로 늘어놓는다 (로컬 좌표 +z 가 꼬리 쪽)
   if (model.segs) {
     for (let i = 0; i < model.segs.length; i++) {
-      model.segs[i].position.set(0, 0, (i + 1) * 2.05);
+      model.segs[i].position.set(0, 0, (i + 1) * 1.55);
       if (i % 4 === 0) {
         G.boss.contactPts.push({ p: new THREE.Vector3(), r: 1.9 * (1 - i * 0.03) });
       }
@@ -2351,7 +2351,7 @@ function updateLeviathan(b, dt) {
       const prev = segs[i - 1].position;
       const sway = Math.sin(b.phase * 2.6 - i * 0.55) * (0.5 + i * 0.03);
       const lift = Math.cos(b.phase * 1.9 - i * 0.42) * 0.16;
-      tmpVec2.set(prev.x + sway, prev.y + lift, prev.z + 2.15);
+      tmpVec2.set(prev.x + sway, prev.y + lift, prev.z + 1.62);
       segs[i].position.lerp(tmpVec2, Math.min(1, dt * 9));
     }
   }

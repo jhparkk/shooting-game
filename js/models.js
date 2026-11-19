@@ -1857,9 +1857,10 @@ export function makeLeviathan(segCount) {
   const segs = [];
   for (let i = 0; i < N; i++) {
     const m = new THREE.Mesh(segGeo, mat);
-    const k = 1 - i * (0.62 / N);
+    // 꼬리로 갈수록 가늘어지고, 마디는 서로 겹쳐 한 몸처럼 이어진다
+    const k = 1 - Math.pow((i + 1) / N, 1.15) * 0.82;
     m.scale.setScalar(k);
-    m.position.set(0, 0, (i + 1) * 2.05);      // 머리 뒤로 이어지는 몸
+    m.position.set(0, 0, (i + 1) * 1.55);
     g.add(m);
     segs.push(m);
   }
@@ -1908,7 +1909,7 @@ export function makeVoidQueen() {
   );
   inner.scale.set(3.2, 1.7, 3.2);
   bell.add(inner);
-  const halo = spriteGlow(0xb98cff, 16, 0.55);
+  const halo = spriteGlow(0xb98cff, 8.5, 0.4);
   g.add(halo);
 
   // 우산 테두리의 마디 — 발광 점 고리
