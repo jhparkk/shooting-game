@@ -1150,6 +1150,14 @@ function beginBoss(kind, model, opts) {
   o.rotation.order = 'YXZ';
   o.scale.setScalar(scale);
   scene.add(o);
+  /* 심해는 탐조등 밖이 칠흑이라, 보스 몸에서 새어 나오는 빛을 하나 달아
+     거대한 실루엣이 어둠 속에서도 읽히게 한다 */
+  const aura = new THREE.PointLight(
+    kind === 'kraken' ? 0xff9ec0 : kind === 'megalodon' ? 0x7fe4ff : kind === 'leviathan' ? 0x86ffd8 : 0xc79dff,
+    11, 86, 2
+  );
+  aura.position.set(0, 0, 0);
+  o.add(aura);
   G.boss = {
     kind,
     def,
@@ -1171,6 +1179,7 @@ function beginBoss(kind, model, opts) {
     chargeCd: 5,
     chargeDir: new THREE.Vector3(0, 0, -1),
     shockCd: 7,
+    aura,
     contactPts: [],
   };
   // 심연룡은 마디를 몸 뒤로 늘어놓는다 (로컬 좌표 +z 가 꼬리 쪽)
@@ -1213,7 +1222,7 @@ function spawnDeepBoss(kind) {
   const model = k === 'megalodon'
     ? makeMegalodon()
     : k === 'leviathan' ? makeLeviathan(16) : makeVoidQueen();
-  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 62 : 74 });
+  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 52 : 62 });
   G.deepBossSeen = true;
   return b;
 }
@@ -1808,10 +1817,8 @@ function updatePlayer(dt) {
 
   // 수심
   G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
-  if (G.depth > G.maxDepth) {
-    G.maxDepth = G.depth;
-    checkDepthMilestones();
-  }
+  if (G.depth > G.maxDepth) G.maxDepth = G.depth;
+  checkDepthMilestones();
 
   // 기포 흘리기 — 잠수정 뒤로 맑은 공기방울이 솟아오른다
   G.bubbleTimer -= dt;
@@ -2199,6 +2206,7 @@ function updateBoss(dt) {
   } else {
     o.scale.setScalar(b.scale);
   }
+  if (b.aura) b.aura.intensity = 11 + Math.sin(b.phase * 1.7) * 2.2;
   if (b.model && b.model.update) b.model.update(b.phase);
 }
 

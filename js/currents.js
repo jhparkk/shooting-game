@@ -36,7 +36,7 @@ export function flowSpeed(x, z, t) {
 export function jetBand(x, z, t) {
   const a = 0.5 + 0.5 * Math.sin(x * 0.0280 - z * 0.0120 + t * 0.55);
   const b = 0.5 + 0.5 * Math.sin(-x * 0.0080 + z * 0.0340 - t * 0.42);
-  return Math.max(smoothstep(0.62, 0.96, a), smoothstep(0.66, 0.98, b) * 0.85);
+  return Math.max(smoothstep(0.70, 0.99, a), smoothstep(0.74, 1.0, b) * 0.88);
 }
 
 /** 그 자리의 해류 벡터 (수평, 유닛/초) — burst 는 돌발 해류 배율(0~1) */
@@ -44,7 +44,7 @@ export function currentAt(x, z, t, burst, out) {
   const ang = flowAngle(x, z, t);
   const jet = jetBand(x, z, t);
   // 강한 띠 안에서는 흐름 방향이 띠를 따라 조금 더 곧게 뻗는다
-  const speed = Math.min(30, (flowSpeed(x, z, t) + 18.5 * jet) * (1 + 0.95 * (burst || 0)));
+  const speed = Math.min(28, (flowSpeed(x, z, t) + 15.5 * jet) * (1 + 0.95 * (burst || 0)));
   const dx = Math.cos(ang) * speed;
   const dz = Math.sin(ang) * speed;
   const o = out || new THREE.Vector3();
@@ -89,7 +89,7 @@ const STREAK_VERT = /* glsl */ `
     vec3 world = uCam + rel;
 
     /* 조각 길이 — 해류가 강할수록 길고 밝게 흐른다 */
-    float len = (1.6 + 7.0 * uStrength) * (0.45 + aSeed);
+    float len = (1.0 + 4.4 * uStrength) * (0.45 + aSeed);
     world += vec3(f.x, 0.0, f.y) * mix(-0.5, 0.5, aEnd) * len;
 
     vec4 mv = viewMatrix * vec4(world, 1.0);
@@ -168,7 +168,7 @@ export class Currents {
       uStrength: { value: 0 },
       uViewHeight: { value: 800 },
       uTanHalfFov: { value: 1 },
-      uColor: { value: new THREE.Color(0xbdf6ff) },
+      uColor: { value: new THREE.Color(0x9fe8ff) },
       uOpacity: { value: 0.5 },
     };
     const mat = new THREE.ShaderMaterial({
@@ -229,13 +229,13 @@ export class Currents {
     const t = this.time;
     this.angle = flowAngle(x, z, t);
     this.jet = jetBand(x, z, t);
-    this.speed = Math.min(30, (flowSpeed(x, z, t) + 18.5 * this.jet) * (1 + 0.95 * this.burst));
-    this.strength = clamp01(this.speed / 26);
+    this.speed = Math.min(28, (flowSpeed(x, z, t) + 15.5 * this.jet) * (1 + 0.95 * this.burst));
+    this.strength = clamp01(this.speed / 24);
 
     const u = this.uni;
     u.uTime.value = t;
     u.uStrength.value = this.strength;
-    u.uOpacity.value = 0.30 + 0.55 * this.strength;
+    u.uOpacity.value = 0.20 + 0.42 * this.strength;
     if (camera) {
       u.uCam.value.copy(camera.position);
       const tan = Math.tan((camera.fov * Math.PI) / 360);
@@ -271,7 +271,7 @@ export class Currents {
     degN = ((degN % 360) + 360) % 360;
     const names = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
     const k = this.strength;
-    const grade = k >= 0.72 ? '매우 강함' : k >= 0.5 ? '강함' : k >= 0.26 ? '보통' : '약함';
+    const grade = k >= 0.78 ? '매우 강함' : k >= 0.52 ? '강함' : k >= 0.28 ? '보통' : '약함';
     return {
       angle: this.angle,
       deg: degN,

@@ -1683,7 +1683,7 @@ export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 30, specular: 0x536470,
-    emissive: 0x0a141a, emissiveIntensity: 0.8,
+    emissive: 0x16292f, emissiveIntensity: 1.15,
   }), 0.55);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
@@ -1710,13 +1710,13 @@ export function makeMegalodon() {
     e.scale.set(1, 1, 1.2);
     g.add(e);
     eyes.push(e);
-    const halo = spriteGlow(MEGA.glow, 1.5, 0.5);
+    const halo = spriteGlow(MEGA.glow, 2.4, 0.55);
     halo.position.copy(e.position);
     g.add(halo);
   }
   // 몸통의 발광 흉터 점
   const dots = [];
-  const dotGeo = new THREE.SphereGeometry(0.085, 6, 5);
+  const dotGeo = new THREE.SphereGeometry(0.13, 6, 5);
   for (let i = 0; i < 10; i++) {
     const s = i % 2 === 0 ? 1 : -1;
     const d = new THREE.Mesh(dotGeo, eyeMat);
@@ -1804,7 +1804,7 @@ export function makeLeviathan(segCount) {
   const N = segCount || 16;
   const mat = addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 38, specular: 0x74b6b8,
-    emissive: 0x06242a, emissiveIntensity: 0.9,
+    emissive: 0x0d3a40, emissiveIntensity: 1.15,
   }), 0.8);
   const glowMat = new THREE.MeshBasicMaterial({ color: LEVI.glow });
 
