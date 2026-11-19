@@ -1764,7 +1764,7 @@ let _leviHead = null;
 function leviathanSegmentGeometry() {
   if (_leviSeg) return _leviSeg;
   const seg = new THREE.SphereGeometry(1, 14, 10);
-  seg.scale(0.94, 0.82, 1.34);
+  seg.scale(0.92, 0.80, 1.95);
   const c = new THREE.Color(LEVI.skin);
   const arr = new Float32Array(seg.attributes.position.count * 3);
   const p = seg.attributes.position;
@@ -3712,14 +3712,16 @@ export function caveDecorGeometry(seed, sockets, opts) {
 
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
+    // 벽마다 다 심으면 불꽃놀이처럼 번잡하다 — 절반 남짓만 고른다
+    if (rnd() > 0.52) continue;
     const roll = rnd();
     if (roll < 0.42) {
       // 광물 결정 다발 — 벽에서 안쪽으로 돋아난 육각 기둥
-      const n = 3 + Math.floor(rnd() * 5);
+      const n = 2 + Math.floor(rnd() * 4);
       const hue = CRYSTAL[Math.floor(rnd() * CRYSTAL.length)];
       for (let k = 0; k < n; k++) {
-        const len = 0.7 + rnd() * 1.9;
-        const rad = 0.10 + rnd() * 0.16;
+        const len = 0.6 + rnd() * 1.5;
+        const rad = 0.08 + rnd() * 0.13;
         const g = new THREE.CylinderGeometry(rad * 0.35, rad, len, 6, 1);
         // 벽 법선 방향 + 약간 흔들린 방향으로 뻗는다
         const tilt = new THREE.Vector3(s.nx + (rnd() - 0.5) * 0.5, s.ny + (rnd() - 0.5) * 0.5 + 0.12, (rnd() - 0.5) * 0.5).normalize();
@@ -3738,10 +3740,10 @@ export function caveDecorGeometry(seed, sockets, opts) {
       }
     } else if (roll < 0.78) {
       // 발광 산호 다발 — 둥근 혹이 모인 군락
-      const n = 3 + Math.floor(rnd() * 4);
+      const n = 2 + Math.floor(rnd() * 3);
       const hue = CORAL[Math.floor(rnd() * CORAL.length)];
       for (let k = 0; k < n; k++) {
-        const r = 0.18 + rnd() * 0.34;
+        const r = 0.14 + rnd() * 0.26;
         const g = new THREE.SphereGeometry(r, 8, 6);
         g.scale(1, 0.7 + rnd() * 0.5, 1);
         g.translate(s.x + (rnd() - 0.5) * 0.9, s.y + (rnd() - 0.5) * 0.7 + r * 0.3, s.z + (rnd() - 0.5) * 1.1);
@@ -3758,14 +3760,14 @@ export function caveDecorGeometry(seed, sockets, opts) {
   }
 
   // 부유하는 빛 알갱이 — 동굴 안 공중
-  const floaters = o.floaters === undefined ? 46 : o.floaters;
+  const floaters = o.floaters === undefined ? 22 : o.floaters;
   const A = o.halfLength || 20;
   const R = o.chamber || 9;
   for (let i = 0; i < floaters; i++) {
     const u = (rnd() - 0.5) * 1.7;
     const a = rnd() * Math.PI * 2;
     const r = R * (0.25 + rnd() * 0.6);
-    pushGlow(Math.cos(a) * r, Math.sin(a) * r * 0.8, u * A * 0.8, 0x8ff6ff, 0.35 + rnd() * 0.5);
+    pushGlow(Math.cos(a) * r, Math.sin(a) * r * 0.8, u * A * 0.8, 0x8ff6ff, 0.25 + rnd() * 0.35);
   }
 
   const geo = parts.length ? mergeParts(parts) : new THREE.BufferGeometry();

@@ -565,11 +565,11 @@ export class World {
       side: THREE.DoubleSide,
     });
     this.caveGlowMat = new THREE.PointsMaterial({
-      size: 1.5,
+      size: 1.0,
       map: glowTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1756,8 +1756,8 @@ export class World {
         this.caveLight.visible = true;
         this.caveLight.position.copy(best.center);
         const k = 1 - Math.sqrt(bd) / 150;
-        this.caveLight.intensity = 0.55 + 1.5 * k * k;
-        this.caveLight.distance = 44 + 26 * k;
+        this.caveLight.intensity = 26 + 74 * k * k;
+        this.caveLight.distance = 52 + 30 * k;
       } else {
         this.caveLight.visible = false;
       }
