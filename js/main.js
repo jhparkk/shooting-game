@@ -3343,7 +3343,7 @@ function boot() {
         return currents.state();
       },
       /** 보스 모델을 눈앞에 세워 둔다 (검증용) */
-      showBossModel: (kind, dist) => {
+      showBossModel: (kind, dist, yawOff) => {
         const made = kind === 'leviathan' ? makeLeviathan(16)
           : kind === 'queen' ? makeVoidQueen()
             : kind === 'megalodon' ? makeMegalodon() : makeKraken();
@@ -3351,7 +3351,7 @@ function boot() {
         computeForward(forward);
         g.position.copy(P.pos).addScaledVector(forward, dist || 17);
         g.rotation.order = 'YXZ';
-        g.rotation.y = P.yaw + Math.PI;      // 머리가 카메라를 향하게
+        g.rotation.y = P.yaw + Math.PI + (yawOff || 0);   // 머리가 카메라를 향하게 (yawOff 로 옆모습)
         g.scale.setScalar(kind === 'kraken' ? 1.8 : 1.5);
         scene.add(g);
         const l = new THREE.PointLight(0xbfe9ff, 420, 70, 2);

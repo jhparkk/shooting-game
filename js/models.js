@@ -1731,7 +1731,7 @@ export function makeMegalodon() {
     e.scale.set(1, 1, 1.2);
     g.add(e);
     eyes.push(e);
-    const halo = spriteGlow(MEGA.glow, 2.4, 0.55);
+    const halo = spriteGlow(MEGA.glow, 1.7, 0.42);
     halo.position.copy(e.position);
     g.add(halo);
   }
@@ -1859,6 +1859,7 @@ export function makeLeviathan(segCount) {
     const m = new THREE.Mesh(segGeo, mat);
     const k = 1 - i * (0.62 / N);
     m.scale.setScalar(k);
+    m.position.set(0, 0, (i + 1) * 2.05);      // 머리 뒤로 이어지는 몸
     g.add(m);
     segs.push(m);
   }
@@ -1892,7 +1893,7 @@ export function makeVoidQueen() {
     color: 0x9c79e0, transparent: true, opacity: 0.66, shininess: 90,
     specular: 0xffd9ff, emissive: 0x3a1f6e, emissiveIntensity: 1.0,
     side: THREE.DoubleSide, depthWrite: false,
-  }), 0xe0b8ff, 1.7, 0.85);
+  }), 0xe0b8ff, 1.7, 0.45);
   const bell = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 16), bellMat);
   bell.scale.set(4.4, 2.7, 4.4);
   g.add(bell);
