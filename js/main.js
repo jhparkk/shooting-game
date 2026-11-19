@@ -1154,7 +1154,7 @@ function beginBoss(kind, model, opts) {
      거대한 실루엣이 어둠 속에서도 읽히게 한다 */
   const aura = new THREE.PointLight(
     kind === 'kraken' ? 0xff9ec0 : kind === 'megalodon' ? 0x7fe4ff : kind === 'leviathan' ? 0x86ffd8 : 0xc79dff,
-    11, 86, 2
+    52, 96, 2
   );
   aura.position.set(0, 0, 0);
   o.add(aura);
@@ -2206,7 +2206,7 @@ function updateBoss(dt) {
   } else {
     o.scale.setScalar(b.scale);
   }
-  if (b.aura) b.aura.intensity = 11 + Math.sin(b.phase * 1.7) * 2.2;
+  if (b.aura) b.aura.intensity = 52 + Math.sin(b.phase * 1.7) * 8;
   if (b.model && b.model.update) b.model.update(b.phase);
 }
 

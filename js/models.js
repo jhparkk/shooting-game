@@ -1437,17 +1437,17 @@ function krakenLimb(segCount, len, thick, curl, color) {
 
 export function makeKraken() {
   const g = new THREE.Group();
-  const skin = addSkin(new THREE.MeshPhongMaterial({
+  const skin = addRim(addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantle, shininess: 42, specular: 0xb07090,
     emissive: 0x2a0a18, emissiveIntensity: 0.55,
-  }), 0.7);
+  }), 0.7), 0xff9ec0, 2.0, 0.5);
   const skinDark = addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantleDark, shininess: 30, specular: 0x7a5060,
   }), 0.6);
-  const limbMat = addSkin(new THREE.MeshPhongMaterial({
+  const limbMat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 16, specular: 0x5a3a48,
     emissive: 0x24080f, emissiveIntensity: 0.5,
-  }), 0.7);
+  }), 0.7), 0xff9ec0, 2.0, 0.45);
 
   // 머리 + 몸통(망토)
   const mantle = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), skin);
@@ -1546,6 +1546,27 @@ export function makeKraken() {
   }
 
   return { group: g, arms, tentacles, glow: null };
+}
+
+/* 어둠 속에서도 실루엣이 읽히도록 — 가장자리가 은은하게 빛나는
+   프레넬 테두리(림 라이트)를 재질에 심는다. 심해는 탐조등 밖이 칠흑이라
+   거대한 몸체가 검은 덩어리로 사라지기 때문. */
+function addRim(mat, color, power, k) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uRimColor = { value: new THREE.Color(color) };
+    sh.uniforms.uRimK = { value: k };
+    sh.uniforms.uRimP = { value: power };
+    sh.fragmentShader = 'uniform vec3 uRimColor;\nuniform float uRimK;\nuniform float uRimP;\n' +
+      sh.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float rimF = 1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition)));
+        totalEmissiveRadiance += uRimColor * pow(clamp(rimF, 0.0, 1.0), uRimP) * uRimK;
+        `
+      );
+  };
+  mat.customProgramCacheKey = () => 'rim' + color + '_' + power + '_' + k;
+  return mat;
 }
 
 /* =========================================================
@@ -1681,10 +1702,10 @@ function megalodonBodyGeometry() {
 
 export function makeMegalodon() {
   const g = new THREE.Group();
-  const mat = addSkin(new THREE.MeshPhongMaterial({
+  const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 30, specular: 0x536470,
     emissive: 0x16292f, emissiveIntensity: 1.15,
-  }), 0.55);
+  }), 0.55), 0x7fe4ff, 2.1, 0.62);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
   g.add(body);
@@ -1802,10 +1823,10 @@ function leviathanHeadGeometry() {
 export function makeLeviathan(segCount) {
   const g = new THREE.Group();
   const N = segCount || 16;
-  const mat = addSkin(new THREE.MeshPhongMaterial({
+  const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 38, specular: 0x74b6b8,
     emissive: 0x0d3a40, emissiveIntensity: 1.15,
-  }), 0.8);
+  }), 0.8), 0x86ffd8, 2.0, 0.62);
   const glowMat = new THREE.MeshBasicMaterial({ color: LEVI.glow });
 
   const head = new THREE.Group();
@@ -1867,11 +1888,11 @@ export function makeLeviathan(segCount) {
 export function makeVoidQueen() {
   const g = new THREE.Group();
 
-  const bellMat = new THREE.MeshPhongMaterial({
+  const bellMat = addRim(new THREE.MeshPhongMaterial({
     color: 0x9c79e0, transparent: true, opacity: 0.66, shininess: 90,
     specular: 0xffd9ff, emissive: 0x3a1f6e, emissiveIntensity: 1.0,
     side: THREE.DoubleSide, depthWrite: false,
-  });
+  }), 0xe0b8ff, 1.7, 0.85);
   const bell = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 16), bellMat);
   bell.scale.set(4.4, 2.7, 4.4);
   g.add(bell);
@@ -1903,10 +1924,10 @@ export function makeVoidQueen() {
   }
 
   // 입술 팔 6가닥 — 두툼하게 말려 내려온다
-  const limbMat = addSkin(new THREE.MeshPhongMaterial({
+  const limbMat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 24, specular: 0x9a7ac0,
     emissive: 0x2a1250, emissiveIntensity: 1.0,
-  }), 0.6);
+  }), 0.6), 0xc79dff, 1.9, 0.7);
   const arms = [];
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
