@@ -213,4 +213,12 @@ export class Sound {
     if (!this.ac) return;
     this._osc('sine', 420 + Math.random() * 300, 900, 0.09, 0.028);
   }
+
+  /** 강한 해류가 몰아칠 때의 물살 소리 — 낮게 깔리는 노이즈가 밀려온다 */
+  currentRush() {
+    if (!this.ac) return;
+    this._noiseBurst(2.4, 0.16, 'bandpass', 260, 900, 0.9);
+    this._noiseBurst(2.8, 0.10, 'lowpass', 700, 180, 1.2, 0.15);
+    this._osc('sine', 62, 44, 1.6, 0.10);
+  }
 }

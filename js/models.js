@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261118b5';
+import { getTextures } from './textures.js?v=20261120a';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1549,6 +1549,419 @@ export function makeKraken() {
 }
 
 /* =========================================================
+   3,000m 아래 초심해의 보스 3종
+   · ① 고대 상어 메갈로돈 — 살아 있는 화석, 아가리를 벌리고 돌진한다
+   · ② 심연룡 레비아탄 — 긴 몸을 나선으로 감아 오는 바다뱀
+   · ③ 심연 해파리 여왕 루미나 — 발광하는 거대한 우산과 촉수
+   셋 다 크라켄보다 두 배 이상 강한 존재로, 모델·패턴이 서로 다르다.
+   ========================================================= */
+
+/* ---------------- ① 메갈로돈 ---------------- */
+const MEGA = {
+  back: 0x3d4952, backDeep: 0x232e37, belly: 0xe4ebe8,
+  fin: 0x2b353d, tooth: 0xf8faf1, scar: 0x93a7b0, glow: 0x8ef0ff,
+};
+
+let _megaBody = null;
+let _megaTail = null;
+let _megaJaw = null;
+
+function megalodonTailGeometry() {
+  if (_megaTail) return _megaTail;
+  // 초승달 꼬리 — 위아래 날이 길게 뻗은 거대한 추진기
+  const g = vfin([
+    [0.00, 0.24], [0.30, 0.95], [0.72, 1.75], [1.06, 2.32],
+    [0.84, 1.42], [0.60, 0.55], [0.66, -0.10], [0.86, -0.86],
+    [1.05, -1.55], [0.62, -0.92], [0.24, -0.28],
+  ], 0.20, MEGA.fin, { smooth: true, curveSegments: 12 });
+  _megaTail = g;
+  return g;
+}
+
+function megalodonJawGeometry() {
+  if (_megaJaw) return _megaJaw;
+  // 아래턱 — 두툼한 판 + 이빨 줄. 피벗은 입꼬리(로컬 원점)
+  const parts = [];
+  const jaw = plate([
+    [0.00, -0.10], [0.55, -0.30], [0.92, -0.46], [1.15, -0.40],
+    [1.02, -0.20], [0.72, -0.06], [0.30, 0.02],
+  ], 0.24, { smooth: true });
+  jaw.rotateY(-Math.PI / 2);
+  jaw.scale(1.02, 1, 1.5);
+  parts.push(paint(jaw, MEGA.backDeep));
+  for (let i = 0; i < 7; i++) {
+    const t = (i / 6 - 0.5) * 2;
+    const tooth = spikeGeo(0.055, 0.26, 5);
+    parts.push(xf(paint(tooth, MEGA.tooth),
+      [Math.sin(t * 1.2) * 0.5, 0.02, t * 1.35], [0, 0, 0.12 * t], [1, 1, 1]));
+  }
+  _megaJaw = mergeParts(parts);
+  return _megaJaw;
+}
+
+function megalodonBodyGeometry() {
+  if (_megaBody) return _megaBody;
+  const profile = [
+    [-3.35, 0.05], [-3.10, 0.22], [-2.78, 0.44], [-2.36, 0.66],
+    [-1.84, 0.84], [-1.22, 0.97], [-0.55, 1.03], [0.16, 1.00],
+    [0.84, 0.88], [1.52, 0.68], [2.12, 0.47], [2.62, 0.30],
+    [2.96, 0.19], [3.14, 0.12],
+  ];
+  const body = bodyGeometry(profile, { radial: 26, sx: 0.68, sy: 0.99 });
+  paintSkin(body, {
+    back: MEGA.back, belly: MEGA.belly, halfHeight: 1.0, blend: [-0.48, 0.22], wave: 0.22,
+    spot: { color: MEGA.backDeep, mix: 0.45, threshold: 0.88 },
+  });
+  const parts = [body];
+
+  // 등지느러미 — 거대한 삼각 날
+  parts.push(xf(vfin([
+    [-1.15, 0.86], [-0.72, 1.42], [-0.10, 2.28], [0.34, 2.52],
+    [0.42, 2.02], [0.62, 1.35], [0.96, 0.90],
+  ], 0.20, MEGA.fin), [0, 0.02, 0.06]));
+  // 제2등지느러미 · 뒷지느러미
+  parts.push(xf(vfin([[-0.30, 0.42], [-0.02, 0.86], [0.20, 0.92], [0.26, 0.44]], 0.10, MEGA.fin), [0, 0, 2.10]));
+  parts.push(xf(vfin([[-0.30, -0.40], [0.02, -0.72], [0.24, -0.74], [0.26, -0.38]], 0.09, MEGA.fin), [0, 0, 2.24]));
+
+  // 가슴지느러미 — 크게 뻗은 날개
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.62], [0.80, 0.34], [1.55, -0.05], [2.05, -0.42],
+      [1.42, -0.74], [0.62, -0.66], [0, -0.24],
+    ].map(([x, y]) => [x * s, y]), 0.11, MEGA.fin),
+      [0.12 * s, -0.20, -1.05], [0, 0, -0.26 * s]));
+  }
+  // 배지느러미
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([
+      [0, 0.24], [0.36, 0.02], [0.44, -0.20], [0.20, -0.24], [0, -0.10],
+    ].map(([x, y]) => [x * s, y]), 0.07, MEGA.fin),
+      [0.12 * s, -0.62, 2.02], [0, 0, 0]));
+  }
+  // 꼬리자루의 가로 융기 (caudal keel)
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([[0, 0.30], [0.34, 0.10], [0.40, -0.12], [0.12, -0.16], [0, 0]], 0.06, MEGA.fin),
+      [0.10 * s, 0.02, 2.72], [0, 0, 0]));
+  }
+
+  // 입 — 검붉은 아가리와 위턱 이빨
+  const mz = -3.02;
+  const mouth = new THREE.SphereGeometry(1, 16, 10);
+  mouth.scale(0.62, 0.30, 0.46);
+  parts.push(xf(paint(mouth, 0x2a1418), [0, -0.30, mz]));
+  for (let i = 0; i < 7; i++) {
+    const t = (i / 6 - 0.5) * 2;
+    const tooth = spikeGeo(0.05, 0.22, 5);
+    parts.push(xf(paint(tooth, MEGA.tooth),
+      [Math.sin(t * 1.2) * 0.5, -0.14, mz - 0.02 + Math.abs(t) * 0.12],
+      [Math.PI - 0.1, 0, 0.1 * t]));
+  }
+
+  // 아가미 홈
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      const z = -1.55 + i * 0.24;
+      const rr = radiusAt(profile, z) * 0.68;
+      const g = new THREE.BoxGeometry(0.03, 0.42, 0.06);
+      parts.push(xf(paint(g, MEGA.backDeep), [rr * 0.95 * s, -0.05, z], [0, 0, 0.16 * s]));
+    }
+  }
+  // 몸에 남은 옛 상처 — 밝은 흉터 자국
+  for (let i = 0; i < 9; i++) {
+    const z = -1.9 + i * 0.52;
+    const rr = radiusAt(profile, z) * 0.7;
+    const s = i % 2 === 0 ? 1 : -1;
+    const g = new THREE.BoxGeometry(0.03, 0.05, 0.5 + (i % 3) * 0.22);
+    parts.push(xf(paint(g, MEGA.scar), [rr * 0.96 * s, 0.24 - (i % 4) * 0.16, z], [0, 0, 0.3 * s]));
+  }
+
+  _megaBody = assemble(parts, -1.2, 3.14);
+  return _megaBody;
+}
+
+export function makeMegalodon() {
+  const g = new THREE.Group();
+  const mat = addSkin(new THREE.MeshPhongMaterial({
+    vertexColors: true, shininess: 30, specular: 0x536470,
+    emissive: 0x0a141a, emissiveIntensity: 0.8,
+  }), 0.55);
+
+  const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
+  g.add(body);
+
+  const tail = new THREE.Group();
+  tail.position.set(0, 0, 3.10);
+  tail.add(new THREE.Mesh(megalodonTailGeometry(), mat));
+  g.add(tail);
+
+  // 아래턱 — 돌진할 때 크게 벌어진다
+  const jawPivot = new THREE.Group();
+  jawPivot.position.set(0, -0.34, -2.86);
+  const jaw = new THREE.Mesh(megalodonJawGeometry(), mat);
+  jawPivot.add(jaw);
+  g.add(jawPivot);
+
+  // 눈 — 심해에서 빛나는 옅은 청록
+  const eyeMat = new THREE.MeshBasicMaterial({ color: MEGA.glow });
+  const eyes = [];
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), eyeMat);
+    e.position.set(0.56 * s, 0.24, -2.62);
+    e.scale.set(1, 1, 1.2);
+    g.add(e);
+    eyes.push(e);
+    const halo = spriteGlow(MEGA.glow, 1.5, 0.5);
+    halo.position.copy(e.position);
+    g.add(halo);
+  }
+  // 몸통의 발광 흉터 점
+  const dots = [];
+  const dotGeo = new THREE.SphereGeometry(0.085, 6, 5);
+  for (let i = 0; i < 10; i++) {
+    const s = i % 2 === 0 ? 1 : -1;
+    const d = new THREE.Mesh(dotGeo, eyeMat);
+    d.position.set(0.66 * s, 0.30 - (i % 3) * 0.2, -1.6 + Math.floor(i / 2) * 0.62);
+    g.add(d);
+    dots.push(d);
+  }
+
+  return {
+    group: g, body, tail, jaw: jawPivot, eyes, dots,
+    update(t) {
+      // 느린 꼬리 흔들림 + 지느러미 같은 미세한 몸놀림
+      tail.rotation.y = Math.sin(t * 2.4) * 0.26;
+      body.rotation.z = Math.sin(t * 1.1) * 0.03;
+    },
+  };
+}
+
+/* ---------------- ② 심연룡 레비아탄 ---------------- */
+const LEVI = { skin: 0x1f4e56, ridge: 0x2f8085, glow: 0x7dffd8, belly: 0x8fd6cf };
+let _leviSeg = null;
+let _leviHead = null;
+
+function leviathanSegmentGeometry() {
+  if (_leviSeg) return _leviSeg;
+  const seg = new THREE.SphereGeometry(1, 14, 10);
+  seg.scale(0.94, 0.82, 1.34);
+  const c = new THREE.Color(LEVI.skin);
+  const arr = new Float32Array(seg.attributes.position.count * 3);
+  const p = seg.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    // 배 쪽은 밝게, 등은 어둡게 — 몸을 따라 완만한 그라데이션
+    const k = clamp01(0.5 + p.getY(i) * 0.5);
+    const col = new THREE.Color(LEVI.belly).lerp(c, 0.25 + k * 0.75);
+    arr[i * 3] = col.r; arr[i * 3 + 1] = col.g; arr[i * 3 + 2] = col.b;
+  }
+  seg.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+
+  const parts = [seg];
+  // 등 마루의 얇은 융기
+  parts.push(xf(vfin([[-0.55, 0.62], [-0.12, 1.16], [0.22, 1.22], [0.34, 0.66]], 0.05, LEVI.ridge)));
+  // 옆구리의 작은 지느러미
+  for (const s of [-1, 1]) {
+    parts.push(xf(hfin([[0, 0.22], [0.46, 0.0], [0.52, -0.18], [0.16, -0.2], [0, -0.06]], 0.04, LEVI.ridge),
+      [0.60 * s, -0.18, 0.2], [0, 0, -0.4 * s]));
+  }
+  _leviSeg = mergeParts(parts);
+  return _leviSeg;
+}
+
+function leviathanHeadGeometry() {
+  if (_leviHead) return _leviHead;
+  const profile = [
+    [-2.30, 0.03], [-2.10, 0.20], [-1.80, 0.40], [-1.40, 0.56],
+    [-0.90, 0.68], [-0.30, 0.76], [0.30, 0.78], [0.80, 0.72], [1.10, 0.60],
+  ];
+  const head = bodyGeometry(profile, { radial: 18, sx: 0.82, sy: 0.86 });
+  paintSkin(head, { back: LEVI.skin, belly: LEVI.belly, halfHeight: 0.76, blend: [-0.4, 0.3], wave: 0.18 });
+  const parts = [head];
+
+  // 머리 위 볏 — 뼈처럼 뻗은 가시
+  for (let i = 0; i < 4; i++) {
+    const z = -0.9 + i * 0.5;
+    const h = 0.7 - i * 0.12;
+    parts.push(xf(paint(spikeGeo(0.11, h, 5), LEVI.ridge), [0, 0.62 - i * 0.06, z], [0.5, 0, 0]));
+  }
+  // 아가리 — 검은 구멍 + 날카로운 이빨
+  const mz = -1.62;
+  const mouth = new THREE.SphereGeometry(1, 14, 8);
+  mouth.scale(0.34, 0.20, 0.72);
+  parts.push(xf(paint(mouth, 0x2a0a12), [0, -0.30, mz]));
+  for (let i = 0; i < 8; i++) {
+    const t = (i / 7) * 2 - 1;
+    const tooth = spikeGeo(0.045, 0.2, 5);
+    const side = i < 4 ? 1 : -1;
+    parts.push(xf(paint(tooth, 0xf4fff2),
+      [0.24 * side, -0.20 + t * 0.04, mz - 0.5 + (i % 4) * 0.3], [Math.PI - 0.2, 0, 0]));
+  }
+  _leviHead = assemble(parts, -1.4, 1.1);
+  return _leviHead;
+}
+
+export function makeLeviathan(segCount) {
+  const g = new THREE.Group();
+  const N = segCount || 16;
+  const mat = addSkin(new THREE.MeshPhongMaterial({
+    vertexColors: true, shininess: 38, specular: 0x74b6b8,
+    emissive: 0x06242a, emissiveIntensity: 0.9,
+  }), 0.8);
+  const glowMat = new THREE.MeshBasicMaterial({ color: LEVI.glow });
+
+  const head = new THREE.Group();
+  const headMesh = new THREE.Mesh(leviathanHeadGeometry(), mat);
+  head.add(headMesh);
+  // 눈 (발광)
+  const eyes = [];
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), glowMat);
+    e.position.set(0.34 * s, 0.14, -1.16);
+    head.add(e);
+    eyes.push(e);
+    const halo = spriteGlow(LEVI.glow, 1.1, 0.45);
+    halo.position.copy(e.position);
+    head.add(halo);
+  }
+  // 아래턱 (물 때 벌어진다)
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -0.28, -1.5);
+  const jawGeo = mergeParts([
+    (() => { const j = plate([[0, 0.02], [0.32, -0.16], [0.5, -0.34], [0.3, -0.4], [0, -0.2]], 0.12, { smooth: true }); j.rotateY(-Math.PI / 2); j.scale(1, 1, 1.5); return paint(j, LEVI.skin); })(),
+  ]);
+  jaw.add(new THREE.Mesh(jawGeo, mat));
+  head.add(jaw);
+  g.add(head);
+
+  const segGeo = leviathanSegmentGeometry();
+  const segs = [];
+  for (let i = 0; i < N; i++) {
+    const m = new THREE.Mesh(segGeo, mat);
+    const k = 1 - i * (0.62 / N);
+    m.scale.setScalar(k);
+    g.add(m);
+    segs.push(m);
+  }
+  // 몸을 따라 흐르는 발광 마디
+  const glowNodes = [];
+  for (let i = 2; i < N; i += 4) {
+    const d = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), glowMat);
+    d.position.set(0, 0.42, 0);
+    segs[i].add(d);
+    glowNodes.push(d);
+  }
+
+  return {
+    group: g, head, jaw, segs, eyes, glowNodes,
+    update(t) {
+      jaw.rotation.x = 0.12 + Math.sin(t * 2.6) * 0.1;
+      headMesh.rotation.z = Math.sin(t * 1.3) * 0.05;
+      for (let i = 0; i < glowNodes.length; i++) {
+        const k = 0.6 + 0.4 * Math.sin(t * 2.2 + i * 1.3);
+        glowNodes[i].scale.setScalar(0.7 + k * 0.6);
+      }
+    },
+  };
+}
+
+/* ---------------- ③ 심연 해파리 여왕 루미나 ---------------- */
+export function makeVoidQueen() {
+  const g = new THREE.Group();
+
+  const bellMat = new THREE.MeshPhongMaterial({
+    color: 0x9c79e0, transparent: true, opacity: 0.66, shininess: 90,
+    specular: 0xffd9ff, emissive: 0x3a1f6e, emissiveIntensity: 1.0,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const bell = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 16), bellMat);
+  bell.scale.set(4.4, 2.7, 4.4);
+  g.add(bell);
+
+  // 우산 속의 빛 — 안쪽에서 은은하게 빛난다
+  const inner = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 18, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xd6f4ff, transparent: true, opacity: 0.30,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    })
+  );
+  inner.scale.set(3.2, 1.7, 3.2);
+  bell.add(inner);
+  const halo = spriteGlow(0xb98cff, 16, 0.55);
+  g.add(halo);
+
+  // 우산 테두리의 마디 — 발광 점 고리
+  const rimMat = new THREE.MeshBasicMaterial({ color: 0xa8f4ff });
+  const rimGeo = new THREE.SphereGeometry(0.19, 6, 5);
+  const rimParts = [];
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    // bell 은 로컬 단위(반지름 1)라 테두리는 x/z 0.98
+    const p = new THREE.Mesh(rimGeo, rimMat);
+    p.position.set(Math.cos(a) * 3.9, -0.5, Math.sin(a) * 3.9);
+    g.add(p);
+    rimParts.push(p);
+  }
+
+  // 입술 팔 6가닥 — 두툼하게 말려 내려온다
+  const limbMat = addSkin(new THREE.MeshPhongMaterial({
+    vertexColors: true, shininess: 24, specular: 0x9a7ac0,
+    emissive: 0x2a1250, emissiveIntensity: 1.0,
+  }), 0.6);
+  const arms = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const pivot = new THREE.Group();
+    pivot.position.set(Math.cos(a) * 1.5, -0.7, Math.sin(a) * 1.5);
+    const dir = new THREE.Vector3(Math.cos(a) * 0.28, -1, Math.sin(a) * 0.28).normalize();
+    pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    const limb = new THREE.Mesh(krakenLimb(6, 8.2, 0.46, 0.1, 0x7a56b8), limbMat);
+    pivot.add(limb);
+    pivot.userData.phase = i * 1.05;
+    g.add(pivot);
+    arms.push({ pivot, limb });
+  }
+  // 가는 촉수 12가닥 — 길게 늘어진다
+  const tentacles = [];
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + 0.24;
+    const pivot = new THREE.Group();
+    pivot.position.set(Math.cos(a) * 3.2, -0.5, Math.sin(a) * 3.2);
+    const dir = new THREE.Vector3(Math.cos(a) * 0.42, -1, Math.sin(a) * 0.42).normalize();
+    pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    const limb = new THREE.Mesh(krakenLimb(9, 13.5, 0.20, 0.07, 0x9a7ad0), limbMat);
+    pivot.add(limb);
+    pivot.userData.phase = 0.7 + i * 0.72;
+    g.add(pivot);
+    tentacles.push({ pivot, limb });
+  }
+
+  return {
+    group: g, bell, inner, halo, arms, tentacles, rim: rimParts,
+    update(t) {
+      // 우산이 부풀었다 줄어드는 맥동
+      const k = 1 + Math.sin(t * 1.6) * 0.09;
+      bell.scale.set(4.4 * (1.06 - (k - 1) * 0.5), 2.7 * k, 4.4 * (1.06 - (k - 1) * 0.5));
+      inner.scale.set(3.2 * k, 1.7 * k, 3.2 * k);
+      halo.material.opacity = 0.35 + 0.2 * Math.sin(t * 1.6);
+      for (let i = 0; i < arms.length; i++) {
+        const p = arms[i].pivot.userData.phase;
+        arms[i].limb.rotation.x = Math.sin(t * 0.9 + p) * 0.2;
+        arms[i].limb.rotation.z = Math.cos(t * 0.7 + p) * 0.22;
+      }
+      for (let i = 0; i < tentacles.length; i++) {
+        const p = tentacles[i].pivot.userData.phase;
+        tentacles[i].limb.rotation.x = Math.sin(t * 0.6 + p) * 0.26;
+        tentacles[i].limb.rotation.z = Math.cos(t * 0.5 + p * 1.3) * 0.3;
+      }
+      for (let i = 0; i < rimParts.length; i++) {
+        const s = 0.7 + 0.5 * Math.sin(t * 2.4 + i * 0.9);
+        rimParts[i].scale.setScalar(s);
+      }
+    },
+  };
+}
+
+/* =========================================================
    관상용 대형 생물 — 고래 4종 · 가오리 3종 · 바다거북
    · 회전체(lathe) 몸통 + 병합 디테일(주름·혹·무늬 패치·지느러미)
    · 각 모델은 update(t) 로 꼬리·날개를 부드럽게 움직인다
@@ -3087,8 +3500,12 @@ export function rockCaveGeometry(seed, opts) {
     0.07 * Math.sin(a * 9 + u * 7.7 + s5) +
     0.05 * Math.sin(u * 11.3 + s6 + a * 2);
 
-  /* 통로 반지름 — 가운데는 일정하고, 아가리에서 살짝 벌어지는 나팔 모양 */
+  /* 통로 반지름 — 가운데는 일부러 크게 벌어져 '동굴 방'을 이룬다.
+     아가리 쪽은 살짝 더 벌어져 자연스러운 깔때기 입구가 된다. */
+  const chamber = o.chamber === undefined ? 1 : o.chamber;
+  const chamberAt = (u) => Math.exp(-Math.pow((u - 0.02) / 0.36, 2));
   const boreAt = (u, a) => bore * (1 + 0.32 * smoothstep(0.68, 1.0, Math.abs(u)))
+    * (1 + 0.62 * chamber * chamberAt(u))
     * (1 + 0.085 * Math.sin(a * 4 + u * 1.7 + s2) + 0.05 * Math.sin(a * 7 - u * 3.1 + s1));
 
   /* 바깥 반지름 — 타원체를 요철로 흔든 것 */
@@ -3218,7 +3635,124 @@ export function rockCaveGeometry(seed, opts) {
     halfLength: A,
     radius: B,
     bore: bore,
+    chamber: bore * (1 + 0.62 * chamber),
     rim: rims,
+    /* 내부 벽면의 자리 — 발광 산호·광물을 심을 곳 (로컬 좌표 + 안쪽 법선) */
+    sockets: (() => {
+      const out = [];
+      const NSU = 9;
+      const NSA = 9;
+      for (let i = 0; i < NSU; i++) {
+        const u = -0.72 + (1.44 * i) / (NSU - 1);
+        for (let j = 0; j < NSA; j++) {
+          const a = (j / NSA) * Math.PI * 2 + i * 0.35;
+          const ri = boreAt(u, a);
+          out.push({
+            x: Math.cos(a) * ri * 0.94,
+            y: Math.sin(a) * ri * 0.86,
+            z: u * A,
+            nx: -Math.cos(a),
+            ny: -Math.sin(a),
+            u,
+            a,
+          });
+        }
+      }
+      return out;
+    })(),
+  };
+}
+
+/**
+ * 동굴 내부 장식 — 벽에 돋은 발광 광물 결정 + 발광 산호 다발 + 부유하는 빛 알갱이.
+ * 동굴 로컬 좌표(통로 축 = z)로 만든다.
+ * @returns {{geo: THREE.BufferGeometry, glow: {pos: Float32Array, col: Float32Array}}}
+ */
+export function caveDecorGeometry(seed, sockets, opts) {
+  const o = opts || {};
+  const rnd = mulberry(seed ^ 0x5bd1);
+  const parts = [];
+  const gp = [];
+  const gc = [];
+  const c = new THREE.Color();
+
+  const CRYSTAL = [0x63e6ff, 0x8f7dff, 0x54ffd0, 0xa8f0ff, 0xd07dff];
+  const CORAL = [0x3ad8c0, 0x6f8cff, 0x9f6bff, 0x49e0a8];
+
+  const list = sockets || [];
+  const pushGlow = (x, y, z, color, size) => {
+    gp.push(x, y, z);
+    c.set(color);
+    const k = size === undefined ? 1 : size;
+    gc.push(c.r * k, c.g * k, c.b * k);
+  };
+
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
+    const roll = rnd();
+    if (roll < 0.42) {
+      // 광물 결정 다발 — 벽에서 안쪽으로 돋아난 육각 기둥
+      const n = 3 + Math.floor(rnd() * 5);
+      const hue = CRYSTAL[Math.floor(rnd() * CRYSTAL.length)];
+      for (let k = 0; k < n; k++) {
+        const len = 0.7 + rnd() * 1.9;
+        const rad = 0.10 + rnd() * 0.16;
+        const g = new THREE.CylinderGeometry(rad * 0.35, rad, len, 6, 1);
+        // 벽 법선 방향 + 약간 흔들린 방향으로 뻗는다
+        const tilt = new THREE.Vector3(s.nx + (rnd() - 0.5) * 0.5, s.ny + (rnd() - 0.5) * 0.5 + 0.12, (rnd() - 0.5) * 0.5).normalize();
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tilt);
+        const m = new THREE.Matrix4().compose(
+          new THREE.Vector3(s.x + (rnd() - 0.5) * 0.7, s.y + (rnd() - 0.5) * 0.7, s.z + (rnd() - 0.5) * 0.9),
+          q,
+          new THREE.Vector3(1, 1, 1)
+        );
+        g.applyMatrix4(m);
+        g.translate(tilt.x * len * 0.45, tilt.y * len * 0.45, tilt.z * len * 0.45);
+        parts.push(paint(g, hue));
+        // 결정 끝의 빛
+        const tip = new THREE.Vector3(0, len * 0.92, 0).applyQuaternion(q);
+        pushGlow(s.x + tip.x, s.y + tip.y, s.z + tip.z, hue, 0.9);
+      }
+    } else if (roll < 0.78) {
+      // 발광 산호 다발 — 둥근 혹이 모인 군락
+      const n = 3 + Math.floor(rnd() * 4);
+      const hue = CORAL[Math.floor(rnd() * CORAL.length)];
+      for (let k = 0; k < n; k++) {
+        const r = 0.18 + rnd() * 0.34;
+        const g = new THREE.SphereGeometry(r, 8, 6);
+        g.scale(1, 0.7 + rnd() * 0.5, 1);
+        g.translate(s.x + (rnd() - 0.5) * 0.9, s.y + (rnd() - 0.5) * 0.7 + r * 0.3, s.z + (rnd() - 0.5) * 1.1);
+        parts.push(paintGradient(g, hue, 0xeaffff));
+      }
+      pushGlow(s.x, s.y, s.z, hue, 1.3);
+    } else if (roll < 0.9) {
+      // 수정 덩이 — 굴러온 작은 바위에 빛나는 결
+      const g = rockGeometry(0.3 + rnd() * 0.5, seed + i * 7, 1);
+      g.translate(s.x * 0.9, s.y * 0.9 - 0.2, s.z);
+      parts.push(paint(g, 0x2c3a44));
+      pushGlow(s.x * 0.9, s.y * 0.9, s.z, 0x63e6ff, 0.7);
+    }
+  }
+
+  // 부유하는 빛 알갱이 — 동굴 안 공중
+  const floaters = o.floaters === undefined ? 46 : o.floaters;
+  const A = o.halfLength || 20;
+  const R = o.chamber || 9;
+  for (let i = 0; i < floaters; i++) {
+    const u = (rnd() - 0.5) * 1.7;
+    const a = rnd() * Math.PI * 2;
+    const r = R * (0.25 + rnd() * 0.6);
+    pushGlow(Math.cos(a) * r, Math.sin(a) * r * 0.8, u * A * 0.8, 0x8ff6ff, 0.35 + rnd() * 0.5);
+  }
+
+  const geo = parts.length ? mergeParts(parts) : new THREE.BufferGeometry();
+  if (parts.length) geo.computeBoundingSphere();
+  return {
+    geo,
+    glow: {
+      pos: new Float32Array(gp),
+      col: new Float32Array(gc),
+    },
   };
 }
 

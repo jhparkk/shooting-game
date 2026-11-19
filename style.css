@@ -184,6 +184,91 @@ body { touch-action: none; }
   color: #eafeff;
 }
 
+/* 해류 표시 — 방향 화살표 · 세기 막대 · 등급 */
+.current {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 2px 9px 2px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 220, 235, 0.14);
+  background: linear-gradient(180deg, rgba(4, 32, 46, 0.44), rgba(4, 24, 36, 0.26));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 400ms ease, background 400ms ease;
+  opacity: 0.82;
+}
+.current-arrow-wrap {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(90, 220, 235, 0.13);
+}
+.current-arrow {
+  display: block;
+  font-size: 9px;
+  line-height: 1;
+  color: #8ff0ff;
+  transition: transform 140ms linear;
+}
+.current-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(160, 230, 238, 0.72);
+}
+.current-track {
+  position: relative;
+  width: 46px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(8, 40, 54, 0.85);
+  overflow: hidden;
+}
+.current-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2ba6d8, #7df3ff);
+  box-shadow: 0 0 8px rgba(110, 235, 255, 0.5);
+  transition: width 180ms linear, background 320ms ease;
+}
+.current-grade {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #cdf6ff;
+  letter-spacing: 0.02em;
+}
+.current-dir {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(160, 230, 238, 0.6);
+}
+.current.strong {
+  opacity: 1;
+  border-color: rgba(255, 186, 110, 0.5);
+  background: linear-gradient(180deg, rgba(62, 40, 8, 0.5), rgba(40, 24, 6, 0.32));
+}
+.current.strong .current-arrow { color: #ffd9a0; }
+.current.strong .current-fill {
+  background: linear-gradient(90deg, #ffa63d, #ffe08a);
+  box-shadow: 0 0 10px rgba(255, 176, 80, 0.6);
+}
+.current.strong .current-grade { color: #ffe1b0; }
+.current.strong .current-dir { color: rgba(255, 226, 190, 0.75); }
+.current.burst .current-arrow-wrap { animation: current-warn 900ms ease-in-out infinite; }
+@keyframes current-warn {
+  0%, 100% { background: rgba(255, 176, 80, 0.16); transform: scale(1); }
+  50% { background: rgba(255, 176, 80, 0.42); transform: scale(1.12); }
+}
+
 .hud {
   position: absolute;
   inset: 0;
@@ -272,6 +357,12 @@ body { touch-action: none; }
   background: rgba(6, 26, 36, 0.8);
   border: 1px solid rgba(255, 120, 140, 0.35);
   overflow: hidden;
+}
+.boss-bar.deep .boss-bar-label { color: #d9e4ff; text-shadow: 0 0 12px rgba(150, 120, 255, 0.85); }
+.boss-bar.deep .boss-bar-track { border-color: rgba(170, 140, 255, 0.45); }
+.boss-bar.deep .boss-bar-fill {
+  background: linear-gradient(90deg, #7a4dff, #4de0ff, #d9f4ff);
+  box-shadow: 0 0 18px rgba(140, 110, 255, 0.85);
 }
 .boss-bar-fill {
   height: 100%;
@@ -986,5 +1077,5 @@ body { touch-action: none; }
   .reticle { transform: scale(0.85); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .new-record, .loading .bubbles i, .dur.danger .dur-fill, .dur-flag { animation: none; }
+  .new-record, .loading .bubbles i, .dur.danger .dur-fill, .dur-flag, .current.burst .current-arrow-wrap { animation: none; }
 }

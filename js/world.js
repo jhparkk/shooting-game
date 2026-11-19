@@ -13,12 +13,12 @@ import {
   rockGeometry, branchCoralGeometry, blobCoralGeometry, tubeCoralGeometry,
   fanCoralGeometry, brainCoralGeometry, tuftCoralGeometry,
   slabRockGeometry, columnRockGeometry, pebbleClusterGeometry,
-  rockCaveGeometry,
+  rockCaveGeometry, caveDecorGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261118b5';
-import { getTextures } from './textures.js?v=20261118b5';
-import { Atmosphere } from './atmosphere.js?v=20261118b5';
+} from './models.js?v=20261120a';
+import { getTextures } from './textures.js?v=20261120a';
+import { Atmosphere } from './atmosphere.js?v=20261120a';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -31,6 +31,7 @@ export const CANYON_FLOOR = -215; // 중층 해저 협곡 바닥 (수심 약 336
 export const TRENCH_FLOOR = -470; // 심해 해구 대지 (수심 약 680m)
 export const ABYSS_FLOOR = -950;  // 초심해 심연 바닥 (수심 약 1,330m)
 export const HADAL_FLOOR = -1985; // 극심해 해구 바닥 (수심 약 2,730m · 마리아나 해구급)
+export const DEEP_FLOOR = -2620;  // 최심해 심연 바닥 (수심 약 3,580m — 해구 안의 가장 깊은 구멍)
 
 /** 수심(m) 환산 계수 — 월드 1단위 = 1.35m */
 export const DEPTH_SCALE = 1.35;
@@ -89,10 +90,21 @@ export const ZONES = [
     sun: 0x8aa8dd, sunI: 0.12, glow: 0.06,
     coral: [0x333d47, 0x3b4551, 0x2f3742, 0x40444a, 0x36404c],
   },
+  {
+    /* 3,000m 아래 — 햇빛이 완전히 끊긴 곳. 물빛은 거의 검푸르고,
+       보이는 것은 잠수정 탐조등과 생물 발광뿐이다. */
+    name: '최심해 심연',
+    fog: 0x01060f, density: 0.0232,
+    skyTop: 0x020a18, skyMid: 0x00030a, skyBottom: 0x000101,
+    hemiSky: 0x122650, hemiGround: 0x010208, hemi: 0.28,
+    ambient: 0x101c3a, ambientI: 0.30,
+    sun: 0x6f8cc6, sunI: 0.05, glow: 0.02,
+    coral: [0x2a333c, 0x313a44, 0x262e38, 0x343c46, 0x2c3540],
+  },
 ];
 
-/* 물빛이 바뀌는 수심(m) 경계 — 0~150 / 150~550 / 550~1,000 / 1,000~1,800 / 1,800+ */
-export const ZONE_DEPTHS = [150, 550, 1000, 1800];
+/* 물빛이 바뀌는 수심(m) 경계 — 0~150 / 150~550 / 550~1,000 / 1,000~1,800 / 1,800~2,750 / 2,750+ */
+export const ZONE_DEPTHS = [150, 550, 1000, 1800, 2750];
 /** 구역 경계에서 물빛이 섞이는 폭(m) */
 const ZONE_BLEND = 160;
 
@@ -231,6 +243,12 @@ function hadalCore(x, z) {
   return smoothstep(620, 190, d);
 }
 
+/** 극심해 해구 안쪽에 뚫린 가장 깊은 구멍 — 3,000m 아래 최심해 심연으로 이어진다 */
+function deepCore(x, z) {
+  const d = Math.hypot((x - 238) * 0.95, z + 1468);
+  return smoothstep(300, 96, d);
+}
+
 /**
  * 해저 높이 (월드 y) — 모든 (x, z) 에서 연속. 경계 없음.
  *  · 산호 언덕 봉우리 y≈21        → 수심 약 18m
@@ -239,6 +257,7 @@ function hadalCore(x, z) {
  *  · 심해 해구 대지   y≈-470      → 수심 약 680m
  *  · 초심해 심연      y≈-950      → 수심 약 1,330m
  *  · 극심해 해구      y≈-1,985    → 수심 약 2,730m
+ *  · 최심해 심연      y≈-2,620    → 수심 약 3,580m
  * 수심(m) = (SURFACE_Y - y) * DEPTH_SCALE
  */
 export function getTerrainHeight(x, z) {
@@ -280,6 +299,15 @@ export function getTerrainHeight(x, z) {
         + 16 * Math.sin(x * 0.017 + 0.9) * Math.cos(z * 0.014 - 1.3)
         + 9 * Math.sin((x - z) * 0.0082 + 0.6);
       h = h * (1 - t3) + f3 * t3;
+    }
+    // 5) 최심해 심연 — 3,000m 아래, 해구 바닥에 다시 뚫린 깊은 구멍
+    const t4 = Math.max(smoothstep(2.02, 2.80, b) * 0.72, deepCore(x, z)) * guard;
+    if (t4 > 0.0015) {
+      const f4 = DEEP_FLOOR
+        + 22 * Math.sin(x * 0.015 - 0.4) * Math.cos(z * 0.013 + 1.7)
+        + 12 * Math.sin((x + z) * 0.0074 - 0.9)
+        + 6 * Math.cos((x - z) * 0.0125);
+      h = h * (1 - t4) + f4 * t4;
     }
   }
   return h;
@@ -526,6 +554,26 @@ export class World {
       );
     };
     this.floorMats = [this.rockMat, this.coralMat, this.kelpMat];
+
+    /* 동굴 내부 — 벽에 돋은 발광 광물·산호와 그 빛 알갱이 */
+    this.caveCrystalMat = new THREE.MeshPhongMaterial({
+      vertexColors: true,
+      shininess: 86,
+      specular: 0xbfefff,
+      emissive: 0x123a4a,
+      emissiveIntensity: 1.15,
+      side: THREE.DoubleSide,
+    });
+    this.caveGlowMat = new THREE.PointsMaterial({
+      size: 1.5,
+      map: glowTexture(),
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.92,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
   }
 
   /**
@@ -835,7 +883,7 @@ export class World {
     geo.rotateX(-Math.PI / 2);
     this.farMat = new THREE.MeshBasicMaterial({ color: this.zone.fog, fog: true, depthWrite: true });
     this.farFloor = new THREE.Mesh(geo, this.farMat);
-    this.farFloor.position.y = HADAL_FLOOR - 40;
+    this.farFloor.position.y = DEEP_FLOOR - 40;
     this.farFloor.frustumCulled = false;
     this.farFloor.renderOrder = -5;
     this.scene.add(this.farFloor);
@@ -1483,13 +1531,27 @@ export class World {
   _buildCaves() {
     this.caves = [];
     this.caveGeoCache = new Map();     // 셀키 -> { geo, colliders, ... }
+    /* 동굴 안을 은은하게 밝히는 빛 — 가장 가까운 동굴 하나에만 붙인다 */
+    this.caveLight = new THREE.PointLight(0x6fe8ff, 0, 52, 2);
+    this.caveLight.visible = false;
+    this.scene.add(this.caveLight);
     for (let i = 0; i < CAVE_SLOTS; i++) {
       const mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.rockMat);
       mesh.visible = false;
       mesh.frustumCulled = false;
       this.scene.add(mesh);
+      // 벽에 돋은 발광 광물·산호(동굴 로컬 좌표)와 그 빛 — 동굴에 딸린 자식
+      const decor = new THREE.Mesh(new THREE.BufferGeometry(), this.caveCrystalMat);
+      decor.frustumCulled = false;
+      mesh.add(decor);
+      const glow = new THREE.Points(new THREE.BufferGeometry(), this.caveGlowMat);
+      glow.frustumCulled = false;
+      glow.renderOrder = 6;
+      mesh.add(glow);
       this.caves.push({
         mesh,
+        decor,
+        glow,
         key: '',
         cols: [],            // 월드 좌표 충돌체
         center: new THREE.Vector3(),
@@ -1518,7 +1580,7 @@ export class World {
       seed,
       halfLength: (20 + rnd() * 7) * sizeK,
       radius: (17 + rnd() * 6) * sizeK,
-      bore: 6.0 * boreK,
+      bore: 7.0 * boreK,
       rot: rnd() * Math.PI * 2,
       jx: (rnd() - 0.5) * CAVE_CELL * 0.5,
       jz: (rnd() - 0.5) * CAVE_CELL * 0.5,
@@ -1570,10 +1632,23 @@ export class World {
       halfLength: spec.halfLength,
       radius: spec.radius,
       bore: spec.bore,
+      chamber: 1,
     });
+    // 동굴 안쪽 벽에 발광 광물·산호를 심는다 (동굴과 함께 캐시)
+    const decor = caveDecorGeometry(spec.seed, made.sockets, {
+      chamber: made.chamber,
+      halfLength: spec.halfLength,
+      floaters: 42,
+    });
+    const glowGeo = new THREE.BufferGeometry();
+    glowGeo.setAttribute('position', new THREE.BufferAttribute(decor.glow.pos, 3));
+    glowGeo.setAttribute('color', new THREE.BufferAttribute(decor.glow.col, 3));
+    glowGeo.computeBoundingSphere();
     const axis = new THREE.Vector3(Math.sin(rot), 0, Math.cos(rot));
     const entry = {
       geo: made.geo,
+      decorGeo: decor.geo,
+      glowGeo,
       colsLocal: made.colliders,
       pos: new THREE.Vector3(x, y, z),
       rot,
@@ -1586,9 +1661,14 @@ export class World {
     this.caveGeoCache.set(key, entry);
     if (this.caveGeoCache.size > 14) {
       // 가장 오래된 것 하나를 버린다 (지오메트리 메모리 유지)
+      const used = new Set((this.caves || []).map((c) => c.key));
       for (const [k, v] of this.caveGeoCache) {
-        if (k !== key) {
-          if (v && v.geo) v.geo.dispose();
+        if (k !== key && !used.has(k)) {
+          if (v && v.geo) {
+            v.geo.dispose();
+            if (v.decorGeo) v.decorGeo.dispose();
+            if (v.glowGeo) v.glowGeo.dispose();
+          }
           this.caveGeoCache.delete(k);
           break;
         }
@@ -1604,6 +1684,8 @@ export class World {
   _assignCave(slot, entry, key) {
     slot.key = key;
     slot.mesh.geometry = entry.geo;
+    if (slot.decor && entry.decorGeo) slot.decor.geometry = entry.decorGeo;
+    if (slot.glow && entry.glowGeo) slot.glow.geometry = entry.glowGeo;
     slot.mesh.position.copy(entry.pos);
     slot.mesh.rotation.set(0, entry.rot, 0);
     slot.mesh.visible = true;
@@ -1657,6 +1739,28 @@ export class World {
       used.add(i);
       this._assignCave(slot, want[i].entry, want[i].key);
       assigned++;
+    }
+
+    /* 동굴 안쪽을 은은하게 밝히는 빛 — 가장 가까운 동굴로 옮긴다 */
+    if (this.caveLight) {
+      let best = null;
+      let bd = Infinity;
+      for (const slot of this.caves) {
+        if (!slot.key) continue;
+        const dx = slot.center.x - px;
+        const dz = slot.center.z - pz;
+        const d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = slot; }
+      }
+      if (best && bd < 150 * 150) {
+        this.caveLight.visible = true;
+        this.caveLight.position.copy(best.center);
+        const k = 1 - Math.sqrt(bd) / 150;
+        this.caveLight.intensity = 0.55 + 1.5 * k * k;
+        this.caveLight.distance = 44 + 26 * k;
+      } else {
+        this.caveLight.visible = false;
+      }
     }
   }
 
@@ -2143,7 +2247,7 @@ export class World {
 
     // 하늘 돔·먼 바닥은 플레이어를 따라간다
     this.sky.position.set(playerPos.x, playerPos.y, playerPos.z);
-    this.farFloor.position.set(playerPos.x, HADAL_FLOOR - 40, playerPos.z);
+    this.farFloor.position.set(playerPos.x, DEEP_FLOOR - 40, playerPos.z);
   }
 
   reset() {

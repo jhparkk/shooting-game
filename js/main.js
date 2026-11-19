@@ -3,16 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261118b5';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261118b5';
-import { RenderPipeline, QUALITY } from './render.js?v=20261118b5';
+import { Sound } from './audio.js?v=20261120a';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120a';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120a';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
+  makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261118b5';
-import { FX } from './fx.js?v=20261118b5';
+} from './models.js?v=20261120a';
+import { FX } from './fx.js?v=20261120a';
+import { Currents } from './currents.js?v=20261120a';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -32,7 +34,7 @@ const REGEN_FADE_FROM = 450;     // 이 수심까지는 정상 회복
 const REGEN_FADE_TO = 1500;      // 이 수심부터는 회복이 거의 멈춘다
 const REGEN_FLOOR = 0.18;        // 심연에서 남는 회복 비율
 const PRESSURE_START = 500;      // 수압이 내구력을 깎기 시작하는 수심(m)
-/* 수심(m) → 초당 내구력 감소 — 1,000m에서 바로 티지지 않고 2,500m+까지 완만하게 오른다 */
+/* 수심(m) → 초당 내구력 감소 — 1,000m에서 바로 티지지 않고 3,500m+까지 완만하게 오른다 */
 const PRESSURE_CURVE = [
   [500, 0.30],
   [900, 0.85],
@@ -40,12 +42,18 @@ const PRESSURE_CURVE = [
   [1800, 2.40],
   [2400, 3.80],
   [2800, 4.60],
+  [3200, 5.20],
+  [3600, 5.80],
 ];
+/* 심해 적응 — 처음 닿는 수심 이정표마다 선체가 개량된다 (최대 내구력 +80, 압력 저항 +8%) */
+const ADAPT_STEPS = [600, 1200, 2000, 2800, 3400];
+const ADAPT_HULL = 80;
+const ADAPT_RESIST = 0.08;
 const DMG_CONTACT = 14;          // 적 생물 접촉
 const DMG_SPIKE = 18;            // 복어·아귀 폭발
 const DMG_ORB = 12;              // 크라켄 구체
 const DMG_BOSS = 22;             // 크라켄 몸통 접촉
-const MAX_HULL_CAP = 360;        // 선체 보강 반복 상한
+const MAX_HULL_CAP = 500;        // 최대 내구력 상한 (심해 적응 + 선체 보강)
 
 /* ---------------- DOM ---------------- */
 const canvas = $('game');
@@ -76,6 +84,12 @@ const el = {
   bossBar: $('boss-bar'),
   bossFill: $('boss-bar-fill'),
   bossHp: $('boss-bar-hp'),
+  bossLabel: $('boss-bar-label'),
+  current: $('current'),
+  currentArrow: $('current-arrow'),
+  currentFill: $('current-fill'),
+  currentGrade: $('current-grade'),
+  currentDir: $('current-dir'),
   reticle: $('reticle'),
   banner: $('notice-banner'),
   toast: $('toast'),
@@ -127,6 +141,9 @@ const G = {
   bubbleTimer: 0.2,
   krakenCd: 30,
   krakenSeen: false,
+  deepBossCd: 45,
+  deepBossSeen: false,
+  adapt: 0,
   shake: 0,
   elapsed: 0,
   flashTimer: 0,
@@ -142,7 +159,7 @@ try {
 }
 
 /* ---------------- 렌더러 ---------------- */
-let renderer, scene, camera, world, fx, player, pipeline;
+let renderer, scene, camera, world, fx, player, pipeline, currents;
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const QUALITY_KEY = 'abyss.quality';          // 'auto' | 'high' | 'medium' | 'low'
@@ -175,6 +192,7 @@ const forward = new THREE.Vector3();
 const horizontal = new THREE.Vector3();
 const tmpVec = new THREE.Vector3();
 const tmpVec2 = new THREE.Vector3();
+const curVec = new THREE.Vector3();
 const camTmp = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -288,6 +306,15 @@ function initThree() {
   world.setCamera(camera);
   fx = new FX(scene);
 
+  /* 해류 — 늘 흐르는 물결과 가끔 몰아치는 강한 해류 */
+  currents = new Currents(scene);
+  currents.onBurst = () => {
+    if (G.state !== 'playing') return;
+    banner('⚠ 강한 해류가 몰아칩니다 · 조향이 밀립니다', 2600);
+    sound.currentRush();
+    G.shake = Math.max(G.shake, 0.45);
+  };
+
   const sub = makeSubmarine();
   sub.group.rotation.order = 'YXZ';
   scene.add(sub.group);
@@ -357,7 +384,8 @@ function buildPools() {
 
   orbGeo = new THREE.SphereGeometry(0.5, 10, 8);
   orbMat = new THREE.MeshBasicMaterial({ color: 0xff9d6b });
-  for (let i = 0; i < 12; i++) {
+  // 초심해 보스는 사방으로 구체를 뿌리므로 넉넉히
+  for (let i = 0; i < 36; i++) {
     const m = new THREE.Mesh(orbGeo, orbMat);
     m.visible = false;
     m.frustumCulled = false;
@@ -660,6 +688,7 @@ function updateDurabilityHud() {
   if (el.durFlag) {
     const show = G.pressure > 0 && G.state === 'playing';
     if (el.durFlag.classList.contains('hidden') === show) el.durFlag.classList.toggle('hidden', !show);
+    if (show) setText(el.durFlag, `⚠ 심해 수압 −${G.pressure.toFixed(1)}/s`);
   }
 }
 
@@ -689,7 +718,8 @@ function regenScaleAt(depth) {
 function updateDurability(dt) {
   if (G.state !== 'playing') return;
   G.sinceHit += dt;
-  G.pressure = pressureRateAt(G.depth);
+  // 심해 적응 단계마다 수압을 8%씩 덜 받는다 (5단계 = 40% 경감)
+  G.pressure = pressureRateAt(G.depth) * (1 - ADAPT_RESIST * G.adapt);
 
   if (G.pressure > 0) {
     G.hull -= G.pressure * dt;
@@ -710,6 +740,30 @@ function updateDurability(dt) {
   }
 
   if (G.bumpCd > 0) G.bumpCd = Math.max(0, G.bumpCd - dt);
+}
+
+/* ---------------- 심해 적응 — 처음 닿는 수심 이정표 ----------------
+   깊은 곳에 처음 발을 들일 때마다 선체가 개량된다.
+   5단계(3,400m)까지 오르면 최대 내구력이 100 → 500 이 된다. */
+function checkDepthMilestones() {
+  let leveled = 0;
+  while (G.adapt < ADAPT_STEPS.length && G.maxDepth >= ADAPT_STEPS[G.adapt]) {
+    G.adapt++;
+    leveled++;
+    G.maxHull = Math.min(MAX_HULL_CAP, G.maxHull + ADAPT_HULL);
+    G.hull = Math.min(G.maxHull, G.hull + ADAPT_HULL + 20);
+    durShownWidth = -1;
+    durShownCls = '';
+    fx.ring(P.pos.clone(), 0x9dfff2, 30, 0.9);
+    fx.burst(P.pos.x, P.pos.y, P.pos.z, 26, {
+      colors: [0x9dfff2, 0xd8fff4, 0xffffff], speed: 12, size: 1.8, life: 0.8,
+    });
+    sound.waveClear();
+  }
+  if (!leveled) return;
+  banner(`심해 적응 ${G.adapt}단계 · 최대 내구력 ${Math.round(G.maxHull)}`, 2600);
+  toast(`선체 개량 · 수압 ${Math.round(ADAPT_RESIST * G.adapt * 100)}% 경감`);
+  refreshHud();
 }
 
 let bannerTimer = 0;
@@ -776,6 +830,51 @@ function updateCompass() {
   }
 }
 
+/* ---------------- 해류 HUD — 방향 화살표 + 세기 ---------------- */
+let curShownDeg = 9999;
+let curShownPct = -1;
+let curShownGrade = '';
+let curShownDir = '';
+let curShownStrong = null;
+let curShownBurst = null;
+
+function updateCurrentHud() {
+  if (!el.current || !currents) return;
+  const h = currents.hud();
+
+  // 화면 기준 방향 — 카메라가 보는 쪽이 위
+  const camB = Math.atan2(camLook.x, -camLook.z);
+  const curB = Math.atan2(Math.cos(currents.angle), -Math.sin(currents.angle));
+  let rel = curB - camB;
+  rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+  const deg = Math.round((rel * 180) / Math.PI);
+  if (deg !== curShownDeg) {
+    curShownDeg = deg;
+    if (el.currentArrow) el.currentArrow.style.transform = `rotate(${deg}deg)`;
+  }
+  const pct = Math.max(3, Math.round(h.pct));
+  if (pct !== curShownPct) {
+    curShownPct = pct;
+    if (el.currentFill) el.currentFill.style.width = pct + '%';
+  }
+  if (h.grade !== curShownGrade) {
+    curShownGrade = h.grade;
+    setText(el.currentGrade, h.grade);
+  }
+  if (h.dirName !== curShownDir) {
+    curShownDir = h.dirName;
+    setText(el.currentDir, h.dirName);
+  }
+  if (h.strong !== curShownStrong) {
+    curShownStrong = h.strong;
+    el.current.classList.toggle('strong', h.strong);
+  }
+  if (h.burst !== curShownBurst) {
+    curShownBurst = h.burst;
+    el.current.classList.toggle('burst', h.burst);
+  }
+}
+
 function refreshHud() {
   setText(el.score, G.score.toLocaleString('ko-KR'));
   setText(el.best, G.best.toLocaleString('ko-KR'));
@@ -795,6 +894,7 @@ function refreshHud() {
   updatePowerups();
   updateCompass();
   updateDurabilityHud();
+  updateCurrentHud();
 }
 
 /* ---------------- 게임 시작/종료 ---------------- */
@@ -826,6 +926,10 @@ function resetGame() {
   G.spawnTimer = 1.4;
   G.krakenCd = 24;
   G.krakenSeen = false;
+  G.deepBossCd = 40;
+  G.deepBossSeen = false;
+  G.adapt = 0;
+  if (currents) currents.reset();
   G.shake = 0;
   G.elapsed = 0;
   G.zoneIndex = 0;
@@ -948,12 +1052,188 @@ function ecoAt(depth) {
 function seedAmbientLife() {
   G.spawnTimer = 2.2;
   G.krakenCd = 24;
+  G.deepBossCd = 40;
 }
 
-/* 수적 생물 — 깊은 심해(700m+)에서만 드물게 조우하는 전설 */
+/* ---------------- 보스 ----------------
+   · 700m+ 심해: 전설의 대왕오징어 크라켄 (기존)
+   · 3,000m+ 최심해: 크라켄보다 두 배 이상 강한 보스 3종
+   기존 크라켄 기준값 — HP 40~96 · 구체 12 · 몸통 접촉 22 · 격퇴 2,600점
+   초심해 보스는 HP 2.5~3.3배, 공격 2배 이상, 보상은 3~4배로 크게 올렸다. */
 const KRAKEN_DEPTH = 700;
-function maybeSpawnKraken(dt) {
+const DEEP_BOSS_DEPTH = 3000;
+
+const BOSS_DEFS = {
+  kraken: {
+    name: '거대 대왕오징어 · 크라켄',
+    shortName: '크라켄',
+    hp: (depth) => Math.min(96, 40 + Math.round(Math.max(0, depth - 600) / 120) * 6),
+    scale: (depth) => 1.65 + Math.min(0.5, Math.max(0, depth - 600) / 1600),
+    contactR: (scale) => 8.4 * (scale / 1.45),
+    contactDmg: DMG_BOSS,
+    orbDmg: DMG_ORB,
+    orbSpeed: 24,
+    orbScale: 1,
+    score: 2600,
+    drops: ['multi', 'hull', 'repair'],
+    bombs: 0,
+    repair: 40,
+    clearance: 18,
+    banner: '심해의 전설 · 크라켄 출현',
+  },
+  megalodon: {
+    name: '고대 상어 · 메갈로돈',
+    shortName: '메갈로돈',
+    hp: () => 240,                 // 크라켄 최대(96)의 2.5배
+    scale: () => 2.35,
+    contactR: (scale) => 7.0 * (scale / 2.35),
+    contactDmg: 44,                // 크라켄 몸통(22)의 2배
+    orbDmg: 26,                    // 크라켄 구체(12)의 2.2배
+    orbSpeed: 34,
+    orbScale: 1.5,
+    score: 7600,
+    drops: ['multi', 'rapid', 'hull', 'repair', 'shield'],
+    bombs: 1,
+    repair: 90,
+    clearance: 24,
+    banner: '3,000m의 포식자 · 메갈로돈',
+  },
+  leviathan: {
+    name: '심연룡 · 레비아탄',
+    shortName: '레비아탄',
+    hp: () => 280,                 // 2.9배
+    scale: () => 1.95,
+    contactR: (scale) => 4.6 * (scale / 1.95),
+    contactDmg: 46,
+    orbDmg: 28,
+    orbSpeed: 30,
+    orbScale: 1.4,
+    score: 8600,
+    drops: ['multi', 'rapid', 'hull', 'repair', 'shield'],
+    bombs: 1,
+    repair: 100,
+    clearance: 22,
+    banner: '심연을 감는 뱀 · 레비아탄',
+  },
+  queen: {
+    name: '심연 해파리 여왕 · 루미나',
+    shortName: '루미나',
+    hp: () => 320,                 // 3.3배
+    scale: () => 1.75,
+    contactR: (scale) => 7.6 * (scale / 1.75),
+    contactDmg: 40,
+    orbDmg: 26,
+    orbSpeed: 26,
+    orbScale: 1.6,
+    score: 9600,
+    drops: ['multi', 'rapid', 'hull', 'repair', 'shield', 'bomb'],
+    bombs: 2,
+    repair: 120,
+    clearance: 26,
+    banner: '발광하는 여왕 · 루미나',
+  },
+};
+
+/** 보스 등장 공통 처리 — 위치·크기·체력·HUD 바 */
+function beginBoss(kind, model, opts) {
+  const def = BOSS_DEFS[kind];
+  const o = model.group;
+  const hp = def.hp(G.depth);
+  const scale = def.scale(G.depth);
+  computeForward(forward);
+  o.position.copy(P.pos).addScaledVector(forward, (opts && opts.dist) || 76);
+  o.position.y = clamp(
+    o.position.y,
+    terrainHeight(o.position.x, o.position.z) + def.clearance,
+    SURFACE_Y - 16
+  );
+  o.rotation.order = 'YXZ';
+  o.scale.setScalar(scale);
+  scene.add(o);
+  G.boss = {
+    kind,
+    def,
+    obj: o,
+    model,
+    hp,
+    maxHp: hp,
+    scale,
+    contactR: def.contactR(scale),
+    contactDmg: def.contactDmg,
+    phase: Math.random() * 6.28,
+    angle: Math.random() * 6.28,
+    fire: 1.8,
+    hit: 0,
+    dead: false,
+    mode: 'stalk',
+    modeT: 0,
+    t: 0,
+    chargeCd: 5,
+    chargeDir: new THREE.Vector3(0, 0, -1),
+    shockCd: 7,
+    contactPts: [],
+  };
+  // 심연룡은 마디를 몸 뒤로 늘어놓는다 (로컬 좌표 +z 가 꼬리 쪽)
+  if (model.segs) {
+    for (let i = 0; i < model.segs.length; i++) {
+      model.segs[i].position.set(0, 0, (i + 1) * 2.05);
+      if (i % 4 === 0) {
+        G.boss.contactPts.push({ p: new THREE.Vector3(), r: 1.9 * (1 - i * 0.03) });
+      }
+    }
+  }
+  if (el.bossLabel) el.bossLabel.textContent = def.name;
+  el.bossBar.classList.toggle('deep', kind !== 'kraken');
+  el.bossBar.classList.remove('hidden');
+  el.bossBar.setAttribute('aria-hidden', 'false');
+  updateBossBar();
+  banner(def.banner, 2900);
+  sound.bossWarn();
+  G.shake = 0.8;
+  return G.boss;
+}
+
+function spawnKraken() {
+  const b = beginBoss('kraken', makeKraken(), { dist: 76 });
+  G.krakenSeen = true;
+  return b;
+}
+
+const DEEP_BOSS_KINDS = ['megalodon', 'leviathan', 'queen'];
+let lastDeepBoss = '';
+function spawnDeepBoss(kind) {
+  let k = kind;
+  if (!k) {
+    k = DEEP_BOSS_KINDS[Math.floor(Math.random() * DEEP_BOSS_KINDS.length)];
+    if (k === lastDeepBoss) {
+      k = DEEP_BOSS_KINDS[(DEEP_BOSS_KINDS.indexOf(k) + 1) % DEEP_BOSS_KINDS.length];
+    }
+  }
+  lastDeepBoss = k;
+  const model = k === 'megalodon'
+    ? makeMegalodon()
+    : k === 'leviathan' ? makeLeviathan(16) : makeVoidQueen();
+  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 62 : 74 });
+  G.deepBossSeen = true;
+  return b;
+}
+
+/** 이 수심에 어울리는 보스가 나타날 때가 되었는가 */
+function maybeSpawnBoss(dt) {
   if (G.state !== 'playing' || G.boss) return;
+
+  // 3,000m 아래 — 초심해 보스 3종
+  if (G.depth >= DEEP_BOSS_DEPTH) {
+    G.deepBossCd -= dt;
+    if (G.deepBossCd <= 0 && Math.random() < dt * 0.10) {
+      spawnDeepBoss();
+      G.deepBossCd = 165;
+    }
+  } else if (G.deepBossCd < 22) {
+    G.deepBossCd = 22;
+  }
+
+  // 700m 아래 — 크라켄
   if (G.depth < KRAKEN_DEPTH) {
     if (G.krakenCd < 8) G.krakenCd = 8;
     return;
@@ -966,48 +1246,28 @@ function maybeSpawnKraken(dt) {
   }
 }
 
-function spawnKraken() {
-  const b = makeKraken();
-  const hp = Math.min(96, 40 + Math.round(Math.max(0, G.depth - 600) / 120) * 6);
-  computeForward(forward);
-  b.group.position.copy(P.pos).addScaledVector(forward, 76);
-  b.group.position.y = clamp(
-    b.group.position.y,
-    terrainHeight(b.group.position.x, b.group.position.z) + 18,
-    SURFACE_Y - 16
-  );
-  b.group.rotation.order = 'YXZ';
-  const scale = 1.65 + Math.min(0.5, Math.max(0, G.depth - 600) / 1600);
-  b.group.scale.setScalar(scale);
-  scene.add(b.group);
-  G.boss = {
-    obj: b.group,
-    arms: b.arms,
-    tentacles: b.tentacles,
-    hp,
-    maxHp: hp,
-    scale,
-    phase: Math.random() * 6.28,
-    angle: Math.random() * 6.28,
-    fire: 2.2,
-    hit: 0,
-    dead: false,
-  };
-  el.bossBar.classList.remove('hidden');
-  el.bossBar.setAttribute('aria-hidden', 'false');
-  updateBossBar();
-  banner('심해의 전설 · 크라켄 출현', 2900);
-  sound.bossWarn();
-  G.shake = 0.8;
-  G.krakenSeen = true;
-}
+/* 이전 이름 유지 (다른 곳에서 부르는 곳이 있다) */
+const maybeSpawnKraken = maybeSpawnBoss;
 
-function krakenDefeated() {
-  G.score += 2600;
-  toast('크라켄 격퇴 +2600');
-  if (G.boss) removeBoss();
-  G.krakenCd = 170;
+function bossDefeated() {
+  const b = G.boss;
+  if (!b) return;
+  const def = b.def;
+  const pos = b.obj.position.clone();
+  G.score += def.score;
+  if (def.bombs) G.bombs = Math.min(6, G.bombs + def.bombs);
+  // 보상 — 점수 + 아이템 여러 개 + 선체 회복 + 음파 폭탄
+  for (let i = 0; i < def.drops.length; i++) {
+    const a = (i / def.drops.length) * Math.PI * 2;
+    dropItem(pos.x + Math.cos(a) * 3.4, pos.y + rand(-1, 2), pos.z + Math.sin(a) * 3.4, def.drops[i]);
+  }
+  G.hull = Math.min(G.maxHull, G.hull + def.repair);
+  toast(`${def.shortName} 격퇴 +${def.score.toLocaleString('ko-KR')}`);
+  removeBoss();
+  if (b.kind === 'kraken') G.krakenCd = 170;
+  else G.deepBossCd = 165;
   sound.waveClear();
+  banner(`${def.shortName} 격퇴 · 보상 획득`, 2500);
   refreshHud();
 }
 
@@ -1404,15 +1664,12 @@ function damageBoss(dmg) {
       }, i * 110);
     }
     fx.flash(pos, 0xffc27a, 24, 0.7);
-    fx.ring(pos, 0xffc27a, 34, 0.9);
+    fx.ring(pos, 0xffc27a, 40, 0.9);
     sound.explode('big');
     G.shake = 1.4;
-    for (let i = 0; i < 3; i++) {
-      dropItem(pos.x + rand(-3, 3), pos.y + rand(-1, 2), pos.z, ['multi', 'hull', 'repair'][i]);
-    }
     setTimeout(() => {
       if (G.state !== 'playing') return;
-      krakenDefeated();
+      bossDefeated();
     }, 900);
   }
 }
@@ -1506,7 +1763,9 @@ function updatePlayer(dt) {
      대각선으로 밀면 달리면서 부드럽게 선회한다. */
   const turnIn = clamp(input.turn, -1, 1);
   const driveIn = clamp(input.move, -1, 1);
-  P.yaw -= turnIn * P.turnRate * dt;          // 오른쪽 = 우회전(시계방향)
+  /* 강한 해류 속에서는 키가 잘 먹지 않는다 — 조향 저항 */
+  const curStrength = currents ? currents.strength : 0;
+  P.yaw -= turnIn * P.turnRate * (1 - 0.38 * curStrength) * dt;   // 오른쪽 = 우회전(시계방향)
 
   // 기울기: 선회 방향으로 몸을 기울인다
   const targetRoll = clamp(-turnIn * 0.4, -0.5, 0.5);
@@ -1528,6 +1787,13 @@ function updatePlayer(dt) {
   P.vel.z += (desired.z - P.vel.z) * damp(accel, dt);
 
   P.pos.addScaledVector(P.vel, dt);
+
+  /* 해류에 밀린다 — 잔잔할 때는 살짝, 강한 해류·돌발 해류에서는
+     추진만으로는 버티기 어려울 만큼 흘러간다 */
+  if (currents) {
+    currents.vector(curVec);
+    P.pos.addScaledVector(curVec, dt * (0.8 + 0.3 * curStrength));
+  }
   clampToWorld(P.pos, P.vel);
 
   // 기울기 — 상승·하강과 조준 시점을 함께 따른다
@@ -1542,7 +1808,10 @@ function updatePlayer(dt) {
 
   // 수심
   G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
-  if (G.depth > G.maxDepth) G.maxDepth = G.depth;
+  if (G.depth > G.maxDepth) {
+    G.maxDepth = G.depth;
+    checkDepthMilestones();
+  }
 
   // 기포 흘리기 — 잠수정 뒤로 맑은 공기방울이 솟아오른다
   G.bubbleTimer -= dt;
@@ -1866,12 +2135,76 @@ function updateEnemies(dt) {
   }
 }
 /* ---------------- 보스 갱신 ---------------- */
+function fireOrbs(b, dir, count, spread, speed, dmg, from) {
+  const def = b.def;
+  const origin = from || b.obj.position;
+  for (let i = 0; i < count; i++) {
+    const orb = orbs.find((x) => !x.active);
+    if (!orb) return;
+    const d = dir.clone();
+    if (count > 1) d.applyAxisAngle(UP, (i - (count - 1) / 2) * spread);
+    d.y += rand(-0.03, 0.09);
+    d.normalize();
+    orb.active = true;
+    orb.life = 8;
+    orb.dmg = dmg || def.orbDmg;
+    orb.mesh.visible = true;
+    orb.mesh.scale.setScalar(def.orbScale || 1);
+    orb.mesh.position.copy(origin).addScaledVector(d, 5 + b.scale * 2.4);
+    orb.vel.copy(d).multiplyScalar(speed || def.orbSpeed);
+  }
+  sound.shoot();
+}
+
+/** 사방으로 퍼지는 구체 고리 (여왕의 패턴) */
+function fireOrbRing(b, count, speed, yBias) {
+  const def = b.def;
+  const origin = b.obj.position;
+  for (let i = 0; i < count; i++) {
+    const orb = orbs.find((x) => !x.active);
+    if (!orb) return;
+    const a = (i / count) * Math.PI * 2 + b.phase * 0.4;
+    const d = new THREE.Vector3(Math.cos(a), (yBias || 0) + Math.sin(a * 3) * 0.06, Math.sin(a)).normalize();
+    orb.active = true;
+    orb.life = 9;
+    orb.dmg = def.orbDmg;
+    orb.mesh.visible = true;
+    orb.mesh.scale.setScalar(def.orbScale || 1);
+    orb.mesh.position.copy(origin).addScaledVector(d, 6 + b.scale * 2);
+    orb.vel.copy(d).multiplyScalar(speed || def.orbSpeed * 0.8);
+  }
+  sound.shoot();
+}
+
 function updateBoss(dt) {
   const b = G.boss;
   if (!b) return;
   b.phase += dt;
-  const o = b.obj;
+  b.t += dt;
 
+  if (b.kind === 'megalodon') updateMegalodon(b, dt);
+  else if (b.kind === 'leviathan') updateLeviathan(b, dt);
+  else if (b.kind === 'queen') updateVoidQueen(b, dt);
+  else updateKrakenBoss(b, dt);
+
+  const o = b.obj;
+  // 해저·수면을 뚫지 않는다
+  const ground = terrainHeight(o.position.x, o.position.z) + 10;
+  if (o.position.y < ground) o.position.y = ground;
+  if (o.position.y > SURFACE_Y - 14) o.position.y = SURFACE_Y - 14;
+
+  if (b.hit > 0) {
+    b.hit -= dt;
+    o.scale.setScalar(b.scale * (1 + b.hit * 0.35));
+  } else {
+    o.scale.setScalar(b.scale);
+  }
+  if (b.model && b.model.update) b.model.update(b.phase);
+}
+
+/* ---- 크라켄 — 천천히 다가와 선회하며 구체를 뿌린다 ---- */
+function updateKrakenBoss(b, dt) {
+  const o = b.obj;
   tmpVec.copy(P.pos).sub(o.position);
   const dist = tmpVec.length() || 1;
   tmpVec.multiplyScalar(1 / dist);
@@ -1879,7 +2212,6 @@ function updateBoss(dt) {
   if (dist > 32) {
     o.position.addScaledVector(tmpVec, 14 * dt);
   } else {
-    // 선회
     const side = tmpVec2.set(-tmpVec.z, 0, tmpVec.x).normalize();
     o.position.addScaledVector(side, Math.sin(b.phase * 0.7) * 14 * dt);
     o.position.y += Math.sin(b.phase * 0.9) * 6 * dt;
@@ -1888,19 +2220,18 @@ function updateBoss(dt) {
   o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.35;
   o.rotation.z = Math.sin(b.phase * 1.2) * 0.08;
 
-  // 다리·촉수 흔들림
-  if (b.arms) {
-    for (let i = 0; i < b.arms.length; i++) {
-      const arm = b.arms[i];
+  if (b.model.arms) {
+    for (let i = 0; i < b.model.arms.length; i++) {
+      const arm = b.model.arms[i];
       const ph = arm.pivot.userData.phase;
       arm.limb.rotation.x = Math.sin(b.phase * 1.1 + ph) * 0.15;
       arm.limb.rotation.y = Math.sin(b.phase * 0.8 + ph * 1.3) * 0.16;
       arm.limb.rotation.z = Math.cos(b.phase * 0.9 + ph) * 0.1;
     }
   }
-  if (b.tentacles) {
-    for (let i = 0; i < b.tentacles.length; i++) {
-      const tt = b.tentacles[i];
+  if (b.model.tentacles) {
+    for (let i = 0; i < b.model.tentacles.length; i++) {
+      const tt = b.model.tentacles[i];
       const ph = tt.pivot.userData.phase;
       tt.limb.rotation.x = Math.sin(b.phase * 0.7 + ph) * 0.22;
       tt.limb.rotation.y = Math.sin(b.phase * 1.3 + ph) * 0.26;
@@ -1908,71 +2239,216 @@ function updateBoss(dt) {
     }
   }
 
-  // 해저·수면을 뚫지 않는다
-  const ground = terrainHeight(o.position.x, o.position.z) + 12;
-  if (o.position.y < ground) o.position.y = ground;
-  if (o.position.y > SURFACE_Y - 14) o.position.y = SURFACE_Y - 14;
-
-  if (b.hit > 0) {
-    b.hit -= dt;
-    o.scale.setScalar(b.scale * (1 + b.hit * 0.4));
-  } else {
-    o.scale.setScalar(b.scale);
-  }
-
-  // 발사
   b.fire -= dt;
   if (b.fire <= 0 && dist < 90) {
     b.fire = 1.6;
-    const count = b.hp < b.maxHp * 0.5 ? 3 : 2;
-    for (let i = 0; i < count; i++) {
-      const orb = orbs.find((x) => !x.active);
-      if (!orb) break;
-      const dir = tmpVec.clone();
-      dir.applyAxisAngle(UP, (i - (count - 1) / 2) * 0.12);
-      dir.y += rand(-0.05, 0.12);
-      orb.active = true;
-      orb.life = 7;
-      orb.mesh.visible = true;
-      orb.mesh.position.copy(o.position).addScaledVector(dir, 5);
-      orb.vel.copy(dir.normalize()).multiplyScalar(24);
+    fireOrbs(b, tmpVec, b.hp < b.maxHp * 0.5 ? 3 : 2, 0.12, b.def.orbSpeed, b.def.orbDmg);
+  }
+}
+
+/* ---- 메갈로돈 — 노려보다가 아가리를 벌리고 몸통째 돌진한다 ---- */
+function updateMegalodon(b, dt) {
+  const o = b.obj;
+  tmpVec.copy(P.pos).sub(o.position);
+  const dist = tmpVec.length() || 1;
+  tmpVec.multiplyScalar(1 / dist);
+
+  if (b.mode === 'charge') {
+    b.modeT -= dt;
+    o.position.addScaledVector(b.chargeDir, 64 * dt);
+    o.rotation.y = Math.atan2(-b.chargeDir.x, -b.chargeDir.z);
+    o.rotation.x = Math.asin(clamp(b.chargeDir.y, -1, 1)) * 0.4;
+    o.rotation.z = Math.sin(b.phase * 9) * 0.05;
+    // 돌진 중에도 어뢰를 흘린다
+    b.fire -= dt;
+    if (b.fire <= 0) {
+      b.fire = 0.55;
+      fireOrbs(b, b.chargeDir, 1, 0, b.def.orbSpeed * 0.9, b.def.orbDmg);
     }
-    sound.shoot();
+    if (b.modeT <= 0) {
+      b.mode = 'recover';
+      b.modeT = 1.2;
+      b.chargeCd = 4.6 + Math.random() * 2.4;
+    }
+  } else if (b.mode === 'windup') {
+    // 몸을 낮추고 아가리를 벌린 채 겨냥한다 — 피할 틈을 주는 예고
+    b.modeT -= dt;
+    o.position.addScaledVector(tmpVec, 5 * dt);
+    o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+    o.rotation.x = 0.12;
+    o.rotation.z = Math.sin(b.phase * 14) * 0.04;
+    if (b.modeT <= 0) {
+      b.mode = 'charge';
+      b.modeT = 1.25;
+      b.chargeDir.copy(tmpVec);
+    }
+  } else if (b.mode === 'recover') {
+    b.modeT -= dt;
+    b.rotationSlow = true;
+    o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+    o.position.y += Math.sin(b.phase * 1.4) * 1.2 * dt;
+    if (b.modeT <= 0) b.mode = 'stalk';
+  } else {
+    // 선회하며 거리를 좁힌다
+    const want = 44;
+    if (dist > want) o.position.addScaledVector(tmpVec, Math.min(26, (dist - want) * 0.6 + 6) * dt);
+    const side = tmpVec2.set(-tmpVec.z, 0, tmpVec.x).normalize();
+    o.position.addScaledVector(side, Math.sin(b.phase * 0.55) * 12 * dt);
+    o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
+    o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.2;
+    o.rotation.z = Math.sin(b.phase * 0.9) * 0.05;
+    b.chargeCd -= dt;
+    b.fire -= dt;
+    if (b.fire <= 0 && dist < 105) {
+      b.fire = 3.2;
+      fireOrbs(b, tmpVec, 3, 0.14, b.def.orbSpeed, b.def.orbDmg);
+    }
+    if (b.chargeCd <= 0 && dist < 100) {
+      b.mode = 'windup';
+      b.modeT = 0.85;
+    }
   }
 
-  // 몸통·촉수 접촉은 resolveBossContact() 에서 처리한다
+  // 아가리 — 예고·돌진에서 크게 벌어진다
+  const jawTarget = b.mode === 'charge' ? 0.62 : b.mode === 'windup' ? 0.3 : 0.06;
+  b.model.jaw.rotation.x += (jawTarget - b.model.jaw.rotation.x) * Math.min(1, dt * 5);
+}
+
+/* ---- 레비아탄 — 몸을 나선으로 감으며 머리에서 구체를 뿜는다 ---- */
+function updateLeviathan(b, dt) {
+  const o = b.obj;
+  // 플레이어 주위를 크게 돌며 오르내린다
+  b.angle += dt * (0.5 + (b.hp < b.maxHp * 0.5 ? 0.22 : 0));
+  const R = 34 + Math.sin(b.phase * 0.7) * 6;
+  const want = tmpVec2.set(
+    P.pos.x + Math.cos(b.angle) * R,
+    P.pos.y + 6 + Math.sin(b.phase * 0.9) * 9,
+    P.pos.z + Math.sin(b.angle) * R
+  );
+  tmpVec.copy(want).sub(o.position);
+  const d = tmpVec.length() || 1;
+  o.position.addScaledVector(tmpVec.multiplyScalar(1 / d), Math.min(d, 30 * dt));
+
+  // 진행 방향을 본다
+  tmpVec.copy(want).sub(o.position).normalize();
+  const yawWant = Math.atan2(-tmpVec.x, -tmpVec.z);
+  o.rotation.y += angDiff(o.rotation.y, yawWant) * Math.min(1, dt * 2.2);
+  o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.5;
+  o.rotation.z = Math.sin(b.phase * 1.4) * 0.12;
+
+  // 마디 사슬 — 앞 마디 뒤를 따라가며 좌우로 물결친다
+  const segs = b.model.segs;
+  if (segs) {
+    for (let i = 1; i < segs.length; i++) {
+      const prev = segs[i - 1].position;
+      const sway = Math.sin(b.phase * 2.6 - i * 0.55) * (0.5 + i * 0.03);
+      const lift = Math.cos(b.phase * 1.9 - i * 0.42) * 0.16;
+      tmpVec2.set(prev.x + sway, prev.y + lift, prev.z + 2.15);
+      segs[i].position.lerp(tmpVec2, Math.min(1, dt * 9));
+    }
+  }
+  // 충돌체 — 머리와 몸 마디
+  for (let i = 0; i < b.contactPts.length; i++) {
+    const idx = i * 4;
+    const seg = segs[Math.min(segs.length - 1, idx)];
+    seg.getWorldPosition(b.contactPts[i].p);
+    b.contactPts[i].r = (2.1 - i * 0.16) * b.scale;
+  }
+
+  // 머리에서 구체를 나선으로
+  b.fire -= dt;
+  if (b.fire <= 0) {
+    b.fire = b.hp < b.maxHp * 0.5 ? 0.42 : 0.62;
+    tmpVec.copy(P.pos).sub(o.position).normalize();
+    fireOrbs(b, tmpVec, 2, 0.2, b.def.orbSpeed, b.def.orbDmg);
+  }
+
+  // 이따금 머리를 크게 내미는 돌진
+  b.modeT -= dt;
+  if (b.modeT <= 0) {
+    b.modeT = 7 + Math.random() * 4;
+    tmpVec.copy(P.pos).sub(o.position).normalize();
+    o.position.addScaledVector(tmpVec, 9);
+  }
+}
+
+/* ---- 여왕 루미나 — 사방으로 구체 고리를 뿌리고, 가까이 오면 전기 충격 ---- */
+function updateVoidQueen(b, dt) {
+  const o = b.obj;
+  tmpVec.copy(P.pos).sub(o.position);
+  const dist = tmpVec.length() || 1;
+  tmpVec.multiplyScalar(1 / dist);
+
+  // 천천히 다가오며 위아래로 맥동하듯 떠다닌다
+  const want = 40;
+  if (dist > want) o.position.addScaledVector(tmpVec, 8 * dt);
+  else o.position.addScaledVector(tmpVec, -3.5 * dt);
+  o.position.y += Math.sin(b.phase * 0.8) * 3.4 * dt;
+  o.rotation.y += dt * 0.18;
+  o.rotation.z = Math.sin(b.phase * 0.6) * 0.06;
+
+  b.fire -= dt;
+  if (b.fire <= 0) {
+    b.fire = b.hp < b.maxHp * 0.5 ? 2.6 : 3.6;
+    fireOrbRing(b, 12, b.def.orbSpeed * 0.85, 0.05);
+    // 정면으로도 한 줄
+    tmpVec.copy(P.pos).sub(o.position).normalize();
+    fireOrbs(b, tmpVec, 3, 0.1, b.def.orbSpeed, b.def.orbDmg);
+  }
+
+  // 가까이 붙으면 전기 충격 — 우산에서 고리가 퍼진다
+  b.shockCd -= dt;
+  if (b.shockCd <= 0 && dist < 34) {
+    b.shockCd = 6.5;
+    fx.ring(o.position.clone(), 0xbf7dff, 30, 0.9);
+    fx.flash(o.position.clone(), 0xd0a0ff, 16, 0.5);
+    fx.burst(o.position.x, o.position.y, o.position.z, 22, {
+      colors: [0xd0a0ff, 0x9dfcff, 0xffffff], speed: 20, size: 2.2, life: 0.7,
+    });
+    sound.explode('big');
+    G.shake = Math.max(G.shake, 0.7);
+    hurtPlayer(20);
+  }
 }
 
 /* ---------------- 보스 몸통 접촉 — 관통 금지 ---------------- */
 function resolveBossContact() {
   const b = G.boss;
   if (!b) return;
-  const BOSS_CONTACT_R = 8.4 * (b.scale / 1.45);
-  const o = b.obj.position;
-  let dx = P.pos.x - o.x;
-  let dy = P.pos.y - o.y;
-  let dz = P.pos.z - o.z;
-  let d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.0001;
-  if (d >= BOSS_CONTACT_R) return;
-  const nx = dx / d;
-  const ny = dy / d;
-  const nz = dz / d;
-  const overlap = BOSS_CONTACT_R - d;
-  P.pos.x += nx * overlap;
-  P.pos.y += ny * overlap;
-  P.pos.z += nz * overlap;
-  const vn = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;
-  if (vn < 0) {
-    P.vel.x -= nx * vn * 1.5;
-    P.vel.y -= ny * vn * 1.5;
-    P.vel.z -= nz * vn * 1.5;
+  const pts = b.contactPts && b.contactPts.length
+    ? b.contactPts
+    : [{ p: b.obj.position, r: b.contactR }];
+  let touched = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const c = pts[i];
+    const R = c.r || b.contactR;
+    const dx = P.pos.x - c.p.x;
+    const dy = P.pos.y - c.p.y;
+    const dz = P.pos.z - c.p.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.0001;
+    if (d >= R) continue;
+    const nx = dx / d;
+    const ny = dy / d;
+    const nz = dz / d;
+    const overlap = R - d;
+    P.pos.x += nx * overlap;
+    P.pos.y += ny * overlap;
+    P.pos.z += nz * overlap;
+    const vn = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;
+    if (vn < 0) {
+      P.vel.x -= nx * vn * 1.5;
+      P.vel.y -= ny * vn * 1.5;
+      P.vel.z -= nz * vn * 1.5;
+    }
+    touched = 1;
   }
+  if (!touched) return;
   if (G.bumpCd <= 0) {
     G.bumpCd = 0.5;
-    G.shake = Math.max(G.shake, 0.5);
+    G.shake = Math.max(G.shake, 0.6);
     sound.bump();
   }
-  hurtPlayer(DMG_BOSS);
+  hurtPlayer(b.contactDmg || DMG_BOSS);
 }
 
 /* ---------------- 대형 관상 생물 충돌 — 데미지 없이 밀려난다 ---------------- */
@@ -2116,7 +2592,7 @@ function updateOrbs(dt) {
     const dy = o.mesh.position.y - P.pos.y;
     const dz = o.mesh.position.z - P.pos.z;
     if (dx * dx + dy * dy + dz * dz < 9) {
-      hurtPlayer(DMG_ORB);
+      hurtPlayer(o.dmg || DMG_ORB);
       o.active = false;
       o.mesh.visible = false;
       fx.burst(o.mesh.position.x, o.mesh.position.y, o.mesh.position.z, 10, {
@@ -2186,6 +2662,7 @@ function applyQuality(name) {
     pipeline.resize(true);
   }
   if (world) world.setQuality(preset);
+  if (currents) currents.setQuality(preset.particles === undefined ? 1 : preset.particles);
   updateQualityUI();
 }
 
@@ -2331,6 +2808,7 @@ function updateIdle(dt) {
     }
   }
   world.update(dt, P.pos);
+  if (currents) currents.update(dt, P.pos, camera);
   updatePreviews();
   fx.update(dt, camera);
 }
@@ -2380,6 +2858,7 @@ function updateGame(dt) {
   updatePlayer(dt);
   updateCamera(dt);
   world.update(dt, P.pos);
+  if (currents) currents.update(dt, P.pos, camera);
   updateVentBubbles(dt);
 
   // 발사
@@ -2415,7 +2894,7 @@ function updateGame(dt) {
       G.spawnTimer = 1.2;
     }
   }
-  maybeSpawnKraken(dt);
+  maybeSpawnBoss(dt);
 
   updateEnemies(dt);
   updateBoss(dt);
@@ -2839,10 +3318,53 @@ function boot() {
   if (params.has('debug') || params.has('steertest')) {
     window.__abyss = {
       G, P, enemies, items, orbs, world, renderer, camera, scene, player, torpedoes,
-      startGame, spawnKraken, maybeSpawnKraken, damageBoss, removeBoss, spawnEnemy, useBomb,
+      startGame, spawnKraken, spawnDeepBoss, maybeSpawnBoss, damageBoss, removeBoss, spawnEnemy, useBomb,
+      currents: () => (currents ? Object.assign(currents.state(), { hud: currents.hud() }) : null),
+      currentHud: () => ({
+        arrow: el.currentArrow ? el.currentArrow.style.transform : null,
+        fill: el.currentFill ? el.currentFill.style.width : null,
+        grade: el.currentGrade ? el.currentGrade.textContent : null,
+        dir: el.currentDir ? el.currentDir.textContent : null,
+        cls: el.current ? el.current.className : null,
+      }),
+      burstCurrent: (on) => {
+        if (!currents) return null;
+        currents.burstT = on === false ? 0 : 30;
+        currents.burst = on === false ? 0 : 1;
+        currents.eventT = 999;
+        return currents.state();
+      },
+      bossInfo: () => (G.boss ? {
+        kind: G.boss.kind,
+        name: G.boss.def.name,
+        hp: G.boss.hp,
+        maxHp: G.boss.maxHp,
+        score: G.boss.def.score,
+        contactDmg: G.boss.contactDmg,
+        orbDmg: G.boss.def.orbDmg,
+        scale: +G.boss.scale.toFixed(2),
+        mode: G.boss.mode,
+        contactPts: G.boss.contactPts.length,
+        dist: +G.boss.obj.position.distanceTo(P.pos).toFixed(1),
+        label: el.bossLabel ? el.bossLabel.textContent : null,
+        segs: G.boss.model && G.boss.model.segs ? G.boss.model.segs.length : 0,
+        barWidth: el.bossFill ? el.bossFill.style.width : null,
+      } : null),
+      adapt: () => ({
+        stage: G.adapt,
+        maxHull: G.maxHull,
+        hull: +G.hull.toFixed(1),
+        cap: MAX_HULL_CAP,
+        steps: ADAPT_STEPS,
+        pressureRaw: +pressureRateAt(G.depth).toFixed(2),
+        pressureEff: +(pressureRateAt(G.depth) * (1 - ADAPT_RESIST * G.adapt)).toFixed(2),
+        resist: +(ADAPT_RESIST * G.adapt).toFixed(2),
+        text: el.durVal ? el.durVal.textContent + '/' + el.durMax.textContent : null,
+        wait: +((SURFACE_Y - P.pos.y) * DEPTH_SCALE).toFixed(0),
+      }),
+      pressureRateAt, regenScaleAt,
       ecoAt, previewCreature, clearPreviews,
       dropItem, collectItem, hurtPlayer, updateHeadlight, resolveCreatureContacts,
-      pressureRateAt, regenScaleAt,
       hull: () => ({
         hull: G.hull, maxHull: G.maxHull, sinceHit: G.sinceHit,
         pressure: G.pressure, regen: G.regen,

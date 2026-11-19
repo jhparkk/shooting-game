@@ -9,11 +9,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="ABYSS DIVER" />
 <meta name="format-detection" content="telephone=no" />
-<meta name="description" content="3인칭 3D 심해 자유 탐험 슈팅. 잠수정을 직접 몰고 산호 언덕에서 수심 2,700m 극심해 해구까지 내려가며 혹등고래·범고래·향유고래·대왕고래와 만타가오리·매가오리·노랑가오리를 만나고, 깊은 해구에서 전설의 대왕오징어 크라켄과 마주하세요. 아이폰 사파리와 PC 모두 지원." />
+<meta name="description" content="3인칭 3D 심해 자유 탐험 슈팅. 잠수정을 직접 몰고 산호 언덕에서 수심 3,500m 최심해 심연까지 내려가며 혹등고래·범고래·향유고래·대왕고래와 만타가오리·매가오리를 만나고, 강한 해류와 수중 동굴을 지나 깊은 해구에서 크라켄과 초심해 보스 메갈로돈·레비아탄·루미나와 맞섭니다. 아이폰 사파리와 PC 모두 지원." />
 <title>ABYSS DIVER · 심해 자유 탐험 3D 슈팅</title>
 <!-- 아이폰 사파리 확대(핀치 줌·더블탭 줌) 차단 가드: CSS·게임 코드보다 먼저 건다 -->
-<script src="js/zoom-guard.js?v=20261118b5"></script>
-<link rel="stylesheet" href="style.css?v=20261118b5" />
+<script src="js/zoom-guard.js?v=20261120a"></script>
+<link rel="stylesheet" href="style.css?v=20261120a" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a5f74'/%3E%3Cpath d='M12 34c8-10 32-10 40 0-8 10-32 10-40 0z' fill='%2340e0d0'/%3E%3Ccircle cx='42' cy='31' r='2.6' fill='%230a5f74'/%3E%3Cpath d='M14 34l-6-6v12z' fill='%2340e0d0'/%3E%3C/svg%3E" />
 <script type="importmap">
 {
@@ -40,7 +40,7 @@
           <span class="stat-sub">최고 <b id="hud-best">0</b></span>
         </div>
         <div class="hull-wrap">
-          <div id="dur" class="dur safe" role="progressbar" aria-label="잠수정 내구력" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <div id="dur" class="dur safe" role="progressbar" aria-label="잠수정 내구력" aria-valuemin="0" aria-valuemax="500" aria-valuenow="100">
             <div class="dur-head">
               <span class="dur-label">내구력</span>
               <span class="dur-read"><b id="dur-val">100</b><i>/</i><span id="dur-max">100</span></span>
@@ -82,9 +82,17 @@
       <div class="compass-read"><b id="hud-heading">북</b><span id="hud-bearing">0°</span></div>
     </div>
 
+    <div id="current" class="current" aria-hidden="true">
+      <span class="current-arrow-wrap"><span id="current-arrow" class="current-arrow">▲</span></span>
+      <span class="current-label">해류</span>
+      <span class="current-track"><i id="current-fill" class="current-fill"></i></span>
+      <b id="current-grade" class="current-grade">약함</b>
+      <span id="current-dir" class="current-dir">북</span>
+    </div>
+
     <div id="boss-bar" class="boss-bar hidden" aria-hidden="true">
       <div class="boss-bar-head">
-        <span class="boss-bar-label">거대 대왕오징어 · 크라켄</span>
+        <span id="boss-bar-label" class="boss-bar-label">거대 대왕오징어 · 크라켄</span>
         <span id="boss-bar-hp" class="boss-bar-hp"></span>
       </div>
       <div class="boss-bar-track"><div id="boss-bar-fill" class="boss-bar-fill"></div></div>
@@ -138,8 +146,8 @@
         <div class="logo-line"></div>
       </div>
       <p class="tagline">
-        산호 언덕에서 출발해 수심 2,700m 극심해 해구까지.<br />
-        혹등고래·범고래·향유고래·대왕고래와 가오리들이 함께 헤엄칩니다.
+        산호 언덕에서 출발해 수심 3,500m 최심해 심연까지.<br />
+        강한 해류와 수중 동굴을 지나 초심해의 보스들과 마주칩니다.
       </p>
       <div class="best-card">
         <span class="best-label">최고 기록</span>
@@ -152,13 +160,16 @@
         <li><b>🎥 시점</b><span>오른쪽 빈 화면 드래그로 360° 둘러보기, 손을 놓으면 잠수정 뒤로 다시 따라옵니다</span></li>
         <li><b>🔍 줌</b><span>두 손가락 핀치로 3D 줌인·줌아웃, ◉ 버튼으로 시점 초기화</span></li>
         <li><b>🔥 발사</b><span>오른쪽 FIRE 를 누르고 있으면 연사, 조준선 방향으로 발사</span></li>
-        <li><b>🌊 탐험</b><span>산호 언덕에서 해구·초심해 심연·극심해 해구(2,700m)까지 내려가세요</span></li>
+        <li><b>🌊 탐험</b><span>산호 언덕에서 해구·초심해 심연을 지나 3,500m 최심해 심연까지 내려가세요</span></li>
+        <li><b>〰 해류</b><span>바다에는 늘 물이 흐릅니다. 가끔 해류 띠와 돌발 강한 해류가 잠수정을 밀고 조향을 흔듭니다</span></li>
+        <li><b>🕳 동굴</b><span>큰 바위 동굴은 그대로 통과할 수 있습니다. 안쪽 방에는 발광 광물과 산호가 빛납니다</span></li>
+        <li><b>👑 보스</b><span>700m+ 크라켄, 3,000m+ 초심해에는 메갈로돈·레비아탄·루미나가 기다립니다</span></li>
         <li><b>🦈 생태</b><span>상어는 650m 까지, 그 아래 심해는 아귀·발광 해파리·향유고래의 영역입니다</span></li>
-        <li><b>🛡 내구력</b><span>500m 아래는 수압이 내구력을 깎습니다. 선체 보강 모듈을 챙기세요</span></li>
+        <li><b>🛡 내구력</b><span>500m 아래는 수압이 내구력을 깎습니다. 깊은 수심에 처음 닿으면 선체가 개량되어 최대 내구력이 500까지 오릅니다</span></li>
         <li><b>🖥 PC</b><span>WASD·방향키 전진·후진·좌우 선회 · 마우스 드래그 시점 · 휠 줌 · Space 발사</span></li>
         <li><b>〰 음파</b><span>폭탄 버튼 또는 B 로 주변 정리</span></li>
       </ul>
-      <div class="start-foot">3인칭 자유 유영 · 500m 아래는 수압 주의 · 700m+ 심해에서 크라켄 조우</div>
+      <div class="start-foot">3인칭 자유 유영 · 최대 내구력 500 · 700m+ 크라켄 · 3,000m+ 초심해 보스 3종</div>
     </div>
   </div>
 
@@ -239,6 +250,6 @@
     __showError('promise: ' + (r && r.message ? r.message : String(r)));
   });
 </script>
-<script type="module" src="js/main.js?v=20261118b5"></script>
+<script type="module" src="js/main.js?v=20261120a"></script>
 </body>
 </html>
