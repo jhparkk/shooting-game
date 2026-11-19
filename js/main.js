@@ -3342,6 +3342,37 @@ function boot() {
         currents.eventT = 999;
         return currents.state();
       },
+      /** 보스 모델을 눈앞에 세워 둔다 (검증용) */
+      showBossModel: (kind, dist) => {
+        const made = kind === 'leviathan' ? makeLeviathan(16)
+          : kind === 'queen' ? makeVoidQueen()
+            : kind === 'megalodon' ? makeMegalodon() : makeKraken();
+        const g = made.group;
+        computeForward(forward);
+        g.position.copy(P.pos).addScaledVector(forward, dist || 17);
+        g.rotation.order = 'YXZ';
+        g.rotation.y = P.yaw + Math.PI;      // 머리가 카메라를 향하게
+        g.scale.setScalar(kind === 'kraken' ? 1.8 : 1.5);
+        scene.add(g);
+        const l = new THREE.PointLight(0xbfe9ff, 420, 70, 2);
+        l.position.copy(g.position).add(new THREE.Vector3(0, 7, -9));
+        scene.add(l);
+        const l2 = new THREE.PointLight(0xffffff, 300, 60, 2);
+        l2.position.copy(P.pos);
+        scene.add(l2);
+        window.__modelPreview = { g, l, l2 };
+        return { kind, pos: [+g.position.x.toFixed(1), +g.position.y.toFixed(1), +g.position.z.toFixed(1)] };
+      },
+      clearBossModel: () => {
+        const p = window.__modelPreview;
+        if (!p) return null;
+        scene.remove(p.g);
+        scene.remove(p.l);
+        scene.remove(p.l2);
+        p.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+        window.__modelPreview = null;
+        return true;
+      },
       bossInfo: () => (G.boss ? {
         kind: G.boss.kind,
         name: G.boss.def.name,
