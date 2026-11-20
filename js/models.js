@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z6';
+import { getTextures } from './textures.js?v=20261120z7';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2219,8 +2219,9 @@ function leviathanSkullGeometry() {
     parts.push(xf(paint(socket, 0x120c08), [ex * 0.96, ey, ez]));
     const eye = new THREE.SphereGeometry(0.168, 18, 14);
     parts.push(xf(paint(eye, LEVI.eye), [ex, ey, ez]));
-    const pupil = new THREE.BoxGeometry(0.052, 0.24, 0.04);
-    parts.push(xf(paint(pupil, 0x0d0703), [ex + 0.128 * s, ey, ez - 0.012]));
+    // 세로 동공은 눈알 위에 얇게 — 호박색 홍채가 넓게 보이게
+    const pupil = new THREE.BoxGeometry(0.030, 0.135, 0.032);
+    parts.push(xf(paint(pupil, 0x0d0703), [ex + 0.150 * s, ey, ez - 0.010]));
   }
 
   /* ── 위턱 이빨 — 주둥이 테를 따라 아래로 돋은 송곳니 ── */
