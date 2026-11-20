@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z2';
+import { getTextures } from './textures.js?v=20261120z3';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2116,6 +2116,16 @@ function leviathanBodyGeometry() {
       [0, rAt(z) * 0.95 + h * 0.32, z], [0.66, 0, 0]));
   }
 
+  /* ── 꼬리 끝 지느러미 — 위아래로 갈라진 수룡의 꼬리날 ── */
+  parts.push(xf(vfin([
+    [-0.30, 0.02], [-0.10, 0.40], [0.30, 0.66], [0.78, 0.60], [1.02, 0.20],
+    [0.86, -0.06], [0.34, -0.22], [-0.06, -0.12],
+  ], 0.08, LEVI.fin, { smooth: true, curveSegments: 10 }), [0, 0.02, 6.28]));
+  parts.push(xf(vfin([
+    [-0.16, -0.02], [0.12, -0.34], [0.54, -0.52], [0.86, -0.34], [0.96, -0.10],
+    [0.46, 0.04], [0.06, 0.02],
+  ], 0.07, LEVI.fin, { smooth: true, curveSegments: 10 }), [0, -0.02, 6.24]));
+
   /* ── 배지느러미 한 쌍 (꼬리 앞 작은 노) ── */
   for (const s of [-1, 1]) {
     parts.push(xf(paint(hfin([
@@ -2175,7 +2185,13 @@ function leviathanSkullGeometry() {
   ];
   for (const [z, h, r] of sagittal) {
     const y = rAt(z) * 0.92;
-    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone), [0, y + h * 0.40, z], [0.55, 0, 0]));
+    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone), [0, y + h * 0.34, z], [0.95, 0, 0]));
+  }
+  /* 목 뒤로 길게 뻗은 한 쌍의 긴 뿔 */
+  for (const s2 of [-1, 1]) {
+    const g = spikeGeo(0.16, 1.55, 6);
+    g.rotateX(1.32);                       // 거의 뒤쪽(+z)을 향해 눕힌다
+    parts.push(xf(paint(g, LEVI.bone), [0.34 * s2, rAt(-4.15) * 0.72, -4.15], [0.12, 0, -0.20 * s2]));
   }
   /* ── 눈 위·볼에서 뒤로 젖혀진 뿔 ── */
   for (const s of [-1, 1]) {
@@ -2209,10 +2225,21 @@ function leviathanSkullGeometry() {
       const t = i / 11;
       const z = -7.10 + t * 2.80;
       const rr = rAt(z);
-      const h = 0.20 + 0.16 * Math.sin(t * Math.PI);
-      parts.push(xf(paint(spikeGeo(0.050, h, 5), LEVI.tooth),
+      const h = 0.26 + 0.22 * Math.sin(t * Math.PI);
+      parts.push(xf(paint(spikeGeo(0.055, h, 5), LEVI.tooth),
         [rr * 0.95 * 0.58 * s, -rr * 0.92 * 0.62, z], [Math.PI, 0, 0.07 * s]));
     }
+  }
+  /* ── 입천장 — 아래턱을 벌리면 붉은 아가리가 보인다 ── */
+  const palate = new THREE.SphereGeometry(1, 16, 10);
+  palate.scale(0.52, 0.10, 1.05);
+  parts.push(xf(paint(palate, LEVI.gum), [0, -rAt(-6.10) * 0.92 * 0.62, -6.10]));
+  /* ── 주둥이 콧등 융기 — 파충류의 각진 콧대 ── */
+  for (const s2 of [-1, 1]) {
+    const ridge = new THREE.SphereGeometry(1, 12, 8);
+    ridge.scale(0.14, 0.12, 0.95);
+    parts.push(xf(paint(ridge, LEVI.backDeep),
+      [rAt(-6.4) * 0.95 * 0.34 * s2, rAt(-6.4) * 0.92 * 0.86, -6.4]));
   }
   /* ── 입 라인 — 주둥이 옆을 따라 흐르는 어두운 틈 ── */
   for (const s of [-1, 1]) {
@@ -2249,7 +2276,7 @@ function leviathanJawGeometry() {
     const y = pos.getY(i);
     // 윗면(입 안)은 잇몸, 바깥은 비늘 — 위쪽 절반을 조금 접어 그릇처럼
     const t = smoothstep(-0.22, -0.01, y);
-    c.copy(leafC).lerp(skinC, 0.5).lerp(gumC, t * 0.88);
+    c.copy(leafC).lerp(skinC, 0.78).lerp(gumC, t * 0.92);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     if (y > 0) pos.setY(i, -y * 0.20);
   }
@@ -2265,8 +2292,8 @@ function leviathanJawGeometry() {
       const t = i / 11;
       const z = -3.40 + t * 3.10;
       const rr = rAt(z);
-      const h = 0.24 + 0.20 * Math.sin(t * Math.PI * 0.95);
-      parts.push(xf(paint(spikeGeo(0.052, h, 5), LEVI.tooth),
+      const h = 0.30 + 0.26 * Math.sin(t * Math.PI * 0.95);
+      parts.push(xf(paint(spikeGeo(0.058, h, 5), LEVI.tooth),
         [rr * 0.90 * 0.60 * s, -0.12, z], [0.08 * s, 0, 0]));
     }
   }
@@ -2322,8 +2349,8 @@ export function makeLeviathan() {
     const rr = radiusAt(leviSkullProfile(), ez);
     const ex = rr * 0.95 * 0.99 * s;
     const ey = rr * 0.30;
-    const halo = spriteGlow(LEVI.glow, 0.52, 0.22);
-    halo.position.set(ex + 0.03 * s, ey, ez - 0.02);
+    const halo = spriteGlow(LEVI.glow, 0.34, 0.16);
+    halo.position.set(ex + 0.05 * s, ey, ez - 0.02);
     g.add(halo);
     halos.push(halo);
     eyes.push(halo);
