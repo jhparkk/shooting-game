@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z5';
+import { getTextures } from './textures.js?v=20261120z6';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1991,7 +1991,7 @@ const LEVI = {
   belly: 0x62707b, bellyMid: 0x44535e,
   bone: 0xc9bfa3, boneDark: 0x968d76,
   fin: 0x232f3a, sail: 0x33454f, sailEdge: 0x1b262f,
-  scar: 0x77362f, tooth: 0xefe8d4, gum: 0x38121a,
+  scar: 0x6a3d37, tooth: 0xefe8d4, gum: 0x38121a,
   eye: 0xffb24a, glow: 0xffb24a,
 };
 const LEVI_SX = 0.90;          // 옆으로 살짝 납작한 몸
@@ -2039,7 +2039,7 @@ function leviSkullProfile() {
 function leviMaterial() {
   if (_leviMat) return _leviMat;
   const mat = swimMaterial({
-    vertexColors: true, shininess: 30, specular: 0x51667a,
+    vertexColors: true, shininess: 16, specular: 0x384a5a,
     emissive: 0x0b1a22, emissiveIntensity: 0.9, side: THREE.DoubleSide,
   }, LEVI_SWIM, 'leviathan');
   const bendHook = mat.onBeforeCompile;
@@ -2076,8 +2076,8 @@ function leviathanBodyGeometry() {
   body.computeVertexNormals();
   paintSkin(body, {
     back: LEVI.back, belly: LEVI.belly, halfHeight: 1.5, blend: [-0.52, 0.10], wave: 0.22,
-    stripe: { color: 0x3d5364, freq: 1.7, mix: 0.26, soft: 0.55, wobble: 1.2 },
-    spot: { color: 0x556a78, threshold: 0.93, mix: 0.45 },
+    stripe: { color: 0x3a4f5f, freq: 1.7, mix: 0.22, soft: 0.55, wobble: 1.2 },
+    spot: { color: 0x4a5c68, threshold: 0.95, mix: 0.28 },
   });
   const parts = [body];
   const rAt = (z) => radiusAt(profile, z);
@@ -2173,7 +2173,7 @@ function leviathanSkullGeometry() {
   skull.computeVertexNormals();
   paintSkin(skull, {
     back: LEVI.back, belly: LEVI.bellyMid, halfHeight: 1.10, blend: [-0.50, 0.08], wave: 0.18,
-    spot: { color: 0x556a78, threshold: 0.9, mix: 0.4 },
+    spot: { color: 0x4a5c68, threshold: 0.93, mix: 0.26 },
   });
   const parts = [skull];
   const rAt = (z) => radiusAt(profile, z);
@@ -2211,12 +2211,16 @@ function leviathanSkullGeometry() {
     const ex = rr * 0.95 * 0.97 * s;
     const ey = rr * 0.30;
     const brow = new THREE.SphereGeometry(1, 14, 10);
-    brow.scale(0.30, 0.16, 0.42);
-    parts.push(xf(paint(brow, LEVI.backDeep), [ex * 1.02, ey + 0.16, ez]));
-    const eye = new THREE.SphereGeometry(0.155, 16, 12);
+    brow.scale(0.26, 0.13, 0.40);
+    parts.push(xf(paint(brow, LEVI.backDeep), [ex * 0.99, ey + 0.28, ez]));
+    // 눈두덩 테 — 검은 고리 안에 호박색 눈알이 들어간다
+    const socket = new THREE.SphereGeometry(0.205, 14, 10);
+    socket.scale(1.0, 0.86, 1.30);
+    parts.push(xf(paint(socket, 0x120c08), [ex * 0.96, ey, ez]));
+    const eye = new THREE.SphereGeometry(0.168, 18, 14);
     parts.push(xf(paint(eye, LEVI.eye), [ex, ey, ez]));
-    const pupil = new THREE.BoxGeometry(0.040, 0.175, 0.03);
-    parts.push(xf(paint(pupil, 0x140a04), [ex + 0.150 * s, ey, ez - 0.018]));
+    const pupil = new THREE.BoxGeometry(0.052, 0.24, 0.04);
+    parts.push(xf(paint(pupil, 0x0d0703), [ex + 0.128 * s, ey, ez - 0.012]));
   }
 
   /* ── 위턱 이빨 — 주둥이 테를 따라 아래로 돋은 송곳니 ── */
@@ -2349,8 +2353,8 @@ export function makeLeviathan() {
     const rr = radiusAt(leviSkullProfile(), ez);
     const ex = rr * 0.95 * 0.99 * s;
     const ey = rr * 0.30;
-    const halo = spriteGlow(LEVI.glow, 0.26, 0.12);
-    halo.position.set(ex + 0.05 * s, ey, ez - 0.02);
+    const halo = spriteGlow(LEVI.glow, 0.40, 0.10);
+    halo.position.set(ex + 0.10 * s, ey, ez - 0.02);
     g.add(halo);
     halos.push(halo);
     eyes.push(halo);
