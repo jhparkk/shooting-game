@@ -16,10 +16,10 @@ import {
   rockCaveGeometry, caveDecorGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261120g';
-import { getTextures } from './textures.js?v=20261120g';
-import { Atmosphere } from './atmosphere.js?v=20261120g';
-import { currentWeightForLength } from './currents.js?v=20261120g';
+} from './models.js?v=20261120h';
+import { getTextures } from './textures.js?v=20261120h';
+import { Atmosphere } from './atmosphere.js?v=20261120h';
+import { currentWeightForLength } from './currents.js?v=20261120h';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -2181,6 +2181,12 @@ export class World {
         this.currents.at(s.center.x, s.center.z, this._cur);
         s.drift.x += (this._cur.x * s.currentW - s.drift.x * 1.1) * dt;
         s.drift.z += (this._cur.z * s.currentW - s.drift.z * 1.1) * dt;
+        // 변위 상한 — 떼가 산호나 바위 속으로 파고들지 않게
+        const sdl = Math.hypot(s.drift.x, s.drift.z);
+        if (sdl > 10) {
+          s.drift.x *= 10 / sdl;
+          s.drift.z *= 10 / sdl;
+        }
         sdx = s.drift.x;
         sdz = s.drift.z;
       }
@@ -2199,6 +2205,11 @@ export class World {
         if (this.currents) {
           o.dx += (this._cur.x * o.cw - o.dx * 3.0) * dt;
           o.dz += (this._cur.z * o.cw - o.dz * 3.0) * dt;
+          const odl = Math.hypot(o.dx, o.dz);
+          if (odl > 4.5) {
+            o.dx *= 4.5 / odl;
+            o.dz *= 4.5 / odl;
+          }
         }
         pos.set(
           cx + o.x + o.dx + Math.sin(this.time * 1.1 + o.p) * 1.1,
@@ -2240,6 +2251,11 @@ export class World {
         this.currents.at(c.center.x, c.center.z, this._cur);
         c.drift.x += (this._cur.x * c.currentW - c.drift.x * 0.55) * dt;
         c.drift.z += (this._cur.z * c.currentW - c.drift.z * 0.55) * dt;
+        const cdl = Math.hypot(c.drift.x, c.drift.z);
+        if (cdl > 8) {
+          c.drift.x *= 8 / cdl;
+          c.drift.z *= 8 / cdl;
+        }
         cdx = c.drift.x;
         cdz = c.drift.z;
       }
