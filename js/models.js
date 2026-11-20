@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120v';
+import { getTextures } from './textures.js?v=20261120w';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1591,7 +1591,7 @@ const MEGA = {
 
 const MEGA_SX = 0.80;                                      // 옆으로 살짝 납작한 몸
 const MEGA_BELLY = 0.90;                                   // 배는 등보다 납작하다
-const MEGA_MOUTH = { z0: -3.42, z1: -1.86, s0: 0.03, th: 1.06, dip: 0.56 };
+const MEGA_MOUTH = { z0: -3.42, z1: -1.86, s0: 0.03, th: 1.10, dip: 0.56 };
 
 let _megaProfile = null;
 let _megaBody = null;
@@ -1767,7 +1767,7 @@ function megalodonJawGeometry() {
   for (let i = 0; i < n0; i++) {
     const y = p0.getY(i);
     if (y > 0.045) {
-      c.copy(gum).lerp(throat, clamp01(y / 0.26) * 0.7 + 0.12);
+      c.copy(gum).lerp(throat, clamp01(y / 0.26) * 0.55 + 0.40);
     } else if (y > -0.018) {
       c.copy(lip).lerp(gum, 0.55);                     // 입술 언저리의 가는 어두운 테
     } else {
