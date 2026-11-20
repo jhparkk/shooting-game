@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120w';
+import { getTextures } from './textures.js?v=20261120x';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1836,10 +1836,10 @@ function megalodonBodyGeometry() {
   /* ── 가슴지느러미 — 뒤로 길게 뻗은 큰 날개 ── */
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
-      [0, 0.80], [0.52, 0.56], [1.06, 0.22], [1.58, -0.26],
-      [1.86, -0.54], [1.38, -0.66], [0.88, -0.58], [0.36, -0.40], [0, -0.18],
+      [0, 0.52], [0.52, 0.34], [1.06, 0.04], [1.58, -0.38],
+      [1.86, -0.66], [1.38, -0.76], [0.88, -0.66], [0.36, -0.44], [0, -0.20],
     ].map(([a, b]) => [a * s, b]), 0.13, MEGA.fin, { smooth: true, curveSegments: 12 }),
-      [0.10 * s, -radiusAt(profile, -1.70) * 0.54, -1.70], [0, -0.10 * s, -0.24 * s]));
+      [0.10 * s, -radiusAt(profile, -1.34) * 0.54, -1.34], [0, -0.10 * s, -0.22 * s]));
   }
 
   /* ── 작은 지느러미들 — 제2등지느러미 · 뒷지느러미 · 배지느러미 ── */
