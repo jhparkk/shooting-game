@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z3';
+import { getTextures } from './textures.js?v=20261120z4';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1999,13 +1999,13 @@ const LEVI_BELLY = 0.94;       // 배는 등보다 조금 납작하다
 const LEVI_SWIM = { amp: 0.92, freq: 3.1, speed: 1.05 };
 
 const LEVI_BODY_CTRL = [
-  [-5.10, 1.10], [-4.55, 1.36], [-3.60, 1.54], [-2.40, 1.66], [-1.00, 1.70],
+  [-4.75, 0.92], [-4.30, 1.24], [-3.60, 1.50], [-2.40, 1.66], [-1.00, 1.70],
   [0.40, 1.66], [1.80, 1.55], [3.00, 1.38], [4.05, 1.17], [4.95, 0.93],
   [5.75, 0.68], [6.35, 0.46], [6.85, 0.28], [7.25, 0.13],
 ];
 const LEVI_SKULL_CTRL = [
   [-7.45, 0.07], [-7.25, 0.26], [-6.95, 0.45], [-6.55, 0.63], [-6.10, 0.82],
-  [-5.65, 1.00], [-5.15, 1.15], [-4.65, 1.25], [-4.15, 1.29], [-3.75, 1.27],
+  [-5.65, 1.02], [-5.15, 1.18], [-4.65, 1.30], [-4.15, 1.36], [-3.70, 1.34],
 ];
 let _leviBodyProfile = null;
 let _leviSkullProfile = null;
@@ -2276,7 +2276,7 @@ function leviathanJawGeometry() {
     const y = pos.getY(i);
     // 윗면(입 안)은 잇몸, 바깥은 비늘 — 위쪽 절반을 조금 접어 그릇처럼
     const t = smoothstep(-0.22, -0.01, y);
-    c.copy(leafC).lerp(skinC, 0.78).lerp(gumC, t * 0.92);
+    c.copy(leafC).lerp(skinC, 0.92).lerp(gumC, t * 0.94);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     if (y > 0) pos.setY(i, -y * 0.20);
   }
@@ -2326,7 +2326,7 @@ export function makeLeviathan() {
   // 아래턱 — 입꼬리를 축으로 벌어진다 (음의 회전 = 아래로 벌어짐)
   const jawPivot = new THREE.Group();
   jawPivot.position.set(0, -0.86, -4.20);
-  jawPivot.rotation.x = -0.03;
+  jawPivot.rotation.x = -0.13;
   jawPivot.add(new THREE.Mesh(leviathanJawGeometry(), mat));
   g.add(jawPivot);
 
@@ -2349,7 +2349,7 @@ export function makeLeviathan() {
     const rr = radiusAt(leviSkullProfile(), ez);
     const ex = rr * 0.95 * 0.99 * s;
     const ey = rr * 0.30;
-    const halo = spriteGlow(LEVI.glow, 0.34, 0.16);
+    const halo = spriteGlow(LEVI.glow, 0.26, 0.12);
     halo.position.set(ex + 0.05 * s, ey, ez - 0.02);
     g.add(halo);
     halos.push(halo);
@@ -2363,10 +2363,10 @@ export function makeLeviathan() {
   // 몸 충돌 구 — 몸통을 따라 늘어놓는다 (게임 쪽에서 위치를 갱신한다)
   const profile = leviBodyProfile();
   const hull = [];
-  for (const z of [-7.05, -6.30, -5.50, -4.60, -3.60, -2.40, -1.10, 0.40, 1.90, 3.20, 4.50, 5.70, 6.80]) {
+  for (const z of [-7.05, -6.30, -5.50, -4.70, -3.80, -2.60, -1.20, 0.40, 1.90, 3.20, 4.50, 5.70, 6.80]) {
     const sk = radiusAt(leviSkullProfile(), z);
     const bd = radiusAt(profile, z);
-    const r = z < -4.6 ? sk : Math.max(sk, bd);
+    const r = z < -4.6 ? sk : Math.max(sk * 0.98, bd);
     hull.push({ x: 0, y: 0.02, z: z, r: Math.max(0.22, r * 0.95) });
   }
 
