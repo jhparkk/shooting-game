@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120e';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120e';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120e';
+import { Sound } from './audio.js?v=20261120f';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120f';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120f';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120e';
-import { FX } from './fx.js?v=20261120e';
-import { Currents } from './currents.js?v=20261120e';
+} from './models.js?v=20261120f';
+import { FX } from './fx.js?v=20261120f';
+import { Currents, currentWeightForLength } from './currents.js?v=20261120f';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -193,6 +193,7 @@ const horizontal = new THREE.Vector3();
 const tmpVec = new THREE.Vector3();
 const tmpVec2 = new THREE.Vector3();
 const curVec = new THREE.Vector3();
+const curVec2 = new THREE.Vector3();
 const camTmp = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -308,6 +309,7 @@ function initThree() {
 
   /* 해류 — 늘 흐르는 물결과 가끔 몰아치는 강한 해류 */
   currents = new Currents(scene);
+  world.setCurrents(currents);   // 물고기·해양 생물도 같은 해류를 탄다
   currents.onBurst = () => {
     if (G.state !== 'playing') return;
     banner('⚠ 강한 해류가 몰아칩니다 · 조향이 밀립니다', 2600);
@@ -1408,6 +1410,8 @@ function spawnEnemy(opt) {
     swirl: rand(1.0, 2.2),
     age: 0,
     swayAmp: rand(1.5, 4),
+    // 해류 영향 계수 — 체급(몸길이≈반지름×3.5)이 클수록 덜 밀린다
+    currentW: currentWeightForLength(stats.r * scale * 3.5),
   });
   return enemies[enemies.length - 1];
 }
@@ -1773,9 +1777,9 @@ function updatePlayer(dt) {
      대각선으로 밀면 달리면서 부드럽게 선회한다. */
   const turnIn = clamp(input.turn, -1, 1);
   const driveIn = clamp(input.move, -1, 1);
-  /* 강한 해류 속에서는 키가 잘 먹지 않는다 — 조향 저항 */
+  /* 강한 해류 속에서는 키가 조금 둔해진다 — 조향 저하는 최대 17% */
   const curStrength = currents ? currents.strength : 0;
-  P.yaw -= turnIn * P.turnRate * (1 - 0.38 * curStrength) * dt;   // 오른쪽 = 우회전(시계방향)
+  P.yaw -= turnIn * P.turnRate * (1 - 0.18 * curStrength) * dt;   // 오른쪽 = 우회전(시계방향)
 
   // 기울기: 선회 방향으로 몸을 기울인다
   const targetRoll = clamp(-turnIn * 0.4, -0.5, 0.5);
@@ -1798,11 +1802,12 @@ function updatePlayer(dt) {
 
   P.pos.addScaledVector(P.vel, dt);
 
-  /* 해류에 밀린다 — 잔잔할 때는 살짝, 강한 해류·돌발 해류에서는
-     추진만으로는 버티기 어려울 만큼 흘러간다 */
+  /* 해류에 밀린다 — 잔잔할 때는 살짝, 강한 해류·돌발 해류에서는 흘러가되
+     최대 (15 × 0.74 ≈ 11 유닛/초)로 전진 32 를 막지 못한다.
+     역해류를 정면으로 거슬러도 60% 이상 전진해 빠져나올 수 있다. */
   if (currents) {
     currents.vector(curVec);
-    P.pos.addScaledVector(curVec, dt * (0.8 + 0.3 * curStrength));
+    P.pos.addScaledVector(curVec, dt * (0.55 + 0.2 * curStrength));
   }
   clampToWorld(P.pos, P.vel);
 
@@ -2051,6 +2056,12 @@ function updateEnemies(dt) {
       o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.3;
     }
 
+    // 해류 — 적 물고기(상어·복어·해파리·아귀)도 같은 흐름에 밀린다
+    if (currents) {
+      currents.at(o.position.x, o.position.z, curVec2);
+      o.position.addScaledVector(curVec2, dt * e.currentW);
+    }
+
     // 부딪힘 반동 (밀려난 뒤 서서히 멈춘다)
     if (e.kb.lengthSq() > 0.0025) {
       o.position.addScaledVector(e.kb, dt);
@@ -2196,6 +2207,11 @@ function updateBoss(dt) {
   else updateKrakenBoss(b, dt);
 
   const o = b.obj;
+  // 해류 — 거대 보스도 완전히 무관하지 않다. 체급 대비 아주 약하게만 밀린다
+  if (currents) {
+    currents.at(o.position.x, o.position.z, curVec2);
+    o.position.addScaledVector(curVec2, dt * 0.12);
+  }
   // 해저·수면을 뚫지 않는다
   const ground = terrainHeight(o.position.x, o.position.z) + 10;
   if (o.position.y < ground) o.position.y = ground;
@@ -3359,6 +3375,102 @@ function boot() {
         currents.burst = on === false ? 0 : 1;
         currents.eventT = 999;
         return currents.state();
+      },
+      /** 임의 지점의 해류 벡터 — 물고기·해양 생물도 같은 흐름을 쓴다 */
+      currentAt: (x, z) => {
+        if (!currents) return null;
+        const v = currents.at(x, z, curVec2);
+        return { speed: +Math.hypot(v.x, v.z).toFixed(2), x: +v.x.toFixed(2), z: +v.z.toFixed(2) };
+      },
+      /** 돌발 해류 주기 실측용 — 남은 대기·지속 시간과 지금까지 몰아친 횟수 */
+      currentTimeline: () => (currents ? {
+        t: +currents.time.toFixed(1),
+        eventT: +currents.eventT.toFixed(1),
+        burstT: +currents.burstT.toFixed(1),
+        burst: +currents.burst.toFixed(3),
+        bursts: currents.bursts,
+        speed: +currents.speed.toFixed(2),
+      } : null),
+      /** 물고기·대형 생물·적·보스의 해류 영향 계수와 실제 밀린 변위 */
+      fishCurrent: () => ({
+        currents: currents ? { speed: +currents.speed.toFixed(2), burst: +currents.burst.toFixed(2) } : null,
+        schools: world.schools.map((s) => ({
+          kind: s.kind,
+          bodyLen: +s.bodyLen.toFixed(2),
+          w: +s.currentW.toFixed(2),
+          fishW: [+Math.min(...s.offsets.map((o) => o.cw)).toFixed(2), +Math.max(...s.offsets.map((o) => o.cw)).toFixed(2)],
+          drift: +Math.hypot(s.drift.x, s.drift.z).toFixed(2),
+          fishDrift: +Math.hypot(s.offsets[0].dx, s.offsets[0].dz).toFixed(2),
+          fishDriftMax: +Math.max(...s.offsets.map((o) => Math.hypot(o.dx, o.dz))).toFixed(2),
+        })),
+        creatures: world.creatures.map((c) => ({
+          kind: c.kind,
+          bodyLen: +c.bodyLen.toFixed(1),
+          w: +c.currentW.toFixed(2),
+          drift: +Math.hypot(c.drift.x, c.drift.z).toFixed(2),
+          visible: c.obj.group.visible,
+        })),
+        enemies: enemies.slice(0, 10).map((e) => ({ type: e.type, w: +e.currentW.toFixed(2) })),
+        boss: G.boss ? { kind: G.boss.kind, w: 0.12 } : null,
+      }),
+      /** 해류 실측 — 주변에서 가장 센 해류 지점으로 옮겨 정면 역해류 전진을 잰다
+          stage: 'start' → 준비, 'read' → 중간 측정, 'end' → 종료 */
+      thrustTest: (stage) => {
+        if (!currents) return null;
+        if (!stage || stage === 'start') {
+          currents.burstT = 120;      // 측정 동안 최대 해류 고정
+          currents.burst = 1;
+          currents.eventT = 999;
+          let best = { s: -1, x: P.pos.x, z: P.pos.z };
+          for (let r = 0; r <= 96; r += 8) {
+            for (let a = 0; a < 32; a++) {
+              const ang = (a / 32) * Math.PI * 2;
+              const x = P.pos.x + Math.cos(ang) * r;
+              const z = P.pos.z + Math.sin(ang) * r;
+              const v = currents.at(x, z, curVec2);
+              const s = Math.hypot(v.x, v.z);
+              if (s > best.s) best = { s, x, z };
+            }
+          }
+          const gy = terrainHeight(best.x, best.z);
+          P.pos.set(best.x, Math.max(gy + 8, P.pos.y), best.z);
+                    P.vel.set(0, 0, 0);
+          const v = currents.at(P.pos.x, P.pos.z, curVec2);
+          const vlen = Math.hypot(v.x, v.z) || 1;
+          const d = { x: -v.x / vlen, z: -v.z / vlen };   // 해류를 정면으로 거스르는 방향
+          P.yaw = Math.atan2(-d.x, -d.z);
+          updateSubTransform(0);
+          snapCamera();
+          joy.move = 1;
+          joy.turn = 0;
+          joy.lift = 0;
+          window.__thrust = { t0: performance.now(), p0: P.pos.clone(), dir: d };
+          return {
+            stage: 'start',
+            at: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)],
+            current: { speed: +vlen.toFixed(2), x: +v.x.toFixed(2), z: +v.z.toFixed(2) },
+            yaw: +P.yaw.toFixed(3),
+          };
+        }
+        const T = window.__thrust;
+        if (!T) return null;
+        if (stage === 'end') { joy.move = 0; }
+        const sec = (performance.now() - T.t0) / 1000;
+        const dx = P.pos.x - T.p0.x;
+        const dz = P.pos.z - T.p0.z;
+        // + = 해류를 거슬러 나아간 거리(전진), - = 해류에 밀려 밀린 거리
+        const along = dx * T.dir.x + dz * T.dir.z;
+        const cur = currents.at(P.pos.x, P.pos.z, curVec2);
+        return {
+          stage: stage || 'read',
+          sec: +sec.toFixed(2),
+          along: +along.toFixed(2),
+          netSpeed: +(along / Math.max(sec, 0.001)).toFixed(2),
+          thrustSpeed: +(P.vel.x * T.dir.x + P.vel.z * T.dir.z).toFixed(2),
+          currentSpeed: +Math.hypot(cur.x, cur.z).toFixed(2),
+          currentPush: +(Math.hypot(cur.x, cur.z) * (0.55 + 0.2 * currents.strength)).toFixed(2),
+          pos: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)],
+        };
       },
       /** 보스 모델을 눈앞에 세워 둔다 (검증용) */
       showBossModel: (kind, dist, yawOff) => {

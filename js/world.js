@@ -16,9 +16,10 @@ import {
   rockCaveGeometry, caveDecorGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261120e';
-import { getTextures } from './textures.js?v=20261120e';
-import { Atmosphere } from './atmosphere.js?v=20261120e';
+} from './models.js?v=20261120f';
+import { getTextures } from './textures.js?v=20261120f';
+import { Atmosphere } from './atmosphere.js?v=20261120f';
+import { currentWeightForLength } from './currents.js?v=20261120f';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -395,6 +396,8 @@ export class World {
     this.kelpUniform = { value: 0 };
     this.creatures = [];
     this.schools = [];
+    this.currents = null;      // setCurrents() 로 받는다 — 물고기도 해류를 탄다
+    this._cur = new THREE.Vector3();
     this.depthT = 0;
     // ?flat — 지형 셰이더를 끄고 단순 재질로 시작 (성능 진단/저사양 폴백)
     this._wantFlat = typeof location !== 'undefined' && /[?&]flat\b/.test(location.search);
@@ -1874,6 +1877,9 @@ export class World {
       cz
     );
     school.radius = 16 + rnd() * 30;
+    // 새 자리로 옮겼으니 해류 변위도 초기화
+    if (school.drift) school.drift.set(0, 0, 0);
+    for (const o of school.offsets) { o.dx = 0; o.dz = 0; }
     school.seeded = true;
   }
 
@@ -1897,6 +1903,10 @@ export class World {
       const cfg = plan[s];
       const count = cfg.count;
       const inst = makeFishSchool(count, cfg.kind);
+      // 몸길이(월드 유닛) — 이 떼의 물고기가 해류에 얼마나 밀리는지 정한다
+      if (inst.geometry && !inst.geometry.boundingBox) inst.geometry.computeBoundingBox();
+      const bb = inst.geometry && inst.geometry.boundingBox;
+      const geoLen = bb ? Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z) : 1.0;
       const school = {
         kind: cfg.kind,
         mesh: inst,
@@ -1907,17 +1917,25 @@ export class World {
         angular: (0.05 + rnd() * 0.09) * (rnd() > 0.5 ? 1 : -1),
         bob: rnd() * 6.28,
         scale: cfg.scale * (0.95 + rnd() * 0.2),
+        bodyLen: geoLen,
         seeded: false,
         rnd: mulberry(900 + s * 37),
       };
+      school.bodyLen = geoLen * school.scale;
+      school.currentW = currentWeightForLength(school.bodyLen);
+      school.drift = new THREE.Vector3();   // 해류에 밀린 변위 (스스로 되돌아온다)
       school.center.set((rnd() - 0.5) * 150, 6 + rnd() * 10, (rnd() - 0.5) * 150);
       for (let i = 0; i < count; i++) {
+        const os = 0.7 + rnd() * 0.6;
         school.offsets.push({
           x: (rnd() - 0.5) * 9,
           y: (rnd() - 0.5) * 4,
           z: (rnd() - 0.5) * 9,
           p: rnd() * 6.28,
-          s: 0.7 + rnd() * 0.6,
+          s: os,
+          // 개체마다 다른 해류 영향 계수 — 큰 놈은 조금 덜 밀린다
+          cw: currentWeightForLength(geoLen * school.scale * os),
+          dx: 0, dz: 0,
         });
       }
       this.schools.push(school);
@@ -2010,6 +2028,12 @@ export class World {
       obj.group.rotation.order = 'YXZ';
       this.scene.add(obj.group);
       c.colliders = this._creatureColliders(obj.group, p.kind);
+      // 체급(몸길이) → 해류 영향 계수 — 큰 고래·가오리일수록 조금만 밀린다
+      const bb = new THREE.Box3().setFromObject(obj.group);
+      const bs = bb.getSize(new THREE.Vector3());
+      c.bodyLen = Math.max(bs.x, bs.y, bs.z);
+      c.currentW = currentWeightForLength(c.bodyLen);
+      c.drift = new THREE.Vector3();   // 해류에 밀린 변위 (스스로 되돌아온다)
       let reach = 0;
       for (const s of c.colliders) {
         reach = Math.max(reach, Math.hypot(s.x, s.y, s.z) + s.r);
@@ -2028,7 +2052,13 @@ export class World {
     c.depth = Math.min(c.band[1], Math.max(c.band[0], playerDepth + (rnd() - 0.5) * 90));
     c.angle = rnd() * Math.PI * 2;
     c.radius = c.radius0 * (0.85 + rnd() * 0.4);
+    if (c.drift) c.drift.set(0, 0, 0);   // 새 자리로 옮겼으니 해류 변위도 초기화
     c.seeded = true;
+  }
+
+  /** 해류장 — 물고기·해양 생물도 잠수정과 같은 흐름을 탄다 */
+  setCurrents(c) {
+    this.currents = c;
   }
 
   /* ---------------- 구역 ---------------- */
@@ -2143,8 +2173,19 @@ export class World {
       const far = Math.hypot(s.center.x - playerPos.x, s.center.z - playerPos.z) > 170;
       if (far) this._seedSchool(s, s.rnd, playerPos.x, playerPos.z);
       s.angle += s.angular * dt;
-      const cx = s.center.x + Math.cos(s.angle) * s.radius;
-      const cz = s.center.z + Math.sin(s.angle) * s.radius;
+      // 해류 — 떼 전체도 해류를 타고 밀린다. 밀린 만큼 스스로 헤엄쳐 되돌아오므로
+      // (1차 지연) 변위는 유한하게 유지되고, 바다 밖으로 휩쓸려 가지 않는다.
+      let sdx = 0;
+      let sdz = 0;
+      if (this.currents) {
+        this.currents.at(s.center.x, s.center.z, this._cur);
+        s.drift.x += (this._cur.x * s.currentW - s.drift.x * 1.1) * dt;
+        s.drift.z += (this._cur.z * s.currentW - s.drift.z * 1.1) * dt;
+        sdx = s.drift.x;
+        sdz = s.drift.z;
+      }
+      const cx = s.center.x + Math.cos(s.angle) * s.radius + sdx;
+      const cz = s.center.z + Math.sin(s.angle) * s.radius + sdz;
       const cy = s.center.y + Math.sin(this.time * 0.5 + s.bob) * 3.5;
       const heading = Math.atan2(-Math.sin(s.angle) * Math.sign(s.angular), Math.cos(s.angle) * Math.sign(s.angular));
       // 떼 전체가 선회 방향 안쪽으로 기울고, 한 마리씩 조금씩 다른 자세로 흔들린다
@@ -2154,10 +2195,15 @@ export class World {
       speedN += 1;
       for (let i = 0; i < s.offsets.length; i++) {
         const o = s.offsets[i];
+        // 개체별 밀림 — 작은 놈이 더 크게 흘러가 떼가 해류 쪽으로 늘어난다
+        if (this.currents) {
+          o.dx += (this._cur.x * o.cw - o.dx * 3.0) * dt;
+          o.dz += (this._cur.z * o.cw - o.dz * 3.0) * dt;
+        }
         pos.set(
-          cx + o.x + Math.sin(this.time * 1.1 + o.p) * 1.1,
+          cx + o.x + o.dx + Math.sin(this.time * 1.1 + o.p) * 1.1,
           cy + o.y + Math.cos(this.time * 1.4 + o.p) * 0.6,
-          cz + o.z + Math.cos(this.time * 1.1 + o.p) * 1.4
+          cz + o.z + o.dz + Math.cos(this.time * 1.1 + o.p) * 1.4
         );
         eul.set(
           Math.sin(this.time * 1.4 + o.p) * 0.12,
@@ -2187,10 +2233,20 @@ export class World {
       if (!c.seeded || far || drift) this._seedCreature(c, playerPos.x, playerPos.z, depth);
 
       const g = c.obj.group;
+      // 해류 — 큰 생물일수록 조금만 밀린다 (고래·가오리·거북)
+      let cdx = 0;
+      let cdz = 0;
+      if (this.currents) {
+        this.currents.at(c.center.x, c.center.z, this._cur);
+        c.drift.x += (this._cur.x * c.currentW - c.drift.x * 0.55) * dt;
+        c.drift.z += (this._cur.z * c.currentW - c.drift.z * 0.55) * dt;
+        cdx = c.drift.x;
+        cdz = c.drift.z;
+      }
       // 원 궤도 위에서 반지름을 살짝 흔들며 도는 부드러운 유영 — 딱딱한 원운동을 벗어난다
       const R = c.radius * (1 + Math.sin(c.t * 0.23 + c.bobPhase * 1.7) * 0.07);
-      const cx = c.center.x + Math.cos(c.angle) * R;
-      const cz = c.center.z + Math.sin(c.angle) * R;
+      const cx = c.center.x + Math.cos(c.angle) * R + cdx;
+      const cz = c.center.z + Math.sin(c.angle) * R + cdz;
       const ground = getTerrainHeight(cx, cz) + c.clearance;
       const wantY = SURFACE_Y - c.depth / DEPTH_SCALE;
       // 이 종이 머물 수 있는 가장 얕은 수심조차 해저보다 아래라면 숨긴다
