@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120i';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120i';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120i';
+import { Sound } from './audio.js?v=20261120j';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120j';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120j';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120i';
-import { FX } from './fx.js?v=20261120i';
-import { Currents, currentWeightForLength } from './currents.js?v=20261120i';
+} from './models.js?v=20261120j';
+import { FX } from './fx.js?v=20261120j';
+import { Currents, currentWeightForLength } from './currents.js?v=20261120j';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -45,15 +45,16 @@ const PRESSURE_CURVE = [
   [3200, 5.20],
   [3600, 5.80],
 ];
-/* 심해 적응 — 처음 닿는 수심 이정표마다 선체가 개량된다 (최대 내구력 +80, 압력 저항 +8%) */
+/* 심해 적응 — 처음 닿는 수심 이정표마다 압력 저항이 오른다.
+   최대 내구력은 오르지 않는다 — 선체 보강 모듈로만 100 → 500 까지 올린다. */
 const ADAPT_STEPS = [600, 1200, 2000, 2800, 3400];
-const ADAPT_HULL = 80;
-const ADAPT_RESIST = 0.08;
+const ADAPT_RESIST = 0.12;       // 단계마다 수압 12% 경감 (5단계 = 60%)
 const DMG_CONTACT = 14;          // 적 생물 접촉
 const DMG_SPIKE = 18;            // 복어·아귀 폭발
 const DMG_ORB = 12;              // 크라켄 구체
 const DMG_BOSS = 22;             // 크라켄 몸통 접촉
-const MAX_HULL_CAP = 500;        // 최대 내구력 상한 (심해 적응 + 선체 보강)
+const MAX_HULL_CAP = 500;        // 최대 내구력 상한 (선체 보강 모듈로만 도달)
+const HULL_HEAL_AT_CAP = 50;     // 최대치일 때 선체 보강 모듈이 대신 회복하는 양
 
 /* ---------------- DOM ---------------- */
 const canvas = $('game');
@@ -745,15 +746,13 @@ function updateDurability(dt) {
 }
 
 /* ---------------- 심해 적응 — 처음 닿는 수심 이정표 ----------------
-   깊은 곳에 처음 발을 들일 때마다 선체가 개량된다.
-   5단계(3,400m)까지 오르면 최대 내구력이 100 → 500 이 된다. */
+   깊은 곳에 처음 발을 들일 때마다 수압 저항만 올라간다(최대 내구력은 그대로).
+   5단계(3,400m)까지 오르면 수압을 60% 덜 받는다. */
 function checkDepthMilestones() {
   let leveled = 0;
   while (G.adapt < ADAPT_STEPS.length && G.maxDepth >= ADAPT_STEPS[G.adapt]) {
     G.adapt++;
     leveled++;
-    G.maxHull = Math.min(MAX_HULL_CAP, G.maxHull + ADAPT_HULL);
-    G.hull = Math.min(G.maxHull, G.hull + ADAPT_HULL + 20);
     durShownWidth = -1;
     durShownCls = '';
     fx.ring(P.pos.clone(), 0x9dfff2, 30, 0.9);
@@ -763,7 +762,7 @@ function checkDepthMilestones() {
     sound.waveClear();
   }
   if (!leveled) return;
-  banner(`심해 적응 ${G.adapt}단계 · 최대 내구력 ${Math.round(G.maxHull)}`, 2600);
+  banner(`심해 적응 ${G.adapt}단계 · 수압 ${Math.round(ADAPT_RESIST * G.adapt * 100)}% 경감`, 2600);
   toast(`선체 개량 · 수압 ${Math.round(ADAPT_RESIST * G.adapt * 100)}% 경감`);
   refreshHud();
 }
@@ -1585,14 +1584,25 @@ function collectItem(it) {
     G.shield = Math.min(4, G.shield + 2);
     toast('수중 실드 · 피해 2회 흡수');
   } else if (it.type === 'hull') {
-    // 최대 내구력 자체가 늘어난다 (+ 현재 내구력도 회복)
+    const before = G.maxHull;
     G.maxHull = Math.min(MAX_HULL_CAP, G.maxHull + 20);
-    G.hull = Math.min(G.maxHull, G.hull + 25);
     durShownWidth = -1;
     durShownCls = '';
-    toast(`선체 보강 · 최대 내구력 +20 (${Math.round(G.maxHull)})`);
-    fx.ring(p.clone(), 0x6dffcf, 14, 0.6);
-    fx.burst(p.x, p.y, p.z, 14, { colors: [0x6dffcf, 0xd8fff4, 0xffffff], speed: 9, size: 1.6, life: 0.6 });
+    if (G.maxHull > before) {
+      // 최대 내구력 자체가 늘어난다 (+ 현재 내구력도 회복)
+      G.hull = Math.min(G.maxHull, G.hull + 25);
+      toast(`선체 보강 · 최대 내구력 +20 (${Math.round(G.maxHull)})`);
+      fx.ring(p.clone(), 0x6dffcf, 14, 0.6);
+      fx.burst(p.x, p.y, p.z, 14, { colors: [0x6dffcf, 0xd8fff4, 0xffffff], speed: 9, size: 1.6, life: 0.6 });
+    } else {
+      // 이미 최대 내구력 — 보강재를 비상 수리로 돌려 현재 내구력을 회복한다
+      G.hull = Math.min(G.maxHull, G.hull + HULL_HEAL_AT_CAP);
+      toast(`선체 보강 한계 · 비상 수리 내구력 +${HULL_HEAL_AT_CAP} (${Math.ceil(G.hull)}/${Math.round(G.maxHull)})`);
+      fx.ring(p.clone(), 0x9dffc9, 18, 0.7);
+      fx.burst(p.x, p.y, p.z, 18, { colors: [0x9dffc9, 0xd8fff4, 0xffffff], speed: 11, size: 1.8, life: 0.7 });
+      el.dur && el.dur.classList.add('heal');
+      setTimeout(() => el.dur && el.dur.classList.remove('heal'), 520);
+    }
   } else if (it.type === 'repair') {
     G.hull = Math.min(G.maxHull, G.hull + 35);
     toast('긴급 수리 키트 · 내구력 +35');
@@ -2351,8 +2361,8 @@ function updateMegalodon(b, dt) {
     }
   }
 
-  // 아가리 — 예고·돌진에서 크게 벌어진다
-  const jawTarget = b.mode === 'charge' ? 0.62 : b.mode === 'windup' ? 0.3 : 0.06;
+  // 아가리 — 예고·돌진에서 크게 벌어진다 (음의 회전 = 아래로 벌어짐)
+  const jawTarget = b.mode === 'charge' ? -0.78 : b.mode === 'windup' ? -0.44 : -0.20;
   b.model.jaw.rotation.x += (jawTarget - b.model.jaw.rotation.x) * Math.min(1, dt * 5);
 }
 
@@ -3553,6 +3563,23 @@ function boot() {
         text: el.durVal ? el.durVal.textContent + '/' + el.durMax.textContent : null,
         wait: +((SURFACE_Y - P.pos.y) * DEPTH_SCALE).toFixed(0),
       }),
+      /** 원하는 수심으로 잠수정을 옮긴다 (수압·심해 적응·최대 내구력 검증용) */
+      gotoDepth: (m) => {
+        const y = SURFACE_Y - Math.max(0, m || 0) / DEPTH_SCALE;
+        P.pos.set(180, y, -1420);
+        P.vel.set(0, 0, 0);
+        G.depth = Math.max(0, (SURFACE_Y - P.pos.y) * DEPTH_SCALE);
+        if (G.depth > G.maxDepth) G.maxDepth = G.depth;
+        updateSubTransform(0);
+        snapCamera();
+        return {
+          depth: +G.depth.toFixed(0),
+          y: +P.pos.y.toFixed(1),
+          maxHull: G.maxHull,
+          hull: +G.hull.toFixed(1),
+          adapt: G.adapt,
+        };
+      },
       pressureRateAt, regenScaleAt,
       ecoAt, previewCreature, clearPreviews,
       dropItem, collectItem, hurtPlayer, updateHeadlight, resolveCreatureContacts,
@@ -3888,7 +3915,7 @@ function boot() {
       fullDescent: async (m) => {
         const target = m || 2500;
         const t0 = performance.now();
-        G.hull = G.maxHull = Math.max(G.maxHull, 300);
+        G.hull = G.maxHull;                 // 최대치까지 채우고 내려간다 (최대 내구력은 건드리지 않는다)
         P.pos.set(210, SURFACE_Y - 6, -1430);
         P.vel.set(0, 0, 0);
         G.depth = 0;

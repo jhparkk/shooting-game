@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120i';
+import { getTextures } from './textures.js?v=20261120j';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1577,123 +1577,223 @@ function addRim(mat, color, power, k) {
    셋 다 크라켄보다 두 배 이상 강한 존재로, 모델·패턴이 서로 다르다.
    ========================================================= */
 
-/* ---------------- ① 메갈로돈 ---------------- */
+/* ---------------- ① 메갈로돈 ----------------
+   어두운 심해 장갑 피부 · 핏빛 아가리 · 사선으로 빛나는 붉은 눈.
+   각진 장갑머리 아래로 위아래 턱이 크게 벌어지고, 여러 줄의 긴 이빨이 드러난다. */
 const MEGA = {
-  back: 0x3d4952, backDeep: 0x232e37, belly: 0xe4ebe8,
-  fin: 0x2b353d, tooth: 0xf8faf1, scar: 0x93a7b0, glow: 0x8ef0ff,
+  back: 0x232d35, backDeep: 0x0b1319, belly: 0xa9b7b6,
+  fin: 0x151e25, tooth: 0xfdfef4, gum: 0x6e1019, throat: 0x300509,
+  scar: 0xdbe8ec, glow: 0xff4a12, socket: 0x05080b,
 };
+const MEGA_MOUTH_Y = -0.36;   // 입천장(위턱 바닥) 높이
 
 let _megaBody = null;
 let _megaTail = null;
 let _megaJaw = null;
 
+/* 이빨 한 줄 — 가운데(앞니)가 가장 길고, 옆으로 갈수록 짧아지며 바깥으로 벌어진다.
+   dir: 1 = 위로 솟는 이빨, -1 = 아래로 드리우는 이빨 */
+function megaTeeth(parts, n, o) {
+  const dir = o.dir === undefined ? 1 : o.dir;
+  const taper = o.taper === undefined ? 0.26 : o.taper;
+  const tilt = o.tilt === undefined ? 0.30 : o.tilt;
+  for (let i = 0; i < n; i++) {
+    const u = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+    const a = u * Math.PI * 0.5;
+    const x = Math.sin(a) * o.width;
+    const z = o.zFront + (1 - Math.cos(a)) * o.zSide;
+    const y = o.yBase + (o.ybow === undefined ? 0 : (1 - Math.cos(a)) * o.ybow);
+    const l = o.len * (1 - taper * Math.abs(u));
+    const g = spikeGeo(o.rad, l, 5);
+    parts.push(xf(paint(g, MEGA.tooth),
+      [x, y + l * 0.5 * dir, z],
+      [dir > 0 ? 0 : Math.PI, 0, -u * tilt * dir],
+      [1, 1, 1]));
+  }
+}
+
+/* 꼬리 — 뒤 가장자리가 찢긴 거대한 초승달 꼬리날 */
 function megalodonTailGeometry() {
   if (_megaTail) return _megaTail;
-  // 초승달 꼬리 — 위아래 날이 길게 뻗은 거대한 추진기
   const g = vfin([
-    [0.00, 0.24], [0.30, 0.95], [0.72, 1.75], [1.06, 2.32],
-    [0.84, 1.42], [0.60, 0.55], [0.66, -0.10], [0.86, -0.86],
-    [1.05, -1.55], [0.62, -0.92], [0.24, -0.28],
-  ], 0.20, MEGA.fin, { smooth: true, curveSegments: 12 });
+    [0.00, 0.26], [0.30, 0.86], [0.60, 1.40], [0.82, 1.82],
+    [0.98, 2.14], [1.20, 2.30], [0.92, 1.54], [0.84, 1.26],
+    [0.68, 0.74], [0.76, 0.10], [0.94, -0.54], [1.04, -1.08],
+    [1.24, -1.56], [0.98, -1.72], [0.66, -1.02], [0.28, -0.32],
+  ], 0.20, MEGA.fin, { curveSegments: 8 });
   _megaTail = g;
   return g;
 }
 
+/* 아래턱 — 두툼한 판 + 붉은 잇몸 + 위로 솟은 두 줄의 이빨. 피벗은 입꼬리(로컬 원점) */
 function megalodonJawGeometry() {
   if (_megaJaw) return _megaJaw;
-  // 아래턱 — 두툼한 판 + 이빨 줄. 피벗은 입꼬리(로컬 원점)
   const parts = [];
-  const jaw = plate([
-    [0.00, -0.10], [0.55, -0.30], [0.92, -0.46], [1.15, -0.40],
-    [1.02, -0.20], [0.72, -0.06], [0.30, 0.02],
-  ], 0.24, { smooth: true });
-  jaw.rotateY(-Math.PI / 2);
-  jaw.scale(1.02, 1, 1.5);
-  parts.push(paint(jaw, MEGA.backDeep));
-  for (let i = 0; i < 7; i++) {
-    const t = (i / 6 - 0.5) * 2;
-    const tooth = spikeGeo(0.055, 0.26, 5);
-    parts.push(xf(paint(tooth, MEGA.tooth),
-      [Math.sin(t * 1.2) * 0.5, 0.02, t * 1.35], [0, 0, 0.12 * t], [1, 1, 1]));
-  }
+  const floor = hfin([
+    [-0.62, -0.04], [-0.82, 0.34], [-0.66, 0.82], [-0.32, 1.10],
+    [0.00, 1.16], [0.32, 1.10], [0.66, 0.82], [0.82, 0.34],
+    [0.62, -0.04], [0.00, 0.04],
+  ], 0.30, { curveSegments: 8 });
+  parts.push(xf(paint(floor, MEGA.backDeep), [0, -0.24, 0]));
+  // 잇몸 — 턱 위에 깔린 붉은 판
+  const gum = hfin([
+    [-0.54, 0.06], [-0.68, 0.36], [-0.54, 0.80], [-0.24, 1.04], [0.00, 1.09],
+    [0.24, 1.04], [0.54, 0.80], [0.68, 0.36], [0.54, 0.06], [0.00, 0.10],
+  ], 0.12, { curveSegments: 8 });
+  parts.push(xf(paint(gum, MEGA.gum), [0, -0.06, 0]));
+  megaTeeth(parts, 11, { width: 0.74, zFront: -1.06, zSide: 0.56, yBase: -0.02, len: 0.60, rad: 0.070 });
+  megaTeeth(parts, 9, { width: 0.52, zFront: -0.92, zSide: 0.48, yBase: 0.00, len: 0.40, rad: 0.048 });
   _megaJaw = mergeParts(parts);
   return _megaJaw;
+}
+
+/* 머리 — 여덟 면의 각진 장갑 두상. 아래를 입천장 높이에서 잘라 평평한 바닥을 만든다 */
+function megalodonHeadGeometry() {
+  const profile = [
+    [-3.62, 0.02], [-3.50, 0.30], [-3.30, 0.62], [-3.02, 0.88],
+    [-2.68, 0.99], [-2.28, 1.04], [-1.88, 1.05],
+  ];
+  const head = bodyGeometry(profile, { radial: 8, sx: 0.76, sy: 0.86 });
+  head.rotateY(Math.PI / 8);              // 각진 면이 위·옆을 향하도록
+  const p = head.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    if (p.getY(i) < MEGA_MOUTH_Y) p.setY(i, MEGA_MOUTH_Y);
+  }
+  p.needsUpdate = true;
+  head.computeVertexNormals();
+  paintSkin(head, {
+    back: MEGA.back, belly: 0x55625f, halfHeight: 1.0, blend: [-0.50, -0.10], wave: 0.16,
+    spot: { color: MEGA.backDeep, mix: 0.5, threshold: 0.88 },
+  });
+  return head;
 }
 
 function megalodonBodyGeometry() {
   if (_megaBody) return _megaBody;
   const profile = [
-    [-3.35, 0.05], [-3.10, 0.22], [-2.78, 0.44], [-2.36, 0.66],
-    [-1.84, 0.84], [-1.22, 0.97], [-0.55, 1.03], [0.16, 1.00],
-    [0.84, 0.88], [1.52, 0.68], [2.12, 0.47], [2.62, 0.30],
-    [2.96, 0.19], [3.14, 0.12],
+    [-2.34, 0.94], [-2.02, 1.04], [-1.48, 1.11], [-0.78, 1.10],
+    [0.02, 1.03], [0.74, 0.90], [1.42, 0.72], [2.02, 0.50],
+    [2.50, 0.32], [2.84, 0.18], [3.06, 0.08],
   ];
-  const body = bodyGeometry(profile, { radial: 26, sx: 0.68, sy: 0.99 });
+  const body = bodyGeometry(profile, { radial: 30, sx: 0.72, sy: 1.0 });
   paintSkin(body, {
-    back: MEGA.back, belly: MEGA.belly, halfHeight: 1.0, blend: [-0.48, 0.22], wave: 0.22,
-    spot: { color: MEGA.backDeep, mix: 0.45, threshold: 0.88 },
+    back: MEGA.back, belly: MEGA.belly, halfHeight: 1.05, blend: [-0.66, -0.14], wave: 0.22,
+    spot: { color: MEGA.backDeep, mix: 0.55, threshold: 0.86 },
   });
   const parts = [body];
+  /* 몸 표면 x — 지느러미·흉터·아가미를 몸에 딱 붙인다 */
+  const sideX = (z, k) => radiusAt(profile, z) * 0.72 * (k === undefined ? 1 : k);
 
-  // 등지느러미 — 거대한 삼각 날
+  // 등지느러미 — 뒤 가장자리가 물어뜯긴 듯 찢긴 거대한 삼각 날
   parts.push(xf(vfin([
-    [-1.15, 0.86], [-0.72, 1.42], [-0.10, 2.28], [0.34, 2.52],
-    [0.42, 2.02], [0.62, 1.35], [0.96, 0.90],
-  ], 0.20, MEGA.fin), [0, 0.02, 0.06]));
+    [-1.30, 0.84], [-1.02, 1.40], [-0.60, 2.02], [-0.16, 2.52],
+    [0.14, 2.86], [0.10, 2.10], [0.50, 2.22], [0.34, 1.56],
+    [0.78, 1.58], [0.52, 0.94], [0.96, 0.90],
+  ], 0.22, MEGA.fin), [0, 0.02, 0.02]));
   // 제2등지느러미 · 뒷지느러미
-  parts.push(xf(vfin([[-0.30, 0.42], [-0.02, 0.86], [0.20, 0.92], [0.26, 0.44]], 0.10, MEGA.fin), [0, 0, 2.10]));
-  parts.push(xf(vfin([[-0.30, -0.40], [0.02, -0.72], [0.24, -0.74], [0.26, -0.38]], 0.09, MEGA.fin), [0, 0, 2.24]));
+  parts.push(xf(vfin([[-0.34, 0.46], [-0.04, 0.94], [0.24, 1.00], [0.30, 0.48]], 0.10, MEGA.fin), [0, 0, 2.06]));
+  parts.push(xf(vfin([[-0.34, -0.44], [0.04, -0.80], [0.28, -0.82], [0.30, -0.42]], 0.09, MEGA.fin), [0, 0, 2.22]));
 
-  // 가슴지느러미 — 크게 뻗은 날개
+  // 가슴지느러미 — 뜯긴 뒤 가장자리의 크고 각진 날개
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
-      [0, 0.62], [0.80, 0.34], [1.55, -0.05], [2.05, -0.42],
-      [1.42, -0.74], [0.62, -0.66], [0, -0.24],
-    ].map(([x, y]) => [x * s, y]), 0.11, MEGA.fin),
-      [0.12 * s, -0.20, -1.05], [0, 0, -0.26 * s]));
+      [0, 0.68], [0.80, 0.42], [1.44, 0.02], [1.96, -0.44],
+      [1.56, -0.50], [1.68, -0.80], [1.14, -0.70], [1.24, -0.96],
+      [0.60, -0.72], [0, -0.26],
+    ].map(([x, y]) => [x * s, y]), 0.12, MEGA.fin),
+      [0.14 * s, -0.24, -1.04], [0, 0, -0.22 * s]));
   }
   // 배지느러미
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
-      [0, 0.24], [0.36, 0.02], [0.44, -0.20], [0.20, -0.24], [0, -0.10],
+      [0, 0.26], [0.38, 0.02], [0.46, -0.22], [0.20, -0.26], [0, -0.10],
     ].map(([x, y]) => [x * s, y]), 0.07, MEGA.fin),
-      [0.12 * s, -0.62, 2.02], [0, 0, 0]));
+      [0.12 * s, -0.66, 2.00], [0, 0, 0]));
   }
   // 꼬리자루의 가로 융기 (caudal keel)
   for (const s of [-1, 1]) {
-    parts.push(xf(hfin([[0, 0.30], [0.34, 0.10], [0.40, -0.12], [0.12, -0.16], [0, 0]], 0.06, MEGA.fin),
+    parts.push(xf(hfin([[0, 0.32], [0.36, 0.10], [0.42, -0.14], [0.12, -0.18], [0, 0]], 0.07, MEGA.fin),
       [0.10 * s, 0.02, 2.72], [0, 0, 0]));
   }
 
-  // 입 — 검붉은 아가리와 위턱 이빨
-  const mz = -3.02;
-  const mouth = new THREE.SphereGeometry(1, 16, 10);
-  mouth.scale(0.62, 0.30, 0.46);
-  parts.push(xf(paint(mouth, 0x2a1418), [0, -0.30, mz]));
+  // 등줄기를 따라 돋은 장갑 비늘판
   for (let i = 0; i < 7; i++) {
-    const t = (i / 6 - 0.5) * 2;
-    const tooth = spikeGeo(0.05, 0.22, 5);
-    parts.push(xf(paint(tooth, MEGA.tooth),
-      [Math.sin(t * 1.2) * 0.5, -0.14, mz - 0.02 + Math.abs(t) * 0.12],
-      [Math.PI - 0.1, 0, 0.1 * t]));
+    const z = -1.86 + i * 0.56;
+    const r = radiusAt(profile, z) * 0.99;
+    const w = 0.13 + 0.04 * Math.sin(i * 1.7);
+    const g = new THREE.BoxGeometry(w * 2, 0.07, 0.40);
+    parts.push(xf(paint(g, MEGA.backDeep), [0, r, z], [0.14, 0, 0.05 * Math.sin(i * 2.1)]));
   }
 
-  // 아가미 홈
+  /* ── 머리 ── */
+  parts.push(megalodonHeadGeometry());
+  // 콧등 능선 (머리 위 각진 쐐기)
+  parts.push(xf(vfin([
+    [-3.56, 0.30], [-3.24, 0.60], [-2.78, 0.70], [-2.32, 0.56],
+    [-2.58, 0.36], [-3.06, 0.26], [-3.42, 0.16],
+  ], 0.66, MEGA.backDeep), [0, 0, 0]));
+  // 볼 장갑판 — 눈 아래 옆머리
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const z = -1.55 + i * 0.24;
-      const rr = radiusAt(profile, z) * 0.68;
-      const g = new THREE.BoxGeometry(0.03, 0.42, 0.06);
-      parts.push(xf(paint(g, MEGA.backDeep), [rr * 0.95 * s, -0.05, z], [0, 0, 0.16 * s]));
+    parts.push(xf(paint(new THREE.BoxGeometry(0.14, 0.44, 0.96), MEGA.backDeep),
+      [0.72 * s, 0.06, -2.62], [0, 0, 0.12 * s]));
+  }
+
+  // 입천장 — 머리 바닥을 덮는 붉은 판
+  const palate = hfin([
+    [-0.68, 0.00], [-0.70, 0.36], [-0.50, 0.70], [-0.24, 0.84], [0.00, 0.88],
+    [0.24, 0.84], [0.50, 0.70], [0.70, 0.36], [0.68, 0.00], [0.00, 0.04],
+  ], 0.10, { curveSegments: 8 });
+  parts.push(xf(paint(palate, MEGA.gum), [0, MEGA_MOUTH_Y - 0.04, -2.62]));
+  // 아구 — 입천장 뒤로 이어지는 짙은 암적색 구멍
+  const throat = new THREE.SphereGeometry(1, 20, 14);
+  throat.scale(0.60, 0.42, 0.46);
+  parts.push(xf(paint(throat, MEGA.throat), [0, MEGA_MOUTH_Y - 0.30, -2.86]));
+  // 위 입술 — 입천장 테두리를 감싸는 어두운 테
+  const lip = new THREE.TorusGeometry(0.70, 0.10, 6, 20, Math.PI);
+  lip.scale(1, 0.30, 1);
+  parts.push(xf(paint(lip, MEGA.backDeep), [0, MEGA_MOUTH_Y - 0.02, -3.02], [0.06, 0, 0]));
+  // 위턱 이빨 두 줄 — 입천장 테두리에서 아래로 드리운다
+  megaTeeth(parts, 13, { width: 0.66, zFront: -3.42, zSide: 0.52, yBase: MEGA_MOUTH_Y - 0.06, ybow: 0.02, len: 0.64, rad: 0.068, dir: -1 });
+  megaTeeth(parts, 11, { width: 0.48, zFront: -3.28, zSide: 0.46, yBase: MEGA_MOUTH_Y - 0.02, ybow: 0.02, len: 0.40, rad: 0.048, dir: -1 });
+
+  // 눈두덩 — 짙은 안와와 그 위로 치켜뜬 눈썹 융기
+  for (const s of [-1, 1]) {
+    const sock = new THREE.SphereGeometry(0.32, 10, 8);
+    sock.scale(1, 0.80, 1);
+    parts.push(xf(paint(sock, MEGA.socket), [0.50 * s, 0.34, -2.86]));
+    parts.push(xf(vfin([
+      [-3.16, 0.48], [-2.98, 0.76], [-2.58, 0.78], [-2.34, 0.60], [-2.70, 0.52],
+    ], 0.34, MEGA.backDeep), [0.40 * s, 0, 0], [0, 0, -0.40 * s]));
+  }
+
+  // 턱 힘살 — 아래턱과 머리를 잇는 각진 살덩이
+  for (const s of [-1, 1]) {
+    parts.push(xf(vfin([
+      [-2.62, -0.30], [-2.30, -0.34], [-2.10, -0.52], [-2.26, -0.92],
+      [-2.56, -0.94], [-2.66, -0.62],
+    ], 0.22, MEGA.back), [0.52 * s, 0, 0], [0, 0, 0.10 * s]));
+  }
+  // 아가미 틈 — 깊게 갈라진 여섯 줄
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 6; i++) {
+      const z = -1.86 + i * 0.20;
+      const g = new THREE.BoxGeometry(0.06, 0.54, 0.05);
+      parts.push(xf(paint(g, 0x04080b), [sideX(z, 0.97) * s, -0.02, z], [0, 0, 0.16 * s]));
     }
   }
-  // 몸에 남은 옛 상처 — 밝은 흉터 자국
-  for (let i = 0; i < 9; i++) {
-    const z = -1.9 + i * 0.52;
-    const rr = radiusAt(profile, z) * 0.7;
+
+  // 몸에 남은 옛 상처 — 눈가의 발톱 자국과 옆구리의 사선 흉터
+  for (let i = 0; i < 3; i++) {
+    const z = -2.50 + i * 0.05;
+    const g = new THREE.BoxGeometry(0.05, 0.10, 0.58);
+    parts.push(xf(paint(g, MEGA.scar), [0.68, 0.62 - i * 0.14, z], [0.16, 0.22, 0.46]));
+  }
+  for (let i = 0; i < 6; i++) {
+    const z = -1.20 + i * 0.60;
     const s = i % 2 === 0 ? 1 : -1;
-    const g = new THREE.BoxGeometry(0.03, 0.05, 0.5 + (i % 3) * 0.22);
-    parts.push(xf(paint(g, MEGA.scar), [rr * 0.96 * s, 0.24 - (i % 4) * 0.16, z], [0, 0, 0.3 * s]));
+    const g = new THREE.BoxGeometry(0.05, 0.06, 0.44 + (i % 3) * 0.24);
+    parts.push(xf(paint(g, MEGA.scar), [sideX(z, 0.97) * s, 0.34 - (i % 4) * 0.18, z],
+      [0, 0, (0.34 + (i % 3) * 0.16) * s]));
   }
 
   _megaBody = assemble(parts, -1.2, 3.14);
@@ -1703,59 +1803,67 @@ function megalodonBodyGeometry() {
 export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
-    vertexColors: true, shininess: 30, specular: 0x536470,
-    emissive: 0x22434f, emissiveIntensity: 1.2,
-  }), 0.55), 0x7fe4ff, 2.1, 0.62);
+    vertexColors: true, shininess: 22, specular: 0x4a5a64,
+    emissive: 0x0c1a24, emissiveIntensity: 1.0,
+  }), 0.62), 0xff5a24, 2.3, 0.6);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
   g.add(body);
 
   const tail = new THREE.Group();
-  tail.position.set(0, 0, 3.10);
+  tail.position.set(0, 0, 3.06);
   tail.add(new THREE.Mesh(megalodonTailGeometry(), mat));
   g.add(tail);
 
-  // 아래턱 — 돌진할 때 크게 벌어진다
+  // 아래턱 — 돌진할 때 크게 벌어진다 (음의 회전 = 아래로 벌어짐)
   const jawPivot = new THREE.Group();
-  jawPivot.position.set(0, -0.34, -2.86);
+  jawPivot.position.set(0, -1.00, -2.62);
+  jawPivot.rotation.x = -0.20;
   const jaw = new THREE.Mesh(megalodonJawGeometry(), mat);
   jawPivot.add(jaw);
   g.add(jawPivot);
 
-  // 눈 — 심해에서 빛나는 옅은 청록
+  // 눈 — 사선으로 치켜뜬 붉은/주황 눈빛 + 검은 세로 동공
   const eyeMat = new THREE.MeshBasicMaterial({ color: MEGA.glow });
+  const slitMat = new THREE.MeshBasicMaterial({ color: 0x1a0402 });
   const eyes = [];
+  const halos = [];
   for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), eyeMat);
-    e.position.set(0.56 * s, 0.24, -2.62);
-    e.scale.set(1, 1, 1.2);
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 9), eyeMat);
+    e.position.set(0.56 * s, 0.34, -2.88);
+    e.scale.set(1.25, 0.52, 0.95);
+    e.rotation.z = -0.54 * s;
     g.add(e);
     eyes.push(e);
-    const halo = spriteGlow(MEGA.glow, 1.7, 0.42);
-    halo.position.copy(e.position);
+
+    const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.06), slitMat);
+    slit.position.set(0.63 * s, 0.34, -2.99);
+    slit.rotation.z = -0.52 * s;
+    g.add(slit);
+
+    const halo = spriteGlow(MEGA.glow, 2.2, 0.52);
+    halo.position.set(0.56 * s, 0.34, -2.90);
     g.add(halo);
+    halos.push(halo);
   }
-  // 몸통의 발광 흉터 점
-  const dots = [];
-  const dotGeo = new THREE.SphereGeometry(0.13, 6, 5);
-  for (let i = 0; i < 10; i++) {
-    const s = i % 2 === 0 ? 1 : -1;
-    const d = new THREE.Mesh(dotGeo, eyeMat);
-    d.position.set(0.66 * s, 0.30 - (i % 3) * 0.2, -1.6 + Math.floor(i / 2) * 0.62);
-    g.add(d);
-    dots.push(d);
-  }
+  // 벌어진 아가리 안쪽에서 새어 나오는 붉은 빛
+  const mouthGlow = spriteGlow(0xff2c08, 3.0, 0.42);
+  mouthGlow.position.set(0, MEGA_MOUTH_Y - 0.36, -3.00);
+  g.add(mouthGlow);
 
   return {
-    group: g, body, tail, jaw: jawPivot, eyes, dots,
+    group: g, body, tail, jaw: jawPivot, eyes, dots: [], halos, mouthGlow,
     update(t) {
       // 느린 꼬리 흔들림 + 지느러미 같은 미세한 몸놀림
-      tail.rotation.y = Math.sin(t * 2.4) * 0.26;
+      tail.rotation.y = Math.sin(t * 2.4) * 0.28;
       body.rotation.z = Math.sin(t * 1.1) * 0.03;
+      // 눈빛이 천천히 이글거린다
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3.1);
+      for (let i = 0; i < halos.length; i++) halos[i].material.opacity = 0.34 + 0.30 * pulse;
+      mouthGlow.material.opacity = 0.28 + 0.18 * Math.sin(t * 2.2 + 1.1);
     },
   };
 }
-
 /* ---------------- ② 심연룡 레비아탄 ---------------- */
 const LEVI = { skin: 0x1f4e56, ridge: 0x2f8085, glow: 0x7dffd8, belly: 0x8fd6cf };
 let _leviSeg = null;

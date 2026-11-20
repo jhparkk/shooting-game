@@ -541,6 +541,14 @@ body { touch-action: none; }
 .dur.danger .dur-track { border-color: rgba(255, 120, 140, 0.6); }
 .dur.danger .dur-fill { animation: dur-pulse 900ms ease-in-out infinite; }
 .dur.regen .dur-fill { box-shadow: 0 0 16px rgba(140, 255, 210, 0.75), inset 0 -2px 3px rgba(0, 50, 50, 0.3); }
+/* 최대 내구력에서 보강 모듈을 비상 수리로 바꿨을 때 — 바가 한 번 크게 빛난다 */
+.dur.heal { animation: dur-heal 520ms ease-out; }
+.dur.heal .dur-fill { box-shadow: 0 0 22px rgba(190, 255, 220, 0.95), inset 0 -2px 3px rgba(0, 60, 50, 0.3); }
+@keyframes dur-heal {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
 @keyframes dur-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
