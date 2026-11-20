@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120x';
+import { getTextures } from './textures.js?v=20261120y';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1583,7 +1583,7 @@ function addRim(mat, color, power, k) {
    · 등은 짙은 청회색, 배와 아래턱 밑면은 창백한 회백색 — 상어 특유의 투톤
    · 주둥이 밑면이 깊게 파여 아가리가 되고, 그 테를 따라 톱니 이빨이 돋는다 */
 const MEGA = {
-  back: 0x2a3540, backDeep: 0x141c22, belly: 0xa0abaa, bellyMid: 0x78868a,
+  back: 0x2a3540, backDeep: 0x141c22, belly: 0x94a09f, bellyMid: 0x748286,
   fin: 0x222c34, finEdge: 0x121a20,
   tooth: 0xe6dcc4, gum: 0x431014, throat: 0x0a0305,
   scar: 0x94a3a8, eye: 0x05080b, glow: 0xc4401f,
@@ -1924,7 +1924,7 @@ function megalodonBodyGeometry() {
 export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
-    vertexColors: true, shininess: 96, specular: 0x1c272e,
+    vertexColors: true, shininess: 140, specular: 0x141e24,
     emissive: 0x05090d, emissiveIntensity: 1.0,
   }), 0.55), 0x9ccde2, 3.4, 0.16);
 

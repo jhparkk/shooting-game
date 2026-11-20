@@ -2,7 +2,7 @@
    ABYSS DIVER — 파티클 / 폭발 / 음파 링 이펙트
    ========================================================= */
 import * as THREE from 'three';
-import { glowTexture } from './models.js?v=20261120x';
+import { glowTexture } from './models.js?v=20261120y';
 
 /** 기포(공기방울) 스프라이트 — 밝은 테두리 + 속이 빈 맑은 원 */
 let _bubbleTex = null;
