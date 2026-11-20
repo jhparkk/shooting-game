@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z';
+import { getTextures } from './textures.js?v=20261120z2';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1987,25 +1987,25 @@ export function makeMegalodon() {
    · 어두운 슬레이트 비늘과 붉은 흉터 / 뼈 볏은 연한 회갈색
    · 유영은 꼬리 후반부가 크게 젓는 묵직한 좌우 파동 (마디 지렁이 흐느적임 없음) */
 const LEVI = {
-  back: 0x2c3b49, backDeep: 0x16212a,
-  belly: 0x6f7d87, bellyMid: 0x4a5a65,
+  back: 0x2d3c4b, backDeep: 0x151f28,
+  belly: 0x62707b, bellyMid: 0x44535e,
   bone: 0xc9bfa3, boneDark: 0x968d76,
   fin: 0x232f3a, sail: 0x33454f, sailEdge: 0x1b262f,
   scar: 0x77362f, tooth: 0xefe8d4, gum: 0x38121a,
   eye: 0xffb24a, glow: 0xffb24a,
 };
-const LEVI_SX = 0.92;          // 옆으로 살짝 납작한 몸
-const LEVI_BELLY = 0.92;       // 배는 등보다 조금 납작하다
+const LEVI_SX = 0.90;          // 옆으로 살짝 납작한 몸
+const LEVI_BELLY = 0.94;       // 배는 등보다 조금 납작하다
 const LEVI_SWIM = { amp: 0.92, freq: 3.1, speed: 1.05 };
 
 const LEVI_BODY_CTRL = [
-  [-5.40, 0.98], [-4.85, 1.16], [-3.95, 1.33], [-2.85, 1.46], [-1.65, 1.52],
-  [-0.45, 1.50], [0.85, 1.42], [2.15, 1.28], [3.40, 1.10], [4.55, 0.90],
-  [5.60, 0.70], [6.50, 0.50], [7.30, 0.33], [7.95, 0.19], [8.40, 0.09],
+  [-5.10, 1.10], [-4.55, 1.36], [-3.60, 1.54], [-2.40, 1.66], [-1.00, 1.70],
+  [0.40, 1.66], [1.80, 1.55], [3.00, 1.38], [4.05, 1.17], [4.95, 0.93],
+  [5.75, 0.68], [6.35, 0.46], [6.85, 0.28], [7.25, 0.13],
 ];
 const LEVI_SKULL_CTRL = [
-  [-7.55, 0.05], [-7.35, 0.17], [-7.05, 0.30], [-6.70, 0.42], [-6.25, 0.55],
-  [-5.80, 0.70], [-5.35, 0.86], [-4.95, 0.99], [-4.60, 1.04],
+  [-7.45, 0.07], [-7.25, 0.26], [-6.95, 0.45], [-6.55, 0.63], [-6.10, 0.82],
+  [-5.65, 1.00], [-5.15, 1.15], [-4.65, 1.25], [-4.15, 1.29], [-3.75, 1.27],
 ];
 let _leviBodyProfile = null;
 let _leviSkullProfile = null;
@@ -2082,34 +2082,38 @@ function leviathanBodyGeometry() {
   const parts = [body];
   const rAt = (z) => radiusAt(profile, z);
 
-  /* ── 등 돛지느러미 — 부채처럼 크게 펴진 돛 ── */
+  /* ── 등 돛지느러미 — 등 한가운데 크게 펴진 가시 돛 ──
+     위 테두리를 톱니처럼 세워 뾰족한 살이 돛 밖으로 솟게 한다 */
+  const SAIL_Z = 0.35;
   parts.push(xf(vfin([
-    [-0.75, 0.03], [-0.52, 0.82], [-0.12, 1.44], [0.28, 1.82], [0.70, 1.98],
-    [1.02, 1.66], [1.34, 1.16], [1.62, 0.68], [1.90, 0.22], [2.14, 0.03],
-  ], 0.10, LEVI.sail, { smooth: true, curveSegments: 16 }),
-    [0, rAt(0.85) * 0.92, 0.85]));
-  // 돛의 살 — 뼈 빛 가시가 돛 위로 삐죽 솟는다
+    [-0.85, 0.04], [-0.72, 0.72], [-0.48, 1.34], [-0.20, 1.86], [0.05, 1.58],
+    [0.30, 2.22], [0.58, 1.72], [0.86, 2.10], [1.14, 1.52], [1.42, 1.62],
+    [1.66, 1.02], [1.88, 0.92], [2.06, 0.30], [2.18, 0.04],
+  ], 0.11, LEVI.sail, { smooth: false, curveSegments: 6 }),
+    [0, rAt(SAIL_Z) * 0.90, SAIL_Z]));
+  // 돛의 살 — 뼈 빛 가시가 돛 위로 길게 솟는다
   const rays = [
-    [-0.60, 0.62, 0.05], [-0.30, 1.10, 0.06], [0.05, 1.62, 0.07],
-    [0.42, 1.92, 0.07], [0.78, 1.72, 0.06], [1.10, 1.30, 0.055],
-    [1.40, 0.82, 0.05], [1.70, 0.38, 0.045],
+    [-0.72, 0.86, 0.055], [-0.42, 1.55, 0.065], [-0.14, 2.05, 0.075],
+    [0.12, 2.35, 0.075], [0.42, 2.10, 0.07], [0.72, 2.20, 0.065],
+    [1.00, 1.66, 0.06], [1.28, 1.70, 0.055], [1.55, 1.12, 0.05],
+    [1.82, 0.98, 0.045],
   ];
   for (const [dz, h, r] of rays) {
-    const z = 0.85 + dz;
-    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.boneDark),
-      [0, rAt(z) * 0.92 + h * 0.34, z], [0.62, 0, 0]));
+    const z = SAIL_Z + dz;
+    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone),
+      [0, rAt(z) * 0.90 + h * 0.30, z], [0.75, 0, 0]));
   }
 
   /* ── 꼬리 쪽 작은 등가시 — 뒤로 갈수록 작아진다 ── */
-  for (const [z, h, r] of [[3.15, 0.42, 0.20], [4.15, 0.36, 0.17],
-    [5.05, 0.30, 0.15], [5.85, 0.24, 0.12], [6.55, 0.18, 0.10]]) {
+  for (const [z, h, r] of [[2.85, 0.52, 0.22], [3.70, 0.46, 0.20],
+    [4.50, 0.38, 0.17], [5.20, 0.30, 0.14], [5.85, 0.22, 0.11], [6.45, 0.16, 0.09]]) {
     parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.boneDark),
       [0, rAt(z) * 0.90 + h * 0.30, z], [0.72, 0, 0]));
   }
   // 목덜미 가시 — 볏에서 등으로 이어진다
-  for (const [z, h, r] of [[-4.2, 0.34, 0.15], [-3.6, 0.28, 0.13], [-3.0, 0.22, 0.11]]) {
+  for (const [z, h, r] of [[-3.9, 0.52, 0.19], [-3.3, 0.44, 0.17], [-2.7, 0.36, 0.15], [-2.1, 0.30, 0.13]]) {
     parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone),
-      [0, rAt(z) * 0.96 + h * 0.34, z], [0.60, 0, 0]));
+      [0, rAt(z) * 0.95 + h * 0.32, z], [0.66, 0, 0]));
   }
 
   /* ── 배지느러미 한 쌍 (꼬리 앞 작은 노) ── */
@@ -2118,108 +2122,111 @@ function leviathanBodyGeometry() {
       [0, 0.20], [0.34, 0.12], [0.62, -0.10], [0.70, -0.32],
       [0.44, -0.40], [0.16, -0.26], [0, -0.12],
     ].map(([a, b]) => [a * s, b]), 0.06, LEVI.fin, { smooth: true, curveSegments: 8 }),
-      LEVI.fin), [0.34 * s, -rAt(2.2) * 0.80, 2.2], [0, 0, -0.18 * s]));
+      LEVI.fin), [0.34 * s, -rAt(1.9) * 0.80, 1.9], [0, 0, -0.18 * s]));
   }
 
   /* ── 옛 상처의 흉터 — 붉은 자국이 옆구리에 남아 있다 ── */
   const scarPatch = (z, th, s, col) => {
     const r = rAt(z);
     const g = new THREE.SphereGeometry(1, 12, 8);
-    g.scale(s[0], s[1], s[2]);
-    parts.push(xf(paint(g, col === undefined ? LEVI.scar : col),
-      [Math.sin(th) * r * LEVI_SX * 0.97,
-        Math.cos(th) * r * (Math.cos(th) > 0 ? 0.99 : LEVI_BELLY) * 0.99, z],
-      [0, 0, -th]));
+    g.scale(s[1], s[2], s[0]);                  // 길이(z)는 길게, 표면 두께는 얇게
+    g.rotateZ(-th);
+    const p = new THREE.Vector3(
+      Math.sin(th) * r * LEVI_SX * 0.97,
+      Math.cos(th) * r * (Math.cos(th) > 0 ? 0.99 : LEVI_BELLY) * 0.99, z);
+    parts.push(xf(paint(g, col === undefined ? LEVI.scar : col), [p.x, p.y, p.z]));
   };
-  scarPatch(-2.35, 0.55, [0.46, 0.07, 0.24]);
-  scarPatch(-1.35, -0.85, [0.60, 0.07, 0.22]);
-  scarPatch(0.35, 1.05, [0.44, 0.06, 0.26]);
-  scarPatch(1.95, -1.10, [0.36, 0.06, 0.20]);
-  scarPatch(-3.55, 0.72, [0.30, 0.06, 0.18]);
-  scarPatch(3.40, 0.95, [0.26, 0.05, 0.16], 0x5f4d45);
+  // 옆구리를 따라 길게 갈라진 옛 상처
+  scarPatch(-2.30, 0.62, [0.95, 0.34, 0.06]);
+  scarPatch(-1.10, -0.92, [1.15, 0.30, 0.05]);
+  scarPatch(0.55, 1.02, [0.80, 0.26, 0.05]);
+  scarPatch(2.10, -1.05, [0.62, 0.20, 0.045]);
+  scarPatch(-3.60, 0.80, [0.55, 0.18, 0.045]);
+  scarPatch(3.60, 0.98, [0.48, 0.16, 0.04], 0x5b4a43);
+  scarPatch(-0.30, -0.30, [0.42, 0.14, 0.04], 0x8a5148);
 
-  _leviBody = assemble(parts, -2.0, 8.4);
+  _leviBody = assemble(parts, -1.6, 7.25);
   return _leviBody;
 }
 
-/** 두개골 — 길고 날렵한 파충류 머리 + 골질 볏 + 송곳니 */
+/** 두개골 — 길고 두툼한 파충류 머리 + 골질 볏 + 송곳니 */
 function leviathanSkullGeometry() {
   if (_leviSkull) return _leviSkull;
   const profile = leviSkullProfile();
-  const skull = bodyGeometry(profile, { radial: 30, sx: 0.86, sy: 0.82 });
+  const skull = bodyGeometry(profile, { radial: 32, sx: 0.95, sy: 1.0 });
   const pos = skull.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
-    if (y < 0) pos.setY(i, y * 0.88);
+    if (y < 0) pos.setY(i, y * 0.92);
   }
   pos.needsUpdate = true;
   skull.computeVertexNormals();
   paintSkin(skull, {
-    back: LEVI.back, belly: LEVI.bellyMid, halfHeight: 0.86, blend: [-0.50, 0.06], wave: 0.18,
+    back: LEVI.back, belly: LEVI.bellyMid, halfHeight: 1.10, blend: [-0.50, 0.08], wave: 0.18,
     spot: { color: 0x556a78, threshold: 0.9, mix: 0.4 },
   });
   const parts = [skull];
   const rAt = (z) => radiusAt(profile, z);
 
-  /* ── 골질 볏 — 정수리에서 목덜미까지 이어지는 뾰족한 뼈 가시 ── */
+  /* ── 골질 볏 — 주둥이 위에서 목덜미까지 이어지는 뾰족한 뼈 가시 ── */
   const sagittal = [
-    [-6.55, 0.12, 0.12], [-6.15, 0.19, 0.14], [-5.75, 0.30, 0.16],
-    [-5.35, 0.42, 0.18], [-4.95, 0.50, 0.19], [-4.60, 0.54, 0.20],
+    [-6.90, 0.20, 0.14], [-6.45, 0.34, 0.17], [-6.00, 0.50, 0.20],
+    [-5.50, 0.66, 0.23], [-5.00, 0.78, 0.25], [-4.50, 0.80, 0.25], [-4.05, 0.70, 0.23],
   ];
   for (const [z, h, r] of sagittal) {
-    const y = rAt(z) * 0.82 * 0.94;
-    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone), [0, y + h * 0.38, z], [0.60, 0, 0]));
+    const y = rAt(z) * 0.92;
+    parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone), [0, y + h * 0.40, z], [0.55, 0, 0]));
   }
   /* ── 눈 위·볼에서 뒤로 젖혀진 뿔 ── */
   for (const s of [-1, 1]) {
-    for (const [z, h, r, out] of [[-5.55, 0.42, 0.12, 0.50], [-5.10, 0.54, 0.14, 0.68],
-      [-4.62, 0.46, 0.13, 0.84]]) {
+    for (const [z, h, r, out] of [[-5.85, 0.52, 0.14, 0.44], [-5.30, 0.80, 0.18, 0.62],
+      [-4.75, 0.86, 0.19, 0.80], [-4.25, 0.66, 0.16, 0.95]]) {
       const rr = rAt(z);
       parts.push(xf(paint(spikeGeo(r, h, 5), LEVI.bone),
-        [Math.sin(out) * rr * 0.84 * s, Math.cos(out) * rr * 0.78 + 0.05, z],
-        [0.42, 0, -out * s]));
+        [Math.sin(out) * rr * 0.90 * s, Math.cos(out) * rr * 0.86 + 0.06, z],
+        [0.48, 0, -out * s]));
     }
   }
 
-  /* ── 눈 — 호박색 눈알과 세로 동공, 두꺼운 눈두덩 ── */
+  /* ── 눈 — 크고 둥근 호박색 눈알과 세로 동공, 두꺼운 눈두덩 ── */
   for (const s of [-1, 1]) {
-    const ez = -5.42;
+    const ez = -5.15;
     const rr = rAt(ez);
-    const ex = rr * 0.86 * 0.92 * s;
-    const ey = rr * 0.34;
-    const brow = new THREE.SphereGeometry(1, 12, 9);
-    brow.scale(0.19, 0.13, 0.30);
-    parts.push(xf(paint(brow, LEVI.backDeep), [ex * 1.03, ey + 0.11, ez]));
-    const eye = new THREE.SphereGeometry(0.10, 14, 10);
+    const ex = rr * 0.95 * 0.97 * s;
+    const ey = rr * 0.30;
+    const brow = new THREE.SphereGeometry(1, 14, 10);
+    brow.scale(0.30, 0.16, 0.42);
+    parts.push(xf(paint(brow, LEVI.backDeep), [ex * 1.02, ey + 0.16, ez]));
+    const eye = new THREE.SphereGeometry(0.155, 16, 12);
     parts.push(xf(paint(eye, LEVI.eye), [ex, ey, ez]));
-    const pupil = new THREE.BoxGeometry(0.026, 0.105, 0.02);
-    parts.push(xf(paint(pupil, 0x140a04), [ex + 0.092 * s, ey, ez - 0.012]));
+    const pupil = new THREE.BoxGeometry(0.040, 0.175, 0.03);
+    parts.push(xf(paint(pupil, 0x140a04), [ex + 0.150 * s, ey, ez - 0.018]));
   }
 
   /* ── 위턱 이빨 — 주둥이 테를 따라 아래로 돋은 송곳니 ── */
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 11; i++) {
-      const t = i / 10;
-      const z = -7.18 + t * 2.34;
+    for (let i = 0; i < 12; i++) {
+      const t = i / 11;
+      const z = -7.10 + t * 2.80;
       const rr = rAt(z);
-      const h = 0.15 + 0.11 * Math.sin(t * Math.PI);
-      parts.push(xf(paint(spikeGeo(0.040, h, 5), LEVI.tooth),
-        [rr * 0.86 * 0.60 * s, -rr * 0.82 * 0.64, z], [Math.PI, 0, 0.07 * s]));
+      const h = 0.20 + 0.16 * Math.sin(t * Math.PI);
+      parts.push(xf(paint(spikeGeo(0.050, h, 5), LEVI.tooth),
+        [rr * 0.95 * 0.58 * s, -rr * 0.92 * 0.62, z], [Math.PI, 0, 0.07 * s]));
     }
   }
   /* ── 입 라인 — 주둥이 옆을 따라 흐르는 어두운 틈 ── */
   for (const s of [-1, 1]) {
     const pts = [];
-    for (let k = 0; k <= 8; k++) {
-      const z = -7.34 + k * 0.30;
+    for (let k = 0; k <= 9; k++) {
+      const z = -7.28 + k * 0.33;
       const rr = rAt(z);
-      pts.push(new THREE.Vector3(rr * 0.86 * 0.84 * s, -rr * 0.82 * 0.60, z));
+      pts.push(new THREE.Vector3(rr * 0.95 * 0.86 * s, -rr * 0.92 * 0.58, z));
     }
-    parts.push(tubeAlong(pts, 0.032, 0x1b1216, 14, 4));
+    parts.push(tubeAlong(pts, 0.038, 0x1b1216, 16, 4));
   }
 
   // 머리는 몸통 굽힘에 함께 휘지 않게 고정한다
-  _leviSkull = noBend(assemble(parts, -7.55, -4.4));
+  _leviSkull = noBend(assemble(parts, -7.45, -3.7));
   return _leviSkull;
 }
 
@@ -2227,10 +2234,10 @@ function leviathanSkullGeometry() {
 function leviathanJawGeometry() {
   if (_leviJaw) return _leviJaw;
   const profile = [
-    [0.34, 0.36], [0.10, 0.58], [-0.25, 0.68], [-0.75, 0.72], [-1.35, 0.68],
-    [-1.95, 0.58], [-2.45, 0.42], [-2.75, 0.24], [-2.90, 0.07],
+    [0.40, 0.30], [0.10, 0.62], [-0.30, 0.84], [-0.85, 1.00], [-1.50, 1.04],
+    [-2.15, 1.00], [-2.70, 0.86], [-3.15, 0.62], [-3.45, 0.32], [-3.60, 0.09],
   ];
-  const jaw = bodyGeometry(profile, { radial: 24, sx: 0.80, sy: 0.55 });
+  const jaw = bodyGeometry(profile, { radial: 28, sx: 0.90, sy: 0.62 });
   const pos = jaw.attributes.position;
   const n = pos.count;
   const col = new Float32Array(n * 3);
@@ -2241,10 +2248,10 @@ function leviathanJawGeometry() {
   for (let i = 0; i < n; i++) {
     const y = pos.getY(i);
     // 윗면(입 안)은 잇몸, 바깥은 비늘 — 위쪽 절반을 조금 접어 그릇처럼
-    const t = smoothstep(-0.17, -0.01, y);
-    c.copy(leafC).lerp(skinC, 0.5).lerp(gumC, t * 0.85);
+    const t = smoothstep(-0.22, -0.01, y);
+    c.copy(leafC).lerp(skinC, 0.5).lerp(gumC, t * 0.88);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-    if (y > 0) pos.setY(i, -y * 0.24);
+    if (y > 0) pos.setY(i, -y * 0.20);
   }
   pos.needsUpdate = true;
   jaw.computeVertexNormals();
@@ -2252,17 +2259,18 @@ function leviathanJawGeometry() {
 
   const parts = [jaw];
   const rAt = (z) => radiusAt(profile, z);
+  // 입꼬리에서 턱 끝까지 늘어선 굵은 송곳니
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 11; i++) {
-      const t = i / 10;
-      const z = -2.70 + t * 2.48;
+    for (let i = 0; i < 12; i++) {
+      const t = i / 11;
+      const z = -3.40 + t * 3.10;
       const rr = rAt(z);
-      const h = 0.19 + 0.13 * Math.sin(t * Math.PI * 0.92);
-      parts.push(xf(paint(spikeGeo(0.043, h, 5), LEVI.tooth),
-        [rr * 0.80 * 0.62 * s, -0.10, z], [0.08 * s, 0, 0]));
+      const h = 0.24 + 0.20 * Math.sin(t * Math.PI * 0.95);
+      parts.push(xf(paint(spikeGeo(0.052, h, 5), LEVI.tooth),
+        [rr * 0.90 * 0.60 * s, -0.12, z], [0.08 * s, 0, 0]));
     }
   }
-  _leviJaw = noBend(assemble(parts, -3.0, 0.4));
+  _leviJaw = noBend(assemble(parts, -3.7, 0.5));
   return _leviJaw;
 }
 
@@ -2290,7 +2298,7 @@ export function makeLeviathan() {
 
   // 아래턱 — 입꼬리를 축으로 벌어진다 (음의 회전 = 아래로 벌어짐)
   const jawPivot = new THREE.Group();
-  jawPivot.position.set(0, -0.42, -4.92);
+  jawPivot.position.set(0, -0.86, -4.20);
   jawPivot.rotation.x = -0.03;
   jawPivot.add(new THREE.Mesh(leviathanJawGeometry(), mat));
   g.add(jawPivot);
@@ -2299,7 +2307,7 @@ export function makeLeviathan() {
   const fins = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group();
-    pivot.position.set(1.00 * s, -0.40, -3.45);
+    pivot.position.set(1.12 * s, -0.92, -3.40);
     pivot.rotation.set(0.04, -0.40 * s, -0.28 * s);   // 뒤로 젖히고 아래로
     pivot.add(new THREE.Mesh(leviathanPectoral(s), mat));
     g.add(pivot);
@@ -2310,10 +2318,10 @@ export function makeLeviathan() {
   const halos = [];
   const eyes = [];
   for (const s of [-1, 1]) {
-    const ez = -5.42;
+    const ez = -5.15;
     const rr = radiusAt(leviSkullProfile(), ez);
-    const ex = rr * 0.86 * 0.92 * s;
-    const ey = rr * 0.34;
+    const ex = rr * 0.95 * 0.99 * s;
+    const ey = rr * 0.30;
     const halo = spriteGlow(LEVI.glow, 0.52, 0.22);
     halo.position.set(ex + 0.03 * s, ey, ez - 0.02);
     g.add(halo);
@@ -2322,15 +2330,17 @@ export function makeLeviathan() {
   }
   // 벌어진 아가리 안쪽에서 새어 나오는 빛 (돌진 예고에 쓴다)
   const mouthGlow = spriteGlow(0xff7a2a, 1.5, 0.0);
-  mouthGlow.position.set(0, -0.62, -6.15);
+  mouthGlow.position.set(0, -1.00, -5.90);
   g.add(mouthGlow);
 
   // 몸 충돌 구 — 몸통을 따라 늘어놓는다 (게임 쪽에서 위치를 갱신한다)
   const profile = leviBodyProfile();
   const hull = [];
-  for (const z of [-6.95, -6.10, -5.15, -4.10, -2.90, -1.60, -0.20, 1.30, 2.80, 4.30, 5.70, 6.90]) {
-    const r = z < -5.4 ? radiusAt(leviSkullProfile(), z) : radiusAt(profile, z);
-    hull.push({ x: 0, y: 0.02, z: z, r: Math.max(0.24, r * 0.95) });
+  for (const z of [-7.05, -6.30, -5.50, -4.60, -3.60, -2.40, -1.10, 0.40, 1.90, 3.20, 4.50, 5.70, 6.80]) {
+    const sk = radiusAt(leviSkullProfile(), z);
+    const bd = radiusAt(profile, z);
+    const r = z < -4.6 ? sk : Math.max(sk, bd);
+    hull.push({ x: 0, y: 0.02, z: z, r: Math.max(0.22, r * 0.95) });
   }
 
   return {
