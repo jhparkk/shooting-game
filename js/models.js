@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120q';
+import { getTextures } from './textures.js?v=20261120r';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1583,8 +1583,8 @@ function addRim(mat, color, power, k) {
    · 등은 짙은 청회색, 배와 아래턱 밑면은 창백한 회백색 — 상어 특유의 투톤
    · 주둥이 밑면이 깊게 파여 아가리가 되고, 그 테를 따라 톱니 이빨이 돋는다 */
 const MEGA = {
-  back: 0x2f3b44, backDeep: 0x161e24, belly: 0xb9c3c1, bellyMid: 0x8a989a,
-  fin: 0x26313a, finEdge: 0x141c22,
+  back: 0x2a3540, backDeep: 0x141c22, belly: 0xaab5b3, bellyMid: 0x7f8d8f,
+  fin: 0x222c34, finEdge: 0x121a20,
   tooth: 0xe6dcc4, gum: 0x431014, throat: 0x0a0305,
   scar: 0x94a3a8, eye: 0x05080b, glow: 0xc4401f,
 };
