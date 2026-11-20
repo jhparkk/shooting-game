@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120k';
+import { getTextures } from './textures.js?v=20261120m';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1805,7 +1805,7 @@ export function makeMegalodon() {
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 22, specular: 0x4a5a64,
     emissive: 0x0c1a24, emissiveIntensity: 1.0,
-  }), 0.62), 0xff6a2e, 3.2, 0.26);
+  }), 0.62), 0xff7a3c, 2.8, 0.20);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
   g.add(body);

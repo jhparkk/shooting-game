@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120k';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120k';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120k';
+import { Sound } from './audio.js?v=20261120m';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120m';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120m';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120k';
-import { FX } from './fx.js?v=20261120k';
-import { Currents, currentWeightForLength } from './currents.js?v=20261120k';
+} from './models.js?v=20261120m';
+import { FX } from './fx.js?v=20261120m';
+import { Currents, currentWeightForLength } from './currents.js?v=20261120m';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1594,7 +1594,7 @@ function collectItem(it) {
       toast(`선체 보강 · 최대 내구력 +20 (${Math.round(G.maxHull)})`);
       fx.ring(p.clone(), 0x6dffcf, 14, 0.6);
       fx.burst(p.x, p.y, p.z, 14, { colors: [0x6dffcf, 0xd8fff4, 0xffffff], speed: 9, size: 1.6, life: 0.6 });
-    } else {
+    } else if (G.hull < G.maxHull - 0.5) {
       // 이미 최대 내구력 — 보강재를 비상 수리로 돌려 현재 내구력을 회복한다
       G.hull = Math.min(G.maxHull, G.hull + HULL_HEAL_AT_CAP);
       toast(`선체 보강 한계 · 비상 수리 내구력 +${HULL_HEAL_AT_CAP} (${Math.ceil(G.hull)}/${Math.round(G.maxHull)})`);
@@ -1602,6 +1602,8 @@ function collectItem(it) {
       fx.burst(p.x, p.y, p.z, 18, { colors: [0x9dffc9, 0xd8fff4, 0xffffff], speed: 11, size: 1.8, life: 0.7 });
       el.dur && el.dur.classList.add('heal');
       setTimeout(() => el.dur && el.dur.classList.remove('heal'), 520);
+    } else {
+      toast(`선체 보강 · 이미 최대 내구력 (${Math.round(G.maxHull)})`);
     }
   } else if (it.type === 'repair') {
     G.hull = Math.min(G.maxHull, G.hull + 35);
