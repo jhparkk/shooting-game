@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120r';
+import { getTextures } from './textures.js?v=20261120s';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1701,8 +1701,8 @@ function paintMegaSkin(geo, profile) {
     const r = Math.max(radiusAt(profile, z), 1e-3);
     // 등·배 경계는 몸통 반지름을 따라가고, 살짝 물결져 단조롭지 않다
     const ny = y / r + Math.sin(z * 1.6 + x * 2.3) * 0.085;
-    const t = smoothstep(-0.30, 0.02, ny);                  // 0 = 배, 1 = 등
-    c.copy(belly).lerp(bellyMid, 0.34 * (1 - Math.abs(2 * t - 1)));
+    const t = smoothstep(-0.40, 0.14, ny);                  // 0 = 배, 1 = 등
+    c.copy(belly).lerp(bellyMid, 0.22 * (1 - Math.abs(2 * t - 1)));
     c.lerp(back, t);
     // 등 쪽 미세한 얼룩
     if (t > 0.45) {
@@ -1924,7 +1924,7 @@ function megalodonBodyGeometry() {
 export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
-    vertexColors: true, shininess: 30, specular: 0x44555e,
+    vertexColors: true, shininess: 78, specular: 0x2b3a42,
     emissive: 0x05090d, emissiveIntensity: 1.0,
   }), 0.55), 0x9ccde2, 3.4, 0.16);
 
