@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120o';
+import { getTextures } from './textures.js?v=20261120p';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1583,9 +1583,9 @@ function addRim(mat, color, power, k) {
    · 등은 짙은 청회색, 배와 아래턱 밑면은 창백한 회백색 — 상어 특유의 투톤
    · 주둥이 밑면이 깊게 파여 아가리가 되고, 그 테를 따라 톱니 이빨이 돋는다 */
 const MEGA = {
-  back: 0x36434c, backDeep: 0x1a2329, belly: 0xdde4e1, bellyMid: 0xa5b2b4,
-  fin: 0x2b3740, finEdge: 0x172027,
-  tooth: 0xefe7d2, gum: 0x4a1417, throat: 0x0b0305,
+  back: 0x2f3b44, backDeep: 0x161e24, belly: 0xc9d2cf, bellyMid: 0x93a1a3,
+  fin: 0x26313a, finEdge: 0x141c22,
+  tooth: 0xe6dcc4, gum: 0x431014, throat: 0x0a0305,
   scar: 0x94a3a8, eye: 0x05080b, glow: 0xc4401f,
 };
 
@@ -1836,10 +1836,10 @@ function megalodonBodyGeometry() {
   /* ── 가슴지느러미 — 뒤로 길게 뻗은 큰 날개 ── */
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
-      [0, 0.66], [0.46, 0.42], [0.94, 0.10], [1.40, -0.24],
-      [1.64, -0.46], [1.22, -0.56], [0.80, -0.50], [0.34, -0.36], [0, -0.18],
-    ].map(([a, b]) => [a * s, b]), 0.09, MEGA.fin, { smooth: true, curveSegments: 12 }),
-      [0.10 * s, -radiusAt(profile, -1.62) * 0.54, -1.62], [0, -0.10 * s, -0.26 * s]));
+      [0, 0.74], [0.50, 0.48], [1.02, 0.14], [1.52, -0.26],
+      [1.80, -0.52], [1.34, -0.62], [0.86, -0.54], [0.36, -0.38], [0, -0.18],
+    ].map(([a, b]) => [a * s, b]), 0.10, MEGA.fin, { smooth: true, curveSegments: 12 }),
+      [0.10 * s, -radiusAt(profile, -1.70) * 0.54, -1.70], [0, -0.10 * s, -0.24 * s]));
   }
 
   /* ── 작은 지느러미들 — 제2등지느러미 · 뒷지느러미 · 배지느러미 ── */
@@ -1924,9 +1924,9 @@ function megalodonBodyGeometry() {
 export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
-    vertexColors: true, shininess: 46, specular: 0x5d7078,
-    emissive: 0x070d11, emissiveIntensity: 1.0,
-  }), 0.55), 0xa9d6e8, 3.0, 0.17);
+    vertexColors: true, shininess: 30, specular: 0x44555e,
+    emissive: 0x05090d, emissiveIntensity: 1.0,
+  }), 0.55), 0x9ccde2, 3.4, 0.16);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
   g.add(body);
