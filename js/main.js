@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120c';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120c';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120c';
+import { Sound } from './audio.js?v=20261120d';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120d';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120d';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120c';
-import { FX } from './fx.js?v=20261120c';
-import { Currents } from './currents.js?v=20261120c';
+} from './models.js?v=20261120d';
+import { FX } from './fx.js?v=20261120d';
+import { Currents } from './currents.js?v=20261120d';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1121,7 +1121,7 @@ const BOSS_DEFS = {
     hp: () => 320,                 // 3.3배
     scale: () => 1.75,
     contactR: (scale) => 7.6 * (scale / 1.75),
-    contactDmg: 40,
+    contactDmg: 46,
     orbDmg: 26,
     orbSpeed: 26,
     orbScale: 1.6,
@@ -2311,7 +2311,6 @@ function updateMegalodon(b, dt) {
     }
   } else if (b.mode === 'recover') {
     b.modeT -= dt;
-    b.rotationSlow = true;
     o.rotation.y = Math.atan2(-tmpVec.x, -tmpVec.z);
     o.position.y += Math.sin(b.phase * 1.4) * 1.2 * dt;
     if (b.modeT <= 0) b.mode = 'stalk';
@@ -2434,7 +2433,7 @@ function updateVoidQueen(b, dt) {
     });
     sound.explode('big');
     G.shake = Math.max(G.shake, 0.7);
-    hurtPlayer(20);
+    hurtPlayer(24);
   }
 }
 
