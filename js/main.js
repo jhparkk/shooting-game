@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120y';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120y';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120y';
+import { Sound } from './audio.js?v=20261120z';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120z';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120z';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120y';
-import { FX } from './fx.js?v=20261120y';
-import { Currents, currentWeightForLength } from './currents.js?v=20261120y';
+} from './models.js?v=20261120z';
+import { FX } from './fx.js?v=20261120z';
+import { Currents, currentWeightForLength } from './currents.js?v=20261120z';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1068,7 +1068,7 @@ const BOSS_DEFS = {
   kraken: {
     name: '거대 대왕오징어 · 크라켄',
     shortName: '크라켄',
-    hp: (depth) => Math.min(96, 40 + Math.round(Math.max(0, depth - 600) / 120) * 6),
+    hp: (depth) => Math.min(960, 400 + Math.round(Math.max(0, depth - 600) / 120) * 60),
     scale: (depth) => 1.65 + Math.min(0.5, Math.max(0, depth - 600) / 1600),
     contactR: (scale) => 8.4 * (scale / 1.45),
     contactDmg: DMG_BOSS,
@@ -1085,7 +1085,7 @@ const BOSS_DEFS = {
   megalodon: {
     name: '고대 상어 · 메갈로돈',
     shortName: '메갈로돈',
-    hp: () => 240,                 // 크라켄 최대(96)의 2.5배
+    hp: () => 2400,                // 크라켄 최대(960)의 2.5배
     scale: () => 2.35,
     contactR: (scale) => 7.0 * (scale / 2.35),
     contactDmg: 44,                // 크라켄 몸통(22)의 2배
@@ -1100,26 +1100,26 @@ const BOSS_DEFS = {
     banner: '3,000m의 포식자 · 메갈로돈',
   },
   leviathan: {
-    name: '심연룡 · 레비아탄',
+    name: '고대 수룡 · 레비아탄',
     shortName: '레비아탄',
-    hp: () => 280,                 // 2.9배
-    scale: () => 1.95,
-    contactR: (scale) => 4.6 * (scale / 1.95),
-    contactDmg: 46,
-    orbDmg: 28,
-    orbSpeed: 30,
-    orbScale: 1.4,
+    hp: () => 2300,                // 크라켄 최대(960)의 2.4배
+    scale: () => 1.90,
+    contactR: (scale) => 3.0 * (scale / 1.90),
+    contactDmg: 36,                // 46 → 36 (몸에 닿았을 때만 아프다)
+    orbDmg: 22,                    // 28 → 22
+    orbSpeed: 22,                  // 30 → 22 (피할 수 있는 속도)
+    orbScale: 1.35,
     score: 8600,
     drops: ['multi', 'rapid', 'hull', 'repair', 'shield'],
     bombs: 1,
     repair: 100,
     clearance: 22,
-    banner: '심연을 감는 뱀 · 레비아탄',
+    banner: '고대의 거인 · 레비아탄 출현',
   },
   queen: {
     name: '심연 해파리 여왕 · 루미나',
     shortName: '루미나',
-    hp: () => 320,                 // 3.3배
+    hp: () => 3200,                // 3.3배
     scale: () => 1.75,
     contactR: (scale) => 7.6 * (scale / 1.75),
     contactDmg: 46,
@@ -1178,19 +1178,16 @@ function beginBoss(kind, model, opts) {
     mode: 'stalk',
     modeT: 0,
     t: 0,
-    chargeCd: 5,
+    chargeCd: kind === 'leviathan' ? 7.5 : 5,
     chargeDir: new THREE.Vector3(0, 0, -1),
     shockCd: 7,
     aura,
     contactPts: [],
   };
-  // 심연룡은 마디를 몸 뒤로 늘어놓는다 (로컬 좌표 +z 가 꼬리 쪽)
-  if (model.segs) {
-    for (let i = 0; i < model.segs.length; i++) {
-      model.segs[i].position.set(0, 0, (i + 1) * 1.55);
-      if (i % 4 === 0) {
-        G.boss.contactPts.push({ p: new THREE.Vector3(), r: 1.9 * (1 - i * 0.03) });
-      }
+  // 몸을 따라 늘어놓은 충돌 구 (수룡 레비아탄) — 위치는 매 프레임 갱신한다
+  if (model.hull) {
+    for (const h of model.hull) {
+      G.boss.contactPts.push({ p: new THREE.Vector3(), r: h.r * scale, x: h.x, y: h.y, z: h.z });
     }
   }
   if (el.bossLabel) el.bossLabel.textContent = def.name;
@@ -1223,8 +1220,8 @@ function spawnDeepBoss(kind) {
   lastDeepBoss = k;
   const model = k === 'megalodon'
     ? makeMegalodon()
-    : k === 'leviathan' ? makeLeviathan(16) : makeVoidQueen();
-  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 46 : 52 });
+    : k === 'leviathan' ? makeLeviathan() : makeVoidQueen();
+  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 58 : 52 });
   G.deepBossSeen = true;
   return b;
 }
@@ -1286,7 +1283,9 @@ function updateBossBar() {
   if (!G.boss) return;
   const k = clamp(G.boss.hp / G.boss.maxHp, 0, 1);
   el.bossFill.style.width = `${k * 100}%`;
-  setText(el.bossHp, `${Math.max(0, G.boss.hp)} / ${G.boss.maxHp}`);
+  // 체력이 네 자리가 되어도 읽히도록 천 단위로 끊어 쓴다 (2,300 / 2,300)
+  setText(el.bossHp,
+    `${Math.max(0, Math.round(G.boss.hp)).toLocaleString('ko-KR')} / ${Math.round(G.boss.maxHp).toLocaleString('ko-KR')}`);
 }
 
 function removeBoss() {
@@ -1305,12 +1304,12 @@ const SHARK_DEPTH_MAX = 650;
 const SHARK_FADE_TIME = 1.5;
 
 const ENEMY_STATS = {
-  shark: { hp: 2, r: 1.7, score: 130 },   // 백상아리
-  hammer: { hp: 3, r: 2.0, score: 180 },  // 귀상어
-  puffer: { hp: 2, r: 1.6, score: 90 },   // 독가시 복어
-  lion: { hp: 1, r: 1.5, score: 110 },    // 쏠배감펭
-  jelly: { hp: 1, r: 1.4, score: 90 },    // 발광 해파리
-  angler: { hp: 2, r: 1.6, score: 140 },  // 심해 아귀
+  shark: { hp: 20, r: 1.7, score: 130 },   // 백상아리
+  hammer: { hp: 30, r: 2.0, score: 180 },  // 귀상어
+  puffer: { hp: 20, r: 1.6, score: 90 },   // 독가시 복어
+  lion: { hp: 10, r: 1.5, score: 110 },    // 쏠배감펭
+  jelly: { hp: 10, r: 1.4, score: 90 },    // 발광 해파리
+  angler: { hp: 20, r: 1.6, score: 140 },  // 심해 아귀
 };
 
 /** 수심에 따라 그 깊이에 사는 생물이 나온다 — 상어류는 650m 까지만 */
@@ -1530,6 +1529,17 @@ function softAim(fromPos, dir) {
   return assistDir.set(-Math.sin(aimYaw) * cp, Math.sin(newPitch), -Math.cos(aimYaw) * cp);
 }
 
+/* 어뢰 한 발의 위력 — 19~25. 심해 생물의 체력이 10배가 된 만큼 함께 올렸다.
+   (체력 2,400 의 메갈로돈을 22평균으로 109발 ≈ 18초에 잡는 균형) */
+const TORPEDO_DMG_MIN = 19;
+const TORPEDO_DMG_MAX = 25;
+function torpedoDamage() {
+  return TORPEDO_DMG_MIN + Math.floor(Math.random() * (TORPEDO_DMG_MAX - TORPEDO_DMG_MIN + 1));
+}
+/* 음파 폭탄 — 어뢰 10발 남짓의 위력 */
+const BOMB_DMG_ENEMY = 120;
+const BOMB_DMG_BOSS = 220;
+
 function fire() {
   // 화면 중앙(조준선) 방향으로 발사 — 카메라를 돌리면 그쪽으로 나간다
   noseVec.copy(P.pos).addScaledVector(aim, 2.2);
@@ -1630,9 +1640,9 @@ function useBomb() {
   });
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e.obj.position.distanceTo(origin) < 95) damageEnemy(e, 6);
+    if (e.obj.position.distanceTo(origin) < 95) damageEnemy(e, BOMB_DMG_ENEMY);
   }
-  if (G.boss && G.boss.obj.position.distanceTo(origin) < 110) damageBoss(10);
+  if (G.boss && G.boss.obj.position.distanceTo(origin) < 110) damageBoss(BOMB_DMG_BOSS);
   refreshHud();
 }
 
@@ -2249,7 +2259,8 @@ function updateBoss(dt) {
         b.model.segs[i].position.set(0, 0, (i + 1) * 1.55);
       }
     }
-    for (const c of b.contactPts) c.p.copy(o.position);
+    // 몸통 충돌 구는 updateLeviathan 이 매 프레임 자세에 맞춰 다시 놓는다
+    if (!b.model.hull) for (const c of b.contactPts) c.p.copy(o.position);
     fx.flash(o.position.clone(), 0x9fe8ff, 12, 0.35);
     sound.sonar();
   }
@@ -2368,61 +2379,105 @@ function updateMegalodon(b, dt) {
   b.model.jaw.rotation.x += (jawTarget - b.model.jaw.rotation.x) * Math.min(1, dt * 5);
 }
 
-/* ---- 레비아탄 — 몸을 나선으로 감으며 머리에서 구체를 뿜는다 ---- */
+/* ---- 고대 수룡 레비아탄 — 느릿하게 배회하다 묵직하게 몸통째 돌진한다 ----
+   예전에는 16마디 사슬이 초당 30으로 플레이어를 감아 돌며 구체를 쏟아 냈다.
+   이제는 무거운 수룡답게 느리게 순항하고, 돌진 전 예고(1.7초)와 돌진 후
+   회복(2.6초)을 넉넉히 두어 피하고 반격할 틈을 만든다. */
+const LEVI_AI = {
+  cruise: 12,        // 순항 추격 (기존 30)
+  charge: 30,        // 돌진 (메갈로돈 64의 절반 이하)
+  turn: 0.95,        // 선회 계수 (기존 2.2)
+  orbit: 46,         // 유지 거리
+  windup: 1.7,       // 돌진 예고
+  recover: 2.6,      // 돌진 후 회복
+};
+
 function updateLeviathan(b, dt) {
   const o = b.obj;
-  // 플레이어 주위를 크게 돌며 오르내린다
-  b.angle += dt * (0.5 + (b.hp < b.maxHp * 0.5 ? 0.22 : 0));
-  const R = 34 + Math.sin(b.phase * 0.7) * 6;
-  const want = tmpVec2.set(
-    P.pos.x + Math.cos(b.angle) * R,
-    P.pos.y + 6 + Math.sin(b.phase * 0.9) * 9,
-    P.pos.z + Math.sin(b.angle) * R
-  );
-  tmpVec.copy(want).sub(o.position);
-  const d = tmpVec.length() || 1;
-  o.position.addScaledVector(tmpVec.multiplyScalar(1 / d), Math.min(d, 30 * dt));
+  const enraged = b.hp < b.maxHp * 0.5;
+  tmpVec.copy(P.pos).sub(o.position);
+  const dist = tmpVec.length() || 1;
+  tmpVec.multiplyScalar(1 / dist);
 
-  // 진행 방향을 본다
-  tmpVec.copy(want).sub(o.position).normalize();
-  const yawWant = Math.atan2(-tmpVec.x, -tmpVec.z);
-  o.rotation.y += angDiff(o.rotation.y, yawWant) * Math.min(1, dt * 2.2);
-  o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.5;
-  o.rotation.z = Math.sin(b.phase * 1.4) * 0.12;
+  if (b.mode === 'charge') {
+    // 정해진 방향으로 몸통째 밀고 나간다 — 방향을 꺾지 않아 비껴 피할 수 있다
+    b.modeT -= dt;
+    o.position.addScaledVector(b.chargeDir, LEVI_AI.charge * dt);
+    o.rotation.y = Math.atan2(-b.chargeDir.x, -b.chargeDir.z);
+    o.rotation.x = Math.asin(clamp(b.chargeDir.y, -1, 1)) * 0.30;
+    o.rotation.z = Math.sin(b.phase * 3.2) * 0.05;
+    if (b.modeT <= 0) {
+      b.mode = 'recover';
+      b.modeT = LEVI_AI.recover;
+      b.chargeCd = (enraged ? 6.5 : 8) + Math.random() * 2.5;
+    }
+  } else if (b.mode === 'windup') {
+    // 머리를 치켜들고 아가리를 크게 벌린 채 겨냥한다 — 넉넉한 예고
+    b.modeT -= dt;
+    o.position.addScaledVector(tmpVec, 4.0 * dt);          // 아주 천천히 밀고 들어온다
+    const yawWant = Math.atan2(-tmpVec.x, -tmpVec.z);
+    o.rotation.y += angDiff(o.rotation.y, yawWant) * Math.min(1, dt * 1.6);
+    o.rotation.x = -0.10;
+    o.rotation.z = Math.sin(b.phase * 2.2) * 0.03;
+    if (b.modeT <= 0) {
+      b.mode = 'charge';
+      b.modeT = 1.45;
+      b.chargeDir.copy(tmpVec);
+      G.shake = Math.max(G.shake, 0.45);
+    }
+  } else if (b.mode === 'recover') {
+    // 무거운 몸을 되돌린다 — 이때가 반격의 틈
+    b.modeT -= dt;
+    o.rotation.y += angDiff(o.rotation.y, Math.atan2(-tmpVec.x, -tmpVec.z)) * Math.min(1, dt * 0.6);
+    o.position.y += Math.sin(b.phase * 0.9) * 1.0 * dt;
+    if (b.modeT <= 0) b.mode = 'stalk';
+  } else {
+    // 순항 — 넓게 돌며 천천히 거리를 좁힌다 (사슬 대신 묵직한 선회)
+    const want = LEVI_AI.orbit + Math.sin(b.phase * 0.45) * 5;
+    const close = dist > want
+      ? Math.min(LEVI_AI.cruise, (dist - want) * 0.5 + 2)
+      : -2.0;
+    o.position.addScaledVector(tmpVec, close * dt);
+    const side = tmpVec2.set(-tmpVec.z, 0, tmpVec.x).normalize();
+    o.position.addScaledVector(side, Math.sin(b.phase * 0.38) * 6 * dt);
+    o.position.y += Math.sin(b.phase * 0.5) * 1.6 * dt;
+    const yawWant = Math.atan2(-tmpVec.x, -tmpVec.z);
+    o.rotation.y += angDiff(o.rotation.y, yawWant) * Math.min(1, dt * LEVI_AI.turn);
+    o.rotation.x = Math.asin(clamp(tmpVec.y, -1, 1)) * 0.22;
+    o.rotation.z = Math.sin(b.phase * 0.75) * 0.06;
 
-  // 마디 사슬 — 앞 마디 뒤를 따라가며 좌우로 물결친다
-  const segs = b.model.segs;
-  if (segs) {
-    for (let i = 1; i < segs.length; i++) {
-      const prev = segs[i - 1].position;
-      const sway = Math.sin(b.phase * 2.6 - i * 0.55) * (0.5 + i * 0.03);
-      const lift = Math.cos(b.phase * 1.9 - i * 0.42) * 0.16;
-      tmpVec2.set(prev.x + sway, prev.y + lift, prev.z + 1.62);
-      segs[i].position.lerp(tmpVec2, Math.min(1, dt * 9));
+    b.chargeCd -= dt;
+    b.fire -= dt;
+    if (b.fire <= 0 && dist < 100) {
+      b.fire = enraged ? 1.35 : 1.95;
+      fireOrbs(b, tmpVec, enraged ? 3 : 2, 0.12, b.def.orbSpeed, b.def.orbDmg);
+    }
+    if (b.chargeCd <= 0 && dist < 78 && dist > 14) {
+      b.mode = 'windup';
+      b.modeT = LEVI_AI.windup;
+      G.shake = Math.max(G.shake, 0.22);
     }
   }
-  // 충돌체 — 머리와 몸 마디
-  for (let i = 0; i < b.contactPts.length; i++) {
-    const idx = i * 4;
-    const seg = segs[Math.min(segs.length - 1, idx)];
-    seg.getWorldPosition(b.contactPts[i].p);
-    b.contactPts[i].r = (2.1 - i * 0.16) * b.scale;
+
+  // 아가리 — 예고·돌진에서 크게 벌어진다 (음의 회전 = 아래로)
+  const jawTarget = b.mode === 'charge' ? -0.62 : b.mode === 'windup' ? -0.40 : -0.05;
+  if (b.model.jaw) {
+    b.model.jaw.rotation.x += (jawTarget - b.model.jaw.rotation.x) * Math.min(1, dt * 4.5);
+  }
+  // 벌린 아가리에서 새는 빛 — 예고를 눈으로도 알 수 있게
+  if (b.model.mouthGlow) {
+    const gTarget = b.mode === 'charge' ? 0.42 : b.mode === 'windup' ? 0.26 : 0;
+    b.model.mouthGlow.material.opacity += (gTarget - b.model.mouthGlow.material.opacity) * Math.min(1, dt * 4);
   }
 
-  // 머리에서 구체를 나선으로
-  b.fire -= dt;
-  if (b.fire <= 0) {
-    b.fire = b.hp < b.maxHp * 0.5 ? 0.42 : 0.62;
-    tmpVec.copy(P.pos).sub(o.position).normalize();
-    fireOrbs(b, tmpVec, 2, 0.2, b.def.orbSpeed, b.def.orbDmg);
-  }
-
-  // 이따금 머리를 크게 내미는 돌진
-  b.modeT -= dt;
-  if (b.modeT <= 0) {
-    b.modeT = 7 + Math.random() * 4;
-    tmpVec.copy(P.pos).sub(o.position).normalize();
-    o.position.addScaledVector(tmpVec, 9);
+  // 몸 충돌 구 — 몸통을 따라 늘어놓은 구를 실제 자세에 맞춰 옮긴다
+  if (b.model.hull) {
+    o.updateMatrixWorld(true);
+    for (let i = 0; i < b.contactPts.length; i++) {
+      const c = b.contactPts[i];
+      if (c.x === undefined) continue;
+      c.p.set(c.x, c.y, c.z).applyMatrix4(o.matrixWorld);
+    }
   }
 }
 
@@ -2601,7 +2656,7 @@ function updateTorpedoes(dt) {
       const dz = e.obj.position.z - tor.mesh.position.z;
       const rr = e.r + 0.8;
       if (dx * dx + dy * dy + dz * dz < rr * rr) {
-        damageEnemy(e, 1);
+        damageEnemy(e, torpedoDamage());
         tor.active = false;
         tor.mesh.visible = false;
         break;
@@ -2610,12 +2665,29 @@ function updateTorpedoes(dt) {
     if (!tor.active) continue;
 
     if (G.boss && !G.boss.dead) {
-      const b = G.boss.obj.position;
-      const dx = b.x - tor.mesh.position.x;
-      const dy = b.y - tor.mesh.position.y;
-      const dz = b.z - tor.mesh.position.z;
-      if (dx * dx + dy * dy + dz * dz < 46) {
-        damageBoss(1);
+      // 보스 몸통을 따라 늘어놓은 충돌 구(수룡) 또는 중심 구에 맞으면 명중
+      const b = G.boss;
+      const pts = b.contactPts && b.contactPts.length ? b.contactPts : null;
+      let hit = false;
+      if (pts) {
+        for (let i = 0; i < pts.length; i++) {
+          const c = pts[i];
+          const rr = (c.r || b.contactR) + 0.9;
+          const dx = c.p.x - tor.mesh.position.x;
+          const dy = c.p.y - tor.mesh.position.y;
+          const dz = c.p.z - tor.mesh.position.z;
+          if (dx * dx + dy * dy + dz * dz < rr * rr) { hit = true; break; }
+        }
+      } else {
+        const p = b.obj.position;
+        const rr = b.contactR + 0.9;
+        const dx = p.x - tor.mesh.position.x;
+        const dy = p.y - tor.mesh.position.y;
+        const dz = p.z - tor.mesh.position.z;
+        if (dx * dx + dy * dy + dz * dz < rr * rr) hit = true;
+      }
+      if (hit) {
+        damageBoss(torpedoDamage());
         tor.active = false;
         tor.mesh.visible = false;
         continue;
@@ -3508,7 +3580,7 @@ function boot() {
       },
       /** 보스 모델을 눈앞에 세워 둔다 (검증용) */
       showBossModel: (kind, dist, yawOff) => {
-        const made = kind === 'leviathan' ? makeLeviathan(16)
+        const made = kind === 'leviathan' ? makeLeviathan()
           : kind === 'queen' ? makeVoidQueen()
             : kind === 'megalodon' ? makeMegalodon() : makeKraken();
         const g = made.group;
@@ -3516,7 +3588,7 @@ function boot() {
         g.position.copy(P.pos).addScaledVector(forward, dist || 17);
         g.rotation.order = 'YXZ';
         g.rotation.y = P.yaw + Math.PI + (yawOff || 0);   // 머리가 카메라를 향하게 (yawOff 로 옆모습)
-        g.scale.setScalar(kind === 'kraken' ? 1.8 : 1.5);
+        g.scale.setScalar(kind === 'kraken' ? 1.8 : kind === 'leviathan' ? 1.9 : 1.5);
         scene.add(g);
         const l = new THREE.PointLight(0xbfe9ff, 420, 70, 2);
         l.position.copy(g.position).add(new THREE.Vector3(0, 7, -9));
@@ -3547,8 +3619,12 @@ function boot() {
         orbDmg: G.boss.def.orbDmg,
         scale: +G.boss.scale.toFixed(2),
         mode: G.boss.mode,
+        modeT: +G.boss.modeT.toFixed(2),
+        chargeCd: +G.boss.chargeCd.toFixed(2),
         contactPts: G.boss.contactPts.length,
         dist: +G.boss.obj.position.distanceTo(P.pos).toFixed(1),
+        pos: [+G.boss.obj.position.x.toFixed(2), +G.boss.obj.position.y.toFixed(2), +G.boss.obj.position.z.toFixed(2)],
+        hull: G.boss.model && G.boss.model.hull ? G.boss.model.hull.length : 0,
         label: el.bossLabel ? el.bossLabel.textContent : null,
         segs: G.boss.model && G.boss.model.segs ? G.boss.model.segs.length : 0,
         barWidth: el.bossFill ? el.bossFill.style.width : null,

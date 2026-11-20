@@ -350,7 +350,7 @@ body { touch-action: none; }
   margin-bottom: 4px;
   text-shadow: 0 0 12px rgba(255, 80, 110, 0.8);
 }
-.boss-bar-hp { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.boss-bar-hp { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; white-space: nowrap; }
 .boss-bar-track {
   height: 7px;
   border-radius: 99px;
