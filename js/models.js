@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120d';
+import { getTextures } from './textures.js?v=20261120e';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1899,18 +1899,17 @@ export function makeVoidQueen() {
   bell.scale.set(4.4, 2.7, 4.4);
   g.add(bell);
 
-  // 우산 속의 빛 — 안쪽에서 은은하게 빛난다
+  // 우산 속의 빛 — 안쪽에서 은은하게 빛난다 (매끈한 구로, 각진 테두리가 보이지 않게)
   const inner = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 18, 12),
+    new THREE.SphereGeometry(1, 30, 20),
     new THREE.MeshBasicMaterial({
-      color: 0xd6f4ff, transparent: true, opacity: 0.30,
+      color: 0xd6f4ff, transparent: true, opacity: 0.22,
       blending: THREE.AdditiveBlending, depthWrite: false,
     })
   );
-  inner.scale.set(3.2, 1.7, 3.2);
+  inner.scale.set(3.0, 1.6, 3.0);
   bell.add(inner);
-  const halo = spriteGlow(0xb98cff, 3.6, 0.45);
-  g.add(halo);
+  const halo = null;
 
   // 우산 테두리의 마디 — 발광 점 고리
   const rimMat = new THREE.MeshBasicMaterial({ color: 0xa8f4ff });
@@ -1965,7 +1964,7 @@ export function makeVoidQueen() {
       const k = 1 + Math.sin(t * 1.6) * 0.09;
       bell.scale.set(4.4 * (1.06 - (k - 1) * 0.5), 2.7 * k, 4.4 * (1.06 - (k - 1) * 0.5));
       inner.scale.set(3.2 * k, 1.7 * k, 3.2 * k);
-      halo.material.opacity = 0.35 + 0.2 * Math.sin(t * 1.6);
+      if (halo) halo.material.opacity = 0.35 + 0.2 * Math.sin(t * 1.6);
       for (let i = 0; i < arms.length; i++) {
         const p = arms[i].pivot.userData.phase;
         arms[i].limb.rotation.x = Math.sin(t * 0.9 + p) * 0.2;

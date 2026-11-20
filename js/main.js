@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120d';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120d';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120d';
+import { Sound } from './audio.js?v=20261120e';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120e';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120e';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120d';
-import { FX } from './fx.js?v=20261120d';
-import { Currents } from './currents.js?v=20261120d';
+} from './models.js?v=20261120e';
+import { FX } from './fx.js?v=20261120e';
+import { Currents } from './currents.js?v=20261120e';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
