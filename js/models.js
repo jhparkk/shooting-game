@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z8';
+import { getTextures } from './textures.js?v=20261120z9';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1939,7 +1939,7 @@ export function makeMegalodon() {
   // 아래턱 — 입꼬리를 축으로 벌어진다 (음의 회전 = 아래로 벌어짐)
   const jawPivot = new THREE.Group();
   jawPivot.position.set(0, -0.50, -2.06);
-  jawPivot.rotation.x = -0.20;
+  jawPivot.rotation.x = -0.28;
   const jaw = new THREE.Mesh(megalodonJawGeometry(), mat);
   jawPivot.add(jaw);
   g.add(jawPivot);
@@ -2004,8 +2004,8 @@ const LEVI_BODY_CTRL = [
   [5.75, 0.68], [6.35, 0.46], [6.85, 0.28], [7.25, 0.13],
 ];
 const LEVI_SKULL_CTRL = [
-  [-7.55, 0.08], [-7.30, 0.30], [-7.00, 0.52], [-6.58, 0.74], [-6.10, 0.96],
-  [-5.62, 1.16], [-5.12, 1.34], [-4.62, 1.46], [-4.12, 1.52], [-3.68, 1.48],
+  [-7.15, 0.16], [-6.98, 0.38], [-6.72, 0.62], [-6.36, 0.84], [-5.95, 1.04],
+  [-5.52, 1.22], [-5.06, 1.38], [-4.58, 1.48], [-4.10, 1.52], [-3.68, 1.48],
 ];
 let _leviBodyProfile = null;
 let _leviSkullProfile = null;
@@ -2228,7 +2228,7 @@ function leviathanSkullGeometry() {
   for (const s of [-1, 1]) {
     for (let i = 0; i < 12; i++) {
       const t = i / 11;
-      const z = -7.10 + t * 2.80;
+      const z = -6.78 + t * 2.52;
       const rr = rAt(z);
       const h = 0.26 + 0.22 * Math.sin(t * Math.PI);
       parts.push(xf(paint(spikeGeo(0.055, h, 5), LEVI.tooth),
@@ -2238,19 +2238,19 @@ function leviathanSkullGeometry() {
   /* ── 입천장 — 아래턱을 벌리면 붉은 아가리가 보인다 ── */
   const palate = new THREE.SphereGeometry(1, 16, 10);
   palate.scale(0.52, 0.10, 1.05);
-  parts.push(xf(paint(palate, LEVI.gum), [0, -rAt(-6.10) * 0.92 * 0.62, -6.10]));
+  parts.push(xf(paint(palate, LEVI.gum), [0, -rAt(-5.90) * 0.92 * 0.62, -5.90]));
   /* ── 주둥이 콧등 융기 — 파충류의 각진 콧대 ── */
   for (const s2 of [-1, 1]) {
     const ridge = new THREE.SphereGeometry(1, 12, 8);
     ridge.scale(0.14, 0.12, 0.95);
     parts.push(xf(paint(ridge, LEVI.backDeep),
-      [rAt(-6.4) * 0.95 * 0.34 * s2, rAt(-6.4) * 0.92 * 0.86, -6.4]));
+      [rAt(-6.1) * 0.95 * 0.34 * s2, rAt(-6.1) * 0.92 * 0.86, -6.1]));
   }
   /* ── 입 라인 — 주둥이 옆을 따라 흐르는 어두운 틈 ── */
   for (const s of [-1, 1]) {
     const pts = [];
     for (let k = 0; k <= 9; k++) {
-      const z = -7.28 + k * 0.33;
+      const z = -6.98 + k * 0.31;
       const rr = rAt(z);
       pts.push(new THREE.Vector3(rr * 0.95 * 0.86 * s, -rr * 0.92 * 0.58, z));
     }
@@ -2362,13 +2362,13 @@ export function makeLeviathan() {
   }
   // 벌어진 아가리 안쪽에서 새어 나오는 빛 (돌진 예고에 쓴다)
   const mouthGlow = spriteGlow(0xff7a2a, 1.4, 0.10);
-  mouthGlow.position.set(0, -1.05, -6.20);
+  mouthGlow.position.set(0, -1.05, -5.95);
   g.add(mouthGlow);
 
   // 몸 충돌 구 — 몸통을 따라 늘어놓는다 (게임 쪽에서 위치를 갱신한다)
   const profile = leviBodyProfile();
   const hull = [];
-  for (const z of [-7.05, -6.30, -5.50, -4.70, -3.80, -2.60, -1.20, 0.40, 1.90, 3.20, 4.50, 5.70, 6.80]) {
+  for (const z of [-6.75, -6.05, -5.40, -4.65, -3.80, -2.60, -1.20, 0.40, 1.90, 3.20, 4.50, 5.70, 6.80]) {
     const sk = radiusAt(leviSkullProfile(), z);
     const bd = radiusAt(profile, z);
     const r = z < -4.6 ? sk : Math.max(sk * 0.98, bd);
