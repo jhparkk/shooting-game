@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120f';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120f';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120f';
+import { Sound } from './audio.js?v=20261120g';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120g';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120g';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120f';
-import { FX } from './fx.js?v=20261120f';
-import { Currents, currentWeightForLength } from './currents.js?v=20261120f';
+} from './models.js?v=20261120g';
+import { FX } from './fx.js?v=20261120g';
+import { Currents, currentWeightForLength } from './currents.js?v=20261120g';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -3389,8 +3389,25 @@ function boot() {
         burstT: +currents.burstT.toFixed(1),
         burst: +currents.burst.toFixed(3),
         bursts: currents.bursts,
+        burstAt: currents.burstAt.map((v) => +v.toFixed(1)),
         speed: +currents.speed.toFixed(2),
       } : null),
+      /** 검증용 — 렌더 없이 게임 시간을 강제로 진행한다 (배경 탭에서 rAF 가 멈출 때) */
+      step: (sec, dt) => {
+        const d = dt || 1 / 60;
+        const n = Math.max(1, Math.round((sec || 0.1) / d));
+        for (let i = 0; i < n; i++) {
+          if (G.state === 'playing') updateGame(d);
+          else updateIdle(d);
+        }
+        return {
+          elapsed: +G.elapsed.toFixed(3),
+          state: G.state,
+          pos: [+P.pos.x.toFixed(2), +P.pos.y.toFixed(2), +P.pos.z.toFixed(2)],
+          vel: [+P.vel.x.toFixed(2), +P.vel.y.toFixed(2), +P.vel.z.toFixed(2)],
+          current: currents ? +currents.speed.toFixed(2) : null,
+        };
+      },
       /** 물고기·대형 생물·적·보스의 해류 영향 계수와 실제 밀린 변위 */
       fishCurrent: () => ({
         currents: currents ? { speed: +currents.speed.toFixed(2), burst: +currents.burst.toFixed(2) } : null,
@@ -3444,7 +3461,7 @@ function boot() {
           joy.move = 1;
           joy.turn = 0;
           joy.lift = 0;
-          window.__thrust = { t0: performance.now(), p0: P.pos.clone(), dir: d };
+          window.__thrust = { t0: performance.now(), e0: G.elapsed, p0: P.pos.clone(), dir: d };
           return {
             stage: 'start',
             at: [+P.pos.x.toFixed(1), +P.pos.y.toFixed(1), +P.pos.z.toFixed(1)],
@@ -3455,7 +3472,7 @@ function boot() {
         const T = window.__thrust;
         if (!T) return null;
         if (stage === 'end') { joy.move = 0; }
-        const sec = (performance.now() - T.t0) / 1000;
+        const sec = Math.max(0.001, G.elapsed - T.e0);   // 게임 시간 기준(프레임과 무관)
         const dx = P.pos.x - T.p0.x;
         const dz = P.pos.z - T.p0.z;
         // + = 해류를 거슬러 나아간 거리(전진), - = 해류에 밀려 밀린 거리

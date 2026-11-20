@@ -172,6 +172,7 @@ export class Currents {
     this.angle = 0;
     this.jet = 0;
     this.bursts = 0;           // 지금까지 몰아친 돌발 해류 횟수(검증용)
+    this.burstAt = [];         // 각 돌발 해류가 시작된 시각(검증용)
     this._vec = new THREE.Vector3();
     this._sample = new THREE.Vector3();
     this.count = o.count || 520;
@@ -242,6 +243,7 @@ export class Currents {
     this.burstT = 0;
     this.eventT = randRange(BURST_FIRST);
     this.bursts = 0;
+    this.burstAt.length = 0;
   }
 
   /** 돌발 해류 진행 — 잠잠하다가 아주 가끔 몰아친다 */
@@ -254,6 +256,7 @@ export class Currents {
       if (this.eventT <= 0) {
         this.burstT = randRange(BURST_LEN);
         this.bursts++;
+        this.burstAt.push(this.time);
         if (this.onBurst) this.onBurst(1);
       }
     }
