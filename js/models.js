@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z4';
+import { getTextures } from './textures.js?v=20261120z5';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2004,8 +2004,8 @@ const LEVI_BODY_CTRL = [
   [5.75, 0.68], [6.35, 0.46], [6.85, 0.28], [7.25, 0.13],
 ];
 const LEVI_SKULL_CTRL = [
-  [-7.45, 0.07], [-7.25, 0.26], [-6.95, 0.45], [-6.55, 0.63], [-6.10, 0.82],
-  [-5.65, 1.02], [-5.15, 1.18], [-4.65, 1.30], [-4.15, 1.36], [-3.70, 1.34],
+  [-7.55, 0.08], [-7.30, 0.30], [-7.00, 0.52], [-6.58, 0.74], [-6.10, 0.96],
+  [-5.62, 1.16], [-5.12, 1.34], [-4.62, 1.46], [-4.12, 1.52], [-3.68, 1.48],
 ];
 let _leviBodyProfile = null;
 let _leviSkullProfile = null;
@@ -2326,7 +2326,7 @@ export function makeLeviathan() {
   // 아래턱 — 입꼬리를 축으로 벌어진다 (음의 회전 = 아래로 벌어짐)
   const jawPivot = new THREE.Group();
   jawPivot.position.set(0, -0.86, -4.20);
-  jawPivot.rotation.x = -0.13;
+  jawPivot.rotation.x = -0.20;
   jawPivot.add(new THREE.Mesh(leviathanJawGeometry(), mat));
   g.add(jawPivot);
 
@@ -2356,8 +2356,8 @@ export function makeLeviathan() {
     eyes.push(halo);
   }
   // 벌어진 아가리 안쪽에서 새어 나오는 빛 (돌진 예고에 쓴다)
-  const mouthGlow = spriteGlow(0xff7a2a, 1.5, 0.0);
-  mouthGlow.position.set(0, -1.00, -5.90);
+  const mouthGlow = spriteGlow(0xff7a2a, 1.4, 0.10);
+  mouthGlow.position.set(0, -1.05, -6.20);
   g.add(mouthGlow);
 
   // 몸 충돌 구 — 몸통을 따라 늘어놓는다 (게임 쪽에서 위치를 갱신한다)
