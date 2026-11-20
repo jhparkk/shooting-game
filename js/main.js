@@ -1222,7 +1222,7 @@ function spawnDeepBoss(kind) {
   const model = k === 'megalodon'
     ? makeMegalodon()
     : k === 'leviathan' ? makeLeviathan(16) : makeVoidQueen();
-  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 52 : 62 });
+  const b = beginBoss(k, model, { dist: k === 'leviathan' ? 46 : 52 });
   G.deepBossSeen = true;
   return b;
 }
@@ -2206,7 +2206,25 @@ function updateBoss(dt) {
   } else {
     o.scale.setScalar(b.scale);
   }
-  if (b.aura) b.aura.intensity = 52 + Math.sin(b.phase * 1.7) * 8;
+  // 플레이어가 너무 멀리 달아나면(깊은 곳의 빠른 상승·하강) 다시 따라붙는다
+  if (o.position.distanceToSquared(P.pos) > 190 * 190) {
+    computeForward(forward);
+    o.position.copy(P.pos).addScaledVector(forward, 68);
+    o.position.y = clamp(
+      o.position.y,
+      terrainHeight(o.position.x, o.position.z) + b.def.clearance,
+      SURFACE_Y - 16
+    );
+    if (b.model.segs) {
+      for (let i = 0; i < b.model.segs.length; i++) {
+        b.model.segs[i].position.set(0, 0, (i + 1) * 1.55);
+      }
+    }
+    for (const c of b.contactPts) c.p.copy(o.position);
+    fx.flash(o.position.clone(), 0x9fe8ff, 12, 0.35);
+    sound.sonar();
+  }
+  if (b.aura) b.aura.intensity = 62 + Math.sin(b.phase * 1.7) * 9;
   if (b.model && b.model.update) b.model.update(b.phase);
 }
 
