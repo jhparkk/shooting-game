@@ -3,18 +3,18 @@
    Three.js 기반, 빌드 없이 단일 페이지로 실행
    ========================================================= */
 import * as THREE from 'three';
-import { Sound } from './audio.js?v=20261120b';
-import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120b';
-import { RenderPipeline, QUALITY } from './render.js?v=20261120b';
+import { Sound } from './audio.js?v=20261120c';
+import { World, ZONES, SURFACE_Y, DEPTH_SCALE, terrainHeight, zoneIndexForDepth } from './world.js?v=20261120c';
+import { RenderPipeline, QUALITY } from './render.js?v=20261120c';
 import {
   makeSubmarine, makeShark, makeHammerhead, makePuffer, makeLionfish,
   makeAnglerfish, makeJellyfish, makeKraken, spriteGlow, swim, setSwimRate, ANIM,
   makeMegalodon, makeLeviathan, makeVoidQueen,
   makeHumpbackWhale, makeBlueWhale, makeOrca, makeSpermWhale,
   makeMantaRay, makeEagleRay, makeStingray, makeTurtle,
-} from './models.js?v=20261120b';
-import { FX } from './fx.js?v=20261120b';
-import { Currents } from './currents.js?v=20261120b';
+} from './models.js?v=20261120c';
+import { FX } from './fx.js?v=20261120c';
+import { Currents } from './currents.js?v=20261120c';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1154,9 +1154,10 @@ function beginBoss(kind, model, opts) {
      거대한 실루엣이 어둠 속에서도 읽히게 한다 */
   const aura = new THREE.PointLight(
     kind === 'kraken' ? 0xff9ec0 : kind === 'megalodon' ? 0x7fe4ff : kind === 'leviathan' ? 0x86ffd8 : 0xc79dff,
-    52, 96, 2
+    150, 96, 2
   );
-  aura.position.set(0, 0, 0);
+  // 몸 '안'에 두면 바깥면이 빛을 못 받는다 — 몸 밖 위쪽 앞에 두어 자기 몸을 비춘다
+  aura.position.set(0, 3.4, -5.6);
   o.add(aura);
   G.boss = {
     kind,
@@ -2224,7 +2225,7 @@ function updateBoss(dt) {
     fx.flash(o.position.clone(), 0x9fe8ff, 12, 0.35);
     sound.sonar();
   }
-  if (b.aura) b.aura.intensity = 62 + Math.sin(b.phase * 1.7) * 9;
+  if (b.aura) b.aura.intensity = 150 + Math.sin(b.phase * 1.7) * 24;
   if (b.model && b.model.update) b.model.update(b.phase);
 }
 

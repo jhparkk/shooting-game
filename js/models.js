@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120b';
+import { getTextures } from './textures.js?v=20261120c';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1439,14 +1439,14 @@ export function makeKraken() {
   const g = new THREE.Group();
   const skin = addRim(addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantle, shininess: 42, specular: 0xb07090,
-    emissive: 0x2a0a18, emissiveIntensity: 0.55,
+    emissive: 0x461327, emissiveIntensity: 0.95,
   }), 0.7), 0xff9ec0, 2.0, 0.5);
   const skinDark = addSkin(new THREE.MeshPhongMaterial({
     color: KRAKEN.mantleDark, shininess: 30, specular: 0x7a5060,
   }), 0.6);
   const limbMat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 16, specular: 0x5a3a48,
-    emissive: 0x24080f, emissiveIntensity: 0.5,
+    emissive: 0x3a0c19, emissiveIntensity: 0.9,
   }), 0.7), 0xff9ec0, 2.0, 0.45);
 
   // 머리 + 몸통(망토)
@@ -1704,7 +1704,7 @@ export function makeMegalodon() {
   const g = new THREE.Group();
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 30, specular: 0x536470,
-    emissive: 0x16292f, emissiveIntensity: 1.15,
+    emissive: 0x22434f, emissiveIntensity: 1.2,
   }), 0.55), 0x7fe4ff, 2.1, 0.62);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
@@ -1825,7 +1825,7 @@ export function makeLeviathan(segCount) {
   const N = segCount || 16;
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 38, specular: 0x74b6b8,
-    emissive: 0x0d3a40, emissiveIntensity: 1.15,
+    emissive: 0x14515c, emissiveIntensity: 1.25,
   }), 0.8), 0x86ffd8, 2.0, 0.62);
   const glowMat = new THREE.MeshBasicMaterial({ color: LEVI.glow });
 
