@@ -58,8 +58,8 @@ export function flowSpeed(x, z, t) {
 /** 해류 띠 — 폭이 좁은 빠른 물줄기가 바다를 가로지른다 (0=밖, 1=한가운데)
     띠가 지나가는 속도도 느리다 — 한 자리에서 몇 초 만에 스쳐 지나가지 않는다 */
 export function jetBand(x, z, t) {
-  const a = 0.5 + 0.5 * Math.sin(x * 0.0280 - z * 0.0120 + t * 0.16);
-  const b = 0.5 + 0.5 * Math.sin(-x * 0.0080 + z * 0.0340 - t * 0.12);
+  const a = 0.5 + 0.5 * Math.sin(x * 0.0280 - z * 0.0120 + t * 0.095);
+  const b = 0.5 + 0.5 * Math.sin(-x * 0.0080 + z * 0.0340 - t * 0.072);
   return Math.max(smoothstep(0.70, 0.99, a), smoothstep(0.74, 1.0, b) * 0.88);
 }
 
