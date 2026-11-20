@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120a';
+import { getTextures } from './textures.js?v=20261120b';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1909,7 +1909,7 @@ export function makeVoidQueen() {
   );
   inner.scale.set(3.2, 1.7, 3.2);
   bell.add(inner);
-  const halo = spriteGlow(0xb98cff, 8.5, 0.4);
+  const halo = spriteGlow(0xb98cff, 3.6, 0.45);
   g.add(halo);
 
   // 우산 테두리의 마디 — 발광 점 고리

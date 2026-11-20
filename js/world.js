@@ -16,9 +16,9 @@ import {
   rockCaveGeometry, caveDecorGeometry,
   tableCoralGeometry, anemoneCoralGeometry,
   kelpGeometry, leafyPlantGeometry, grassTuftGeometry, paintGradient, paint, mulberry,
-} from './models.js?v=20261120a';
-import { getTextures } from './textures.js?v=20261120a';
-import { Atmosphere } from './atmosphere.js?v=20261120a';
+} from './models.js?v=20261120b';
+import { getTextures } from './textures.js?v=20261120b';
+import { Atmosphere } from './atmosphere.js?v=20261120b';
 
 /* 텍스처 좌표 — 월드 1유닛당 uv. 한 장이 약 16유닛을 덮는다 */
 const UV_WORLD = 0.0625;
@@ -1756,8 +1756,8 @@ export class World {
         this.caveLight.visible = true;
         this.caveLight.position.copy(best.center);
         const k = 1 - Math.sqrt(bd) / 150;
-        this.caveLight.intensity = 26 + 74 * k * k;
-        this.caveLight.distance = 52 + 30 * k;
+        this.caveLight.intensity = 170 + 230 * k * k;
+        this.caveLight.distance = 58 + 34 * k;
       } else {
         this.caveLight.visible = false;
       }
