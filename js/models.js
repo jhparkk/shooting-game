@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120z7';
+import { getTextures } from './textures.js?v=20261120z8';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -2045,9 +2045,9 @@ function leviMaterial() {
   const bendHook = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, renderer) => {
     bendHook(sh, renderer);
-    sh.uniforms.uRimColor = { value: new THREE.Color(0x9fe8ff) };
-    sh.uniforms.uRimK = { value: 0.55 };
-    sh.uniforms.uRimP = { value: 2.4 };
+    sh.uniforms.uRimColor = { value: new THREE.Color(0x8fd8ef) };
+    sh.uniforms.uRimK = { value: 0.30 };
+    sh.uniforms.uRimP = { value: 3.2 };
     sh.fragmentShader = 'uniform vec3 uRimColor;\nuniform float uRimK;\nuniform float uRimP;\n' +
       sh.fragmentShader.replace(
         '#include <emissivemap_fragment>',
