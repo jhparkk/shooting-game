@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120j';
+import { getTextures } from './textures.js?v=20261120k';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1603,7 +1603,7 @@ function megaTeeth(parts, n, o) {
     const x = Math.sin(a) * o.width;
     const z = o.zFront + (1 - Math.cos(a)) * o.zSide;
     const y = o.yBase + (o.ybow === undefined ? 0 : (1 - Math.cos(a)) * o.ybow);
-    const l = o.len * (1 - taper * Math.abs(u));
+    const l = o.len * (1 - taper * Math.abs(u)) * (i % 2 === 0 ? 1 : 0.74);
     const g = spikeGeo(o.rad, l, 5);
     parts.push(xf(paint(g, MEGA.tooth),
       [x, y + l * 0.5 * dir, z],
@@ -1650,14 +1650,14 @@ function megalodonJawGeometry() {
 /* 머리 — 여덟 면의 각진 장갑 두상. 아래를 입천장 높이에서 잘라 평평한 바닥을 만든다 */
 function megalodonHeadGeometry() {
   const profile = [
-    [-3.62, 0.02], [-3.50, 0.30], [-3.30, 0.62], [-3.02, 0.88],
-    [-2.68, 0.99], [-2.28, 1.04], [-1.88, 1.05],
+    [-3.64, 0.02], [-3.52, 0.24], [-3.34, 0.54], [-3.08, 0.80],
+    [-2.74, 0.94], [-2.32, 1.00], [-1.88, 1.02],
   ];
-  const head = bodyGeometry(profile, { radial: 8, sx: 0.76, sy: 0.86 });
-  head.rotateY(Math.PI / 8);              // 각진 면이 위·옆을 향하도록
+  const head = bodyGeometry(profile, { radial: 14, sx: 0.74, sy: 0.84 });
+  head.rotateY(Math.PI / 14);             // 각진 면이 위·옆을 향하도록
   const p = head.attributes.position;
   for (let i = 0; i < p.count; i++) {
-    if (p.getY(i) < MEGA_MOUTH_Y) p.setY(i, MEGA_MOUTH_Y);
+    if (p.getY(i) < MEGA_MOUTH_Y - 0.04) p.setY(i, MEGA_MOUTH_Y - 0.04);
   }
   p.needsUpdate = true;
   head.computeVertexNormals();
@@ -1805,7 +1805,7 @@ export function makeMegalodon() {
   const mat = addRim(addSkin(new THREE.MeshPhongMaterial({
     vertexColors: true, shininess: 22, specular: 0x4a5a64,
     emissive: 0x0c1a24, emissiveIntensity: 1.0,
-  }), 0.62), 0xff5a24, 2.3, 0.6);
+  }), 0.62), 0xff6a2e, 3.2, 0.26);
 
   const body = new THREE.Mesh(megalodonBodyGeometry(), mat);
   g.add(body);
@@ -1847,7 +1847,7 @@ export function makeMegalodon() {
     halos.push(halo);
   }
   // 벌어진 아가리 안쪽에서 새어 나오는 붉은 빛
-  const mouthGlow = spriteGlow(0xff2c08, 3.0, 0.42);
+  const mouthGlow = spriteGlow(0xff2c08, 2.2, 0.30);
   mouthGlow.position.set(0, MEGA_MOUTH_Y - 0.36, -3.00);
   g.add(mouthGlow);
 
@@ -1859,8 +1859,8 @@ export function makeMegalodon() {
       body.rotation.z = Math.sin(t * 1.1) * 0.03;
       // 눈빛이 천천히 이글거린다
       const pulse = 0.5 + 0.5 * Math.sin(t * 3.1);
-      for (let i = 0; i < halos.length; i++) halos[i].material.opacity = 0.34 + 0.30 * pulse;
-      mouthGlow.material.opacity = 0.28 + 0.18 * Math.sin(t * 2.2 + 1.1);
+      for (let i = 0; i < halos.length; i++) halos[i].material.opacity = 0.26 + 0.24 * pulse;
+      mouthGlow.material.opacity = 0.20 + 0.12 * Math.sin(t * 2.2 + 1.1);
     },
   };
 }
