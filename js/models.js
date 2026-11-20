@@ -7,7 +7,7 @@
    ========================================================= */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getTextures } from './textures.js?v=20261120t';
+import { getTextures } from './textures.js?v=20261120u';
 
 /** 표면 텍스처(피부·금속) — 처음 필요할 때 한 번만 굽는다 */
 let _skinSet = null;
@@ -1700,7 +1700,7 @@ function paintMegaSkin(geo, profile) {
     const z = pos.getZ(i);
     const r = Math.max(radiusAt(profile, z), 1e-3);
     // 등·배 경계는 몸통 반지름을 따라가고, 살짝 물결져 단조롭지 않다
-    const ny = y / r + Math.sin(z * 1.6 + x * 2.3) * 0.085;
+    const ny = y / r + Math.sin(z * 1.15 + x * 1.9) * 0.15 + Math.sin(z * 2.9 + 1.3) * 0.05;
     const t = smoothstep(-0.34, 0.06, ny);                  // 0 = 배, 1 = 등
     c.copy(belly).lerp(bellyMid, 0.22 * (1 - Math.abs(2 * t - 1)));
     c.lerp(back, t);
@@ -1836,9 +1836,9 @@ function megalodonBodyGeometry() {
   /* ── 가슴지느러미 — 뒤로 길게 뻗은 큰 날개 ── */
   for (const s of [-1, 1]) {
     parts.push(xf(hfin([
-      [0, 0.74], [0.50, 0.48], [1.02, 0.14], [1.52, -0.26],
-      [1.80, -0.52], [1.34, -0.62], [0.86, -0.54], [0.36, -0.38], [0, -0.18],
-    ].map(([a, b]) => [a * s, b]), 0.10, MEGA.fin, { smooth: true, curveSegments: 12 }),
+      [0, 0.80], [0.52, 0.56], [1.06, 0.22], [1.58, -0.26],
+      [1.86, -0.54], [1.38, -0.66], [0.88, -0.58], [0.36, -0.40], [0, -0.18],
+    ].map(([a, b]) => [a * s, b]), 0.13, MEGA.fin, { smooth: true, curveSegments: 12 }),
       [0.10 * s, -radiusAt(profile, -1.70) * 0.54, -1.70], [0, -0.10 * s, -0.24 * s]));
   }
 
